@@ -1,0 +1,154 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&family=Outfit:wght@300;400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ivory:  #FDFAF4;
+  --ivory2: #F5F0E8;
+  --ivory3: #EDE5D6;
+  --ivory4: #E0D5C2;
+  --green:  #1C3D2E;
+  --green2: #2A5940;
+  --green3: #3D7A58;
+  --green4: #6AAF87;
+  --green5: #C2E0CE;
+  --green6: #EAF4EE;
+  --terra:  #C4582A;
+  --terra2: #E07040;
+  --terra3: #F5C4A8;
+  --terra4: #FDF0E8;
+  --ink:    #1A1208;
+  --ink2:   #4A3C28;
+  --ink3:   #8A7860;
+  --ink4:   #BFB49A;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+/* 🔥 Mobile typography boost */
+@media (max-width: 640px) {
+  html {
+    font-size: 17px;
+  }
+}
+
+body {
+  background: var(--ivory);
+  color: var(--ink);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 300;
+  line-height: 1.6; /* premium readability */
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--ivory3); }
+::-webkit-scrollbar-thumb { background: var(--green3); }
+
+/* Range input */
+input[type=range] {
+  -webkit-appearance: none;
+  height: 3px;
+  background: var(--ivory3);
+  border-radius: 2px;
+  outline: none;
+  width: 100%;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--green);
+  cursor: pointer;
+  box-shadow: 0 0 0 4px rgba(61,122,88,.15);
+}
+
+/* Animations */
+@keyframes marquee { to { transform: translateX(-50%); } }
+@keyframes scroll-left { to { transform: translateX(-50%); } }
+@keyframes bob {
+  0%, 100% { transform: translate(-50%,-50%) translateY(0); }
+  50% { transform: translate(-50%,-50%) translateY(-10px); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .4; transform: scale(.7); }
+}
+
+.animate-marquee { animation: marquee 22s linear infinite; }
+.animate-bob { animation: bob 5s ease-in-out infinite; }
+.animate-fade-up { animation: fadeUp .8s forwards; }
+.animate-pulse-dot { animation: pulse 2s infinite; }
+
+/* Fade in on scroll */
+.fade-in { opacity: 0; transform: translateY(18px); transition: opacity .65s, transform .65s; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+@layer components {
+
+  /* 🔥 Buttons upgraded for mobile readability */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 font-sans text-base sm:text-sm font-medium tracking-wide
+           px-8 py-3.5 bg-green text-ivory border-none cursor-pointer rounded-md
+           transition-all duration-300 whitespace-nowrap relative overflow-hidden;
+  }
+  .btn-primary:hover { @apply bg-green-2; }
+  .btn-primary:disabled { @apply opacity-50 cursor-not-allowed; }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center font-sans text-base sm:text-sm font-normal tracking-wide
+           px-8 py-3.5 bg-transparent text-green border border-green-3 cursor-pointer rounded-md
+           transition-all duration-300 whitespace-nowrap;
+  }
+  .btn-outline:hover { @apply bg-green-6; }
+
+  .btn-terra {
+    @apply inline-flex items-center justify-center font-sans text-base sm:text-sm font-medium tracking-wide
+           px-8 py-3.5 bg-terra text-white border-none cursor-pointer rounded-md
+           transition-all duration-300 whitespace-nowrap;
+  }
+  .btn-terra:hover { @apply bg-terra-2; }
+
+  .card {
+    @apply bg-white border border-ivory-3 rounded-mana overflow-hidden transition-all duration-300;
+  }
+  .card:hover { @apply -translate-y-1 shadow-medium border-green-5; }
+
+  .section {
+    @apply py-20 px-[5%];
+  }
+
+  /* 🔥 Eyebrow text improved */
+  .eyebrow {
+    @apply inline-flex items-center gap-2.5 text-sm sm:text-xs tracking-widest uppercase text-green-3 font-normal mb-2.5;
+  }
+  .eyebrow::before {
+    content: '';
+    @apply w-5 h-px bg-green-3 block;
+  }
+
+  /* 🔥 Section title responsive */
+  .section-title {
+    @apply font-serif text-2xl sm:text-3xl md:text-4xl font-light text-ink leading-tight tracking-tight;
+  }
+
+  /* 🔥 Input improved */
+  .input {
+    @apply w-full px-4 py-3 border border-ivory-3 rounded-md font-sans text-base sm:text-sm text-ink
+           bg-white outline-none transition-colors duration-200;
+  }
+  .input:focus { @apply border-green-3; }
+}
