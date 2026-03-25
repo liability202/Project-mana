@@ -1,6 +1,5 @@
 -- =============================================
 -- MANA DATABASE SCHEMA
--- Paste this into Supabase → SQL Editor → Run
 -- =============================================
 
 -- PRODUCTS
