@@ -85,6 +85,68 @@ create table if not exists kit_orders (
   created_at timestamptz default now()
 );
 
+-- USER PROFILES
+create table if not exists user_profiles (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid unique references auth.users(id),
+  phone text unique,
+  full_name text,
+  email text,
+  is_cashback_eligible boolean default false,
+  created_at timestamptz default now()
+);
+
+-- COUPONS / INFLUENCER CODES
+create table if not exists coupons (
+  id uuid default gen_random_uuid() primary key,
+  code text unique not null,
+  discount_type text not null check (discount_type in ('percentage','fixed')),
+  discount_value integer not null,
+  influencer_name text,
+  commission_rate numeric(5,2),
+  usage_count integer default 0,
+  total_orders integer default 0,
+  total_revenue bigint default 0,
+  total_discount_given bigint default 0,
+  is_active boolean default true,
+  created_at timestamptz default now()
+);
+
+-- WALLET
+create table if not exists wallet (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid unique references auth.users(id),
+  phone text unique,
+  balance bigint default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- WALLET TRANSACTIONS
+create table if not exists wallet_transactions (
+  id uuid default gen_random_uuid() primary key,
+  wallet_id uuid not null references wallet(id) on delete cascade,
+  user_id uuid references auth.users(id),
+  phone text,
+  order_id uuid references orders(id),
+  amount bigint not null,
+  type text not null check (type in ('credit','debit')),
+  reason text not null check (reason in ('cashback','usage','adjustment')),
+  description text,
+  created_at timestamptz default now()
+);
+
+alter table orders add column if not exists discount_amount integer default 0;
+alter table orders add column if not exists final_amount integer default 0;
+alter table orders add column if not exists cashback_earned integer default 0;
+alter table orders add column if not exists wallet_used integer default 0;
+
+create index if not exists idx_coupons_code on coupons(code);
+create index if not exists idx_wallet_phone on wallet(phone);
+create index if not exists idx_user_profiles_phone on user_profiles(phone);
+create index if not exists idx_wallet_transactions_wallet_id on wallet_transactions(wallet_id);
+create index if not exists idx_orders_coupon_code on orders(coupon_code);
+
 -- ── SAMPLE PRODUCTS (run this to populate your store) ──
 insert into products (name, slug, description, category, price, price_per_unit, tags, vendor, variants) values
 (
@@ -181,6 +243,10 @@ insert into products (name, slug, description, category, price, price_per_unit, 
 alter table products enable row level security;
 alter table orders enable row level security;
 alter table appointments enable row level security;
+alter table coupons enable row level security;
+alter table wallet enable row level security;
+alter table wallet_transactions enable row level security;
+alter table user_profiles enable row level security;
 
 -- Anyone can read products
 create policy "products_public_read" on products for select using (true);
@@ -194,3 +260,8 @@ create policy "orders_own_read" on orders for select
 
 -- Public can insert appointments
 create policy "appts_insert" on appointments for insert with check (true);
+
+create policy "coupons_public_read_active" on coupons for select using (is_active = true);
+create policy "wallet_own_read" on wallet for select using (auth.uid() = user_id or user_id is null);
+create policy "wallet_txn_own_read" on wallet_transactions for select using (auth.uid() = user_id or user_id is null);
+create policy "profiles_own_read" on user_profiles for select using (auth.uid() = user_id or user_id is null);
