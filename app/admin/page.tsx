@@ -172,7 +172,10 @@ export default function AdminPage() {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-serif text-xl text-ink">Products</h2>
-              <a href="/admin/product/new" className="btn-primary text-sm py-2 px-4 no-underline">+ Add Product</a>
+              <div className="flex gap-2">
+                <a href="/admin/kit/new" className="btn-outline text-sm py-2 px-4 no-underline">+ Add Kit</a>
+                <a href="/admin/product/new" className="btn-primary text-sm py-2 px-4 no-underline">+ Add Product</a>
+              </div>
             </div>
             <div className="bg-white border border-ivory-3 rounded-xl overflow-hidden">
               <table className="w-full text-sm">
