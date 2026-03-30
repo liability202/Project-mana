@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import {
-  calculateCouponDiscount,
   creditCashback,
   debitWallet,
   ensureUserProfile,
+  getAppliedCouponDiscount,
   getCouponByCode,
   getWalletSnapshot,
   normalizePhone,
+  validateCouponRules,
 } from '@/lib/commerce'
 import crypto from 'crypto'
 
@@ -44,7 +45,9 @@ export async function POST(req: Request) {
     if (body.coupon_code) {
       coupon = await getCouponByCode(supabaseAdmin, body.coupon_code)
       if (!coupon) return NextResponse.json({ error: 'Invalid or inactive coupon code.' }, { status: 400 })
-      discountAmount = calculateCouponDiscount(body.subtotal, coupon)
+      const ruleError = validateCouponRules(body.subtotal, coupon)
+      if (ruleError) return NextResponse.json({ error: ruleError }, { status: 400 })
+      discountAmount = getAppliedCouponDiscount(body.subtotal, coupon)
     }
 
     const walletSnapshot = await getWalletSnapshot(supabaseAdmin, {
@@ -168,6 +171,21 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   const auth = req.headers.get('authorization')
+  const { searchParams } = new URL(req.url)
+  const phone = normalizePhone(searchParams.get('phone') || '')
+
+  if (phone) {
+    const { data, error } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('customer_phone', phone)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(data)
+  }
+
   if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

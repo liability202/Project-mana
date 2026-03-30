@@ -50,10 +50,16 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxx
 SUPABASE_SERVICE_ROLE_KEY=eyJxxx
 RAZORPAY_KEY_ID=rzp_test_xxx
 RAZORPAY_KEY_SECRET=xxx
+RAZORPAY_WEBHOOK_SECRET=xxx
 NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_xxx
 NEXT_PUBLIC_WHATSAPP_NUMBER=919876543210   ← your number, no + or spaces
 NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD=999
 ADMIN_SECRET=pick-a-strong-password
+NEXT_PUBLIC_SITE_URL=https://your-site.vercel.app
+WHATSAPP_TOKEN=your_meta_whatsapp_token
+WHATSAPP_PHONE_NUMBER_ID=your_meta_phone_number_id
+WEBHOOK_VERIFY_TOKEN=choose-a-random-secret
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ---

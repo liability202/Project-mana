@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { calculateCouponDiscount, getCouponByCode } from '@/lib/commerce'
+import { getAppliedCouponDiscount, getCouponByCode, validateCouponRules } from '@/lib/commerce'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: Request) {
@@ -14,7 +14,10 @@ export async function POST(req: Request) {
     const coupon = await getCouponByCode(supabaseAdmin, code)
     if (!coupon) return NextResponse.json({ error: 'Invalid or inactive coupon code.' }, { status: 404 })
 
-    const discountAmount = calculateCouponDiscount(subtotal, coupon)
+    const ruleError = validateCouponRules(subtotal, coupon)
+    if (ruleError) return NextResponse.json({ error: ruleError }, { status: 400 })
+
+    const discountAmount = getAppliedCouponDiscount(subtotal, coupon)
     return NextResponse.json({
       valid: true,
       coupon,

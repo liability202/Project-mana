@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
+import type { Order } from '@/lib/supabase'
 
 type Transaction = {
   id: string
@@ -14,37 +15,62 @@ type Transaction = {
 
 export default function AccountPage() {
   const [phone, setPhone] = useState('')
+  const [instagramHandle, setInstagramHandle] = useState('')
   const [entered, setEntered] = useState(false)
   const [balance, setBalance] = useState(0)
   const [eligible, setEligible] = useState(false)
+  const [requestStatus, setRequestStatus] = useState<'none' | 'requested' | 'approved'>('none')
   const [txns, setTxns] = useState<Transaction[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
 
   const lookup = async () => {
     const clean = phone.replace(/\D/g, '')
     if (clean.length < 10) { showToast('Enter a valid 10-digit number'); return }
     setLoading(true)
-    const res = await fetch(`/api/wallet?phone=${clean}`)
-    const data = await res.json()
-    setBalance(data.balance || 0)
-    setEligible(Boolean(data.is_cashback_eligible))
-    setTxns(data.transactions || [])
+    const [walletRes, orderRes] = await Promise.all([
+      fetch(`/api/wallet?phone=${clean}`),
+      fetch(`/api/orders?phone=${clean}`),
+    ])
+    const [walletData, orderData] = await Promise.all([walletRes.json(), orderRes.json()])
+    setBalance(walletData.balance || 0)
+    setEligible(Boolean(walletData.is_cashback_eligible))
+    setRequestStatus(walletData.profile?.cashback_request_status || 'none')
+    setInstagramHandle(walletData.profile?.instagram_handle || '')
+    setTxns(walletData.transactions || [])
+    setOrders(Array.isArray(orderData) ? orderData : [])
     setEntered(true)
     setLoading(false)
   }
 
+  const requestCashback = async () => {
+    const clean = phone.replace(/\D/g, '')
+    const res = await fetch('/api/wallet/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: clean, instagram_handle: instagramHandle }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      showToast(data?.error || 'Could not submit request')
+      return
+    }
+    setRequestStatus('requested')
+    showToast('Cashback request submitted')
+  }
+
   return (
-    <div className="px-[5%] py-10 max-w-[800px] mx-auto">
+    <div className="px-[5%] py-10 max-w-[980px] mx-auto">
       <div className="eyebrow">My Account</div>
       <h1 className="font-serif text-3xl font-light text-ink mb-8">
-        Wallet & <em className="not-italic text-green">Cashback</em>
+        Wallet, Orders & <em className="not-italic text-green">Cashback</em>
       </h1>
 
       {!entered ? (
         <div className="bg-white border border-ivory-3 rounded-xl p-8 shadow-soft max-w-md">
           <div className="text-2xl mb-4">📱</div>
           <h2 className="font-serif text-xl text-ink mb-1">Enter your WhatsApp number</h2>
-          <p className="text-sm text-ink-3 mb-5">We use your phone number to find your wallet, cashback eligibility, and transaction history.</p>
+          <p className="text-sm text-ink-3 mb-5">Track your wallet, cashback status, and order history using the same number you used at checkout.</p>
           <input
             type="tel"
             value={phone}
@@ -54,7 +80,7 @@ export default function AccountPage() {
             className="input mb-4"
           />
           <button onClick={lookup} disabled={loading} className="btn-primary w-full justify-center disabled:opacity-50">
-            <span>{loading ? 'Looking up...' : 'View My Wallet'}</span>
+            <span>{loading ? 'Loading...' : 'Open My Account'}</span>
           </button>
         </div>
       ) : (
@@ -67,59 +93,82 @@ export default function AccountPage() {
             </div>
             <div className="text-center">
               <div className="text-xs tracking-widest uppercase text-green-4 mb-2">Cashback Status</div>
-              <div className="font-serif text-2xl text-green-4">{eligible ? 'Eligible' : 'Not Eligible'}</div>
+              <div className="font-serif text-2xl text-green-4">
+                {eligible ? 'Eligible' : requestStatus === 'requested' ? 'Requested' : 'Not Eligible'}
+              </div>
               <div className="text-xs text-green-4 mt-1">5% cashback after delivery</div>
             </div>
             <div className="text-center flex flex-col items-center justify-center">
               <a href="/checkout" className="btn-primary no-underline text-sm py-2.5 px-6">
                 <span>Use Cashback →</span>
               </a>
-              <p className="text-xs text-green-4 mt-2">Apply your wallet balance at checkout</p>
+              <p className="text-xs text-green-4 mt-2">Wallet balance can be used on the next order</p>
             </div>
           </div>
 
-          <div className="bg-green-6 border border-green-5 rounded-xl p-5">
-            <div className="font-serif text-base text-ink mb-3">How cashback works</div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                ['🛍', 'Place an order', 'Apply a coupon and complete checkout normally'],
-                ['📦', 'Order gets delivered', 'Cashback is released only after status changes to delivered'],
-                ['💰', 'Use wallet later', 'Use available cashback on the next order'],
-              ].map(([ico, t, d]) => (
-                <div key={t} className="flex gap-3">
-                  <span className="text-xl flex-shrink-0">{ico}</span>
-                  <div>
-                    <div className="text-sm font-medium text-ink">{t}</div>
-                    <div className="text-xs text-ink-3 mt-0.5">{d}</div>
-                  </div>
-                </div>
-              ))}
+          {!eligible && (
+            <div className="bg-white border border-ivory-3 rounded-xl p-5">
+              <div className="font-serif text-lg text-ink mb-2">Unlock cashback</div>
+              <p className="text-sm text-ink-3 mb-4">
+                Follow the brand on Instagram or complete the required action, then submit your handle here for approval.
+              </p>
+              <div className="flex gap-3 flex-wrap">
+                <input
+                  value={instagramHandle}
+                  onChange={e => setInstagramHandle(e.target.value)}
+                  placeholder="@yourhandle"
+                  className="input max-w-[280px]"
+                />
+                <button onClick={requestCashback} disabled={requestStatus === 'requested'} className="btn-primary">
+                  <span>{requestStatus === 'requested' ? 'Request Sent' : 'Request Cashback Access'}</span>
+                </button>
+              </div>
             </div>
+          )}
+
+          <div className="bg-white border border-ivory-3 rounded-xl overflow-hidden shadow-soft">
+            <div className="px-5 py-4 border-b border-ivory-3">
+              <div className="font-serif text-lg text-ink">Order Tracking</div>
+            </div>
+            {orders.length === 0 ? (
+              <div className="text-center py-10 text-ink-3 text-sm">No orders found for this number yet.</div>
+            ) : (
+              <div className="divide-y divide-ivory-3">
+                {orders.map(order => (
+                  <div key={order.id} className="px-5 py-4 flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                      <div className="text-sm font-medium text-ink">#{order.id.slice(0, 8).toUpperCase()}</div>
+                      <div className="text-xs text-ink-4 mt-1">
+                        {new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                      <div className="text-xs text-ink-4 mt-1">{Array.isArray(order.items) ? order.items.length : 0} items</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-serif text-lg text-green">{formatPrice(order.final_amount || order.total)}</div>
+                      <div className="text-xs text-ink-3 mt-1 capitalize">{order.status}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="bg-white border border-ivory-3 rounded-xl overflow-hidden shadow-soft">
             <div className="px-5 py-4 border-b border-ivory-3">
-              <div className="font-serif text-lg text-ink">Transaction History</div>
+              <div className="font-serif text-lg text-ink">Wallet Transaction History</div>
             </div>
             {txns.length === 0 ? (
-              <div className="text-center py-10 text-ink-3 text-sm">
-                No transactions yet. Place your first order to earn cashback.
-              </div>
+              <div className="text-center py-10 text-ink-3 text-sm">No wallet transactions yet.</div>
             ) : (
               <div className="divide-y divide-ivory-3">
                 {txns.map(t => {
                   const isCredit = t.type === 'credit'
                   return (
                     <div key={t.id} className="flex items-center justify-between px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm ${isCredit ? 'bg-green-6' : 'bg-terra-4'}`}>
-                          {t.reason === 'cashback' ? '💰' : t.reason === 'usage' ? '🛒' : '✦'}
-                        </div>
-                        <div>
-                          <div className="text-sm text-ink">{t.description || t.reason}</div>
-                          <div className="text-xs text-ink-4 mt-0.5">
-                            {new Date(t.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </div>
+                      <div>
+                        <div className="text-sm text-ink">{t.description || t.reason}</div>
+                        <div className="text-xs text-ink-4 mt-0.5">
+                          {new Date(t.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </div>
                       </div>
                       <div className={`font-serif text-base ${isCredit ? 'text-green' : 'text-terra'}`}>

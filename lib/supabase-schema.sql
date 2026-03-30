@@ -24,6 +24,7 @@ create table if not exists products (
 create table if not exists orders (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references auth.users(id),
+  order_ref text unique,
   customer_name text not null,
   customer_phone text not null,
   customer_email text,
@@ -43,8 +44,18 @@ create table if not exists orders (
     check (payment_status in ('pending','paid','failed','refunded')),
   payment_id text,
   razorpay_order_id text,
+  razorpay_link text,
   notes text,
   created_at timestamptz default now()
+);
+
+-- WHATSAPP SESSIONS
+create table if not exists wa_sessions (
+  phone text primary key,
+  state text default 'GREETING',
+  lang text default 'English',
+  cart jsonb default '{}'::jsonb,
+  updated_at timestamptz default now()
 );
 
 -- APPOINTMENTS (Video calls)
@@ -93,6 +104,9 @@ create table if not exists user_profiles (
   full_name text,
   email text,
   is_cashback_eligible boolean default false,
+  instagram_handle text,
+  cashback_request_status text default 'none'
+    check (cashback_request_status in ('none','requested','approved')),
   created_at timestamptz default now()
 );
 
@@ -104,6 +118,9 @@ create table if not exists coupons (
   discount_value integer not null,
   influencer_name text,
   commission_rate numeric(5,2),
+  min_order_amount integer default 0,
+  max_discount integer,
+  usage_limit integer,
   usage_count integer default 0,
   total_orders integer default 0,
   total_revenue bigint default 0,
@@ -140,12 +157,17 @@ alter table orders add column if not exists discount_amount integer default 0;
 alter table orders add column if not exists final_amount integer default 0;
 alter table orders add column if not exists cashback_earned integer default 0;
 alter table orders add column if not exists wallet_used integer default 0;
+alter table orders add column if not exists order_ref text unique;
+alter table orders add column if not exists razorpay_link text;
 
 create index if not exists idx_coupons_code on coupons(code);
 create index if not exists idx_wallet_phone on wallet(phone);
 create index if not exists idx_user_profiles_phone on user_profiles(phone);
 create index if not exists idx_wallet_transactions_wallet_id on wallet_transactions(wallet_id);
 create index if not exists idx_orders_coupon_code on orders(coupon_code);
+create index if not exists idx_orders_order_ref on orders(order_ref);
+create index if not exists idx_orders_customer_phone on orders(customer_phone);
+create index if not exists idx_wa_sessions_updated_at on wa_sessions(updated_at);
 
 -- ── SAMPLE PRODUCTS (run this to populate your store) ──
 insert into products (name, slug, description, category, price, price_per_unit, tags, vendor, variants) values
@@ -247,6 +269,7 @@ alter table coupons enable row level security;
 alter table wallet enable row level security;
 alter table wallet_transactions enable row level security;
 alter table user_profiles enable row level security;
+alter table wa_sessions enable row level security;
 
 -- Anyone can read products
 create policy "products_public_read" on products for select using (true);
@@ -265,3 +288,4 @@ create policy "coupons_public_read_active" on coupons for select using (is_activ
 create policy "wallet_own_read" on wallet for select using (auth.uid() = user_id or user_id is null);
 create policy "wallet_txn_own_read" on wallet_transactions for select using (auth.uid() = user_id or user_id is null);
 create policy "profiles_own_read" on user_profiles for select using (auth.uid() = user_id or user_id is null);
+create policy "wa_sessions_service_role_all" on wa_sessions for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');

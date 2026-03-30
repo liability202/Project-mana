@@ -3,8 +3,17 @@ import { useEffect, useState } from 'react'
 import { formatPrice } from '@/lib/utils'
 import type { Coupon, Order, Product } from '@/lib/supabase'
 
-type AdminTab = 'orders' | 'products' | 'coupons'
+type AdminTab = 'orders' | 'products' | 'coupons' | 'customers'
 type OrderFilter = 'all' | 'pending' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled'
+type CustomerSnapshot = {
+  balance: number
+  is_cashback_eligible: boolean
+  profile?: {
+    phone?: string
+    instagram_handle?: string | null
+    cashback_request_status?: 'none' | 'requested' | 'approved'
+  }
+}
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -51,9 +60,15 @@ export default function AdminPage() {
     discount_value: '',
     influencer_name: '',
     commission_rate: '',
+    min_order_amount: '',
+    max_discount: '',
+    usage_limit: '',
     is_active: true,
   })
   const [couponMessage, setCouponMessage] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [customerData, setCustomerData] = useState<CustomerSnapshot | null>(null)
+  const [customerMessage, setCustomerMessage] = useState('')
 
   const login = () => {
     if (password === process.env.NEXT_PUBLIC_ADMIN_HINT || password.length > 6) {
@@ -117,6 +132,9 @@ export default function AdminPage() {
         discount_value: Number(couponForm.discount_value || 0),
         influencer_name: couponForm.influencer_name || null,
         commission_rate: couponForm.commission_rate ? Number(couponForm.commission_rate) : null,
+        min_order_amount: couponForm.min_order_amount ? Math.round(Number(couponForm.min_order_amount) * 100) : 0,
+        max_discount: couponForm.max_discount ? Math.round(Number(couponForm.max_discount) * 100) : null,
+        usage_limit: couponForm.usage_limit ? Number(couponForm.usage_limit) : null,
         is_active: couponForm.is_active,
       }),
     })
@@ -134,9 +152,52 @@ export default function AdminPage() {
       discount_value: '',
       influencer_name: '',
       commission_rate: '',
+      min_order_amount: '',
+      max_discount: '',
+      usage_limit: '',
       is_active: true,
     })
     setCouponMessage('Coupon created successfully.')
+  }
+
+  const lookupCustomer = async () => {
+    const phone = customerPhone.replace(/\D/g, '')
+    if (phone.length < 10) {
+      setCustomerMessage('Enter a valid phone number.')
+      return
+    }
+    const data = await fetch(`/api/wallet?phone=${phone}`).then(res => res.json())
+    setCustomerData(data)
+    setCustomerMessage('')
+  }
+
+  const updateCustomerEligibility = async (eligible: boolean) => {
+    const phone = customerPhone.replace(/\D/g, '')
+    const secret = localStorage.getItem('mana_admin') || ''
+    const res = await fetch('/api/wallet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', authorization: `Bearer ${secret}` },
+      body: JSON.stringify({
+        phone,
+        is_cashback_eligible: eligible,
+        instagram_handle: customerData?.profile?.instagram_handle || null,
+        cashback_request_status: eligible ? 'approved' : 'none',
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      setCustomerMessage(data?.error || 'Could not update cashback eligibility.')
+      return
+    }
+    setCustomerData(prev => prev ? {
+      ...prev,
+      is_cashback_eligible: eligible,
+      profile: {
+        ...prev.profile,
+        cashback_request_status: eligible ? 'approved' : 'none',
+      },
+    } : prev)
+    setCustomerMessage(`Cashback ${eligible ? 'approved' : 'removed'} for this customer.`)
   }
 
   if (!auth) {
@@ -171,6 +232,7 @@ export default function AdminPage() {
           <button onClick={() => setTab('orders')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'orders' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Orders</button>
           <button onClick={() => setTab('products')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'products' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Products</button>
           <button onClick={() => setTab('coupons')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'coupons' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Coupons</button>
+          <button onClick={() => setTab('customers')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'customers' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Customers</button>
           <button onClick={() => { localStorage.removeItem('mana_admin'); setAuth(false) }} className="text-xs text-green-4 hover:text-ivory transition-colors">Logout</button>
         </div>
       </div>
@@ -316,6 +378,7 @@ export default function AdminPage() {
                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Category</th>
                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Price</th>
                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Stock</th>
+                    <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ivory-3">
@@ -332,13 +395,16 @@ export default function AdminPage() {
                           {product.in_stock ? 'In Stock' : 'Out of Stock'}
                         </span>
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        <a href={`/admin/product/${product.id}`} className="text-xs text-green-3 hover:text-green no-underline">Edit</a>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
-        ) : (
+        ) : tab === 'coupons' ? (
           <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
             <form onSubmit={createCoupon} className="bg-white border border-ivory-3 rounded-xl p-5">
               <h2 className="font-serif text-xl text-ink mb-4">Create Coupon</h2>
@@ -367,6 +433,18 @@ export default function AdminPage() {
                 <div>
                   <label className="text-xs text-ink-3 block mb-1.5">Commission Rate (%)</label>
                   <input value={couponForm.commission_rate} onChange={e => setCouponForm(prev => ({ ...prev, commission_rate: e.target.value }))} className="input" inputMode="decimal" placeholder="10" />
+                </div>
+                <div>
+                  <label className="text-xs text-ink-3 block mb-1.5">Minimum Order (₹)</label>
+                  <input value={couponForm.min_order_amount} onChange={e => setCouponForm(prev => ({ ...prev, min_order_amount: e.target.value }))} className="input" inputMode="decimal" placeholder="500" />
+                </div>
+                <div>
+                  <label className="text-xs text-ink-3 block mb-1.5">Max Discount (₹)</label>
+                  <input value={couponForm.max_discount} onChange={e => setCouponForm(prev => ({ ...prev, max_discount: e.target.value }))} className="input" inputMode="decimal" placeholder="250" />
+                </div>
+                <div>
+                  <label className="text-xs text-ink-3 block mb-1.5">Usage Limit</label>
+                  <input value={couponForm.usage_limit} onChange={e => setCouponForm(prev => ({ ...prev, usage_limit: e.target.value }))} className="input" inputMode="numeric" placeholder="100" />
                 </div>
                 <label className="flex items-center gap-3 text-sm text-ink cursor-pointer">
                   <input type="checkbox" checked={couponForm.is_active} onChange={e => setCouponForm(prev => ({ ...prev, is_active: e.target.checked }))} className="h-4 w-4 accent-[var(--green)]" />
@@ -403,6 +481,13 @@ export default function AdminPage() {
                         </td>
                         <td className="px-4 py-3 text-ink-3">
                           {coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : formatPrice(coupon.discount_value)}
+                          {(coupon.min_order_amount || coupon.max_discount || coupon.usage_limit) ? (
+                            <div className="text-xs text-ink-4 mt-1">
+                              {coupon.min_order_amount ? `Min ${formatPrice(coupon.min_order_amount)}` : 'No min'}
+                              {coupon.max_discount ? ` · Max ${formatPrice(coupon.max_discount)}` : ''}
+                              {coupon.usage_limit ? ` · Limit ${coupon.usage_limit}` : ''}
+                            </div>
+                          ) : null}
                         </td>
                         <td className="px-4 py-3 text-ink-3">{coupon.influencer_name || '-'}</td>
                         <td className="px-4 py-3 text-ink-3">{coupon.total_orders || coupon.usage_count || 0}</td>
@@ -423,6 +508,48 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
+            <div className="bg-white border border-ivory-3 rounded-xl p-5">
+              <h2 className="font-serif text-xl text-ink mb-4">Cashback Eligibility</h2>
+              <div className="space-y-4">
+                <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="input" placeholder="Customer phone number" />
+                <button onClick={lookupCustomer} className="btn-primary w-full justify-center">Lookup Customer</button>
+                {customerMessage && <div className="text-sm text-ink-3">{customerMessage}</div>}
+              </div>
+            </div>
+            <div className="bg-white border border-ivory-3 rounded-xl p-5">
+              <h2 className="font-serif text-xl text-ink mb-4">Customer Snapshot</h2>
+              {!customerData ? (
+                <div className="text-sm text-ink-3">Lookup a customer to view cashback status and wallet details.</div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="rounded-lg bg-ivory-2 p-3">
+                      <div className="text-xs text-ink-4 mb-1">Wallet Balance</div>
+                      <div className="font-medium text-ink">{formatPrice(customerData.balance || 0)}</div>
+                    </div>
+                    <div className="rounded-lg bg-ivory-2 p-3">
+                      <div className="text-xs text-ink-4 mb-1">Eligibility</div>
+                      <div className="font-medium text-ink">{customerData.is_cashback_eligible ? 'Eligible' : 'Not eligible'}</div>
+                    </div>
+                    <div className="rounded-lg bg-ivory-2 p-3">
+                      <div className="text-xs text-ink-4 mb-1">Request Status</div>
+                      <div className="font-medium text-ink capitalize">{customerData.profile?.cashback_request_status || 'none'}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-ivory-2 p-3">
+                    <div className="text-xs text-ink-4 mb-1">Instagram Handle</div>
+                    <div className="font-medium text-ink">{customerData.profile?.instagram_handle || 'Not provided'}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => updateCustomerEligibility(true)} className="btn-primary">Approve Cashback</button>
+                    <button onClick={() => updateCustomerEligibility(false)} className="btn-outline">Remove Eligibility</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

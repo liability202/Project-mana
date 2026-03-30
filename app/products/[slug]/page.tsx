@@ -32,9 +32,14 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
       })
   }, [params.slug])
 
+  useEffect(() => {
+    setActiveImg(0)
+  }, [activeVar?.id])
+
   if (loading) return <ProductSkeleton />
   if (!product) return <div className="section text-center text-ink-3">Product not found. <Link href="/products">Browse all products →</Link></div>
 
+  const galleryImages = activeVar?.images?.length ? activeVar.images : product.images
   const basePrice = activeVar?.price || product.price
   const livePrice = Math.round((basePrice / 500) * grams)
   const sliderMax = unit === 'kg' ? 20 : 2000
@@ -47,7 +52,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
     addItem({
       product_id: product.id,
       product_name: product.name,
-      product_image: product.images?.[0] || '',
+      product_image: galleryImages?.[0] || '',
       variant_id: activeVar?.id,
       variant_name: activeVar?.name,
       weight_grams: grams,
@@ -84,15 +89,15 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
         {/* Gallery */}
         <div className="lg:sticky lg:top-20">
           <div className="rounded-xl overflow-hidden border border-ivory-3 bg-ivory-2 mb-3 shadow-soft">
-            {product.images?.[activeImg] ? (
-              <Image src={product.images[activeImg]} alt={product.name} width={700} height={700} className="object-cover w-full aspect-square" priority />
+            {galleryImages?.[activeImg] ? (
+              <Image src={galleryImages[activeImg]} alt={product.name} width={700} height={700} className="object-cover w-full aspect-square" priority />
             ) : (
               <div className="w-full aspect-square bg-ivory-2 flex items-center justify-center text-ink-4">No image</div>
             )}
           </div>
-          {product.images && product.images.length > 1 && (
+          {galleryImages && galleryImages.length > 1 && (
             <div className="flex gap-2.5">
-              {product.images.map((img, i) => (
+              {galleryImages.map((img, i) => (
                 <button
                   key={i}
                   onClick={() => setActiveImg(i)}

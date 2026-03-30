@@ -7,8 +7,14 @@ export async function GET(req: Request) {
   const tag = searchParams.get('tag')
   const q = searchParams.get('q')
   const limit = parseInt(searchParams.get('limit') || '24')
+  const id = searchParams.get('id')
+  const includeAll = searchParams.get('include_all') === '1'
+  const auth = req.headers.get('authorization')
+  const isAdmin = auth === `Bearer ${process.env.ADMIN_SECRET}`
 
-  let query = supabase.from('products').select('*').eq('in_stock', true)
+  let query = supabase.from('products').select('*')
+  if (!(includeAll && isAdmin)) query = query.eq('in_stock', true)
+  if (id) query = query.eq('id', id)
   if (category) query = query.eq('category', category)
   if (tag) query = query.contains('tags', [tag])
   if (q) query = query.ilike('name', `%${q}%`)

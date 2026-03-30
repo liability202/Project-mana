@@ -9,6 +9,9 @@ export type CouponRecord = {
   discount_value: number
   influencer_name?: string | null
   commission_rate?: number | null
+  min_order_amount?: number | null
+  max_discount?: number | null
+  usage_limit?: number | null
   usage_count: number
   total_orders: number
   total_revenue: number
@@ -48,6 +51,23 @@ export function normalizePhone(phone: string) {
 export function calculateCouponDiscount(subtotal: number, coupon: Pick<CouponRecord, 'discount_type' | 'discount_value'>) {
   if (coupon.discount_type === 'fixed') return Math.min(subtotal, coupon.discount_value)
   return Math.min(subtotal, Math.round((subtotal * coupon.discount_value) / 100))
+}
+
+export function validateCouponRules(subtotal: number, coupon: CouponRecord) {
+  if (!coupon.is_active) return 'Coupon is inactive.'
+  if ((coupon.usage_limit || 0) > 0 && coupon.usage_count >= (coupon.usage_limit || 0)) {
+    return 'Coupon usage limit has been reached.'
+  }
+  if ((coupon.min_order_amount || 0) > subtotal) {
+    return `Minimum order amount is ${coupon.min_order_amount}.`
+  }
+  return null
+}
+
+export function getAppliedCouponDiscount(subtotal: number, coupon: CouponRecord) {
+  const raw = calculateCouponDiscount(subtotal, coupon)
+  if (coupon.max_discount && coupon.max_discount > 0) return Math.min(raw, coupon.max_discount)
+  return raw
 }
 
 export async function getCouponByCode(client: SupabaseClient, code: string) {

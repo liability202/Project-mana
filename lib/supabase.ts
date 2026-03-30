@@ -18,6 +18,7 @@ export type Order = {
   customer_email?: string; address: string; city: string
   state?: string; pincode: string; items: any[]
   subtotal: number; discount: number; shipping: number; total: number
+  order_ref?: string; razorpay_link?: string
   coupon_code?: string; discount_amount?: number; final_amount?: number
   wallet_used?: number; cashback_earned?: number
   status: string; payment_status: string
@@ -27,6 +28,8 @@ export type Order = {
 export type Variant = {
   id: string; name: string; description?: string
   price: number; quality_tag?: 'best' | 'popular' | 'basic'
+  images?: string[]
+  items?: any[]
 }
 export type CartItem = {
   product_id: string; product_name: string; product_image: string
@@ -40,6 +43,9 @@ export type Coupon = {
   discount_value: number
   influencer_name?: string | null
   commission_rate?: number | null
+  min_order_amount?: number | null
+  max_discount?: number | null
+  usage_limit?: number | null
   usage_count: number
   total_orders: number
   total_revenue: number
@@ -74,5 +80,7 @@ export type UserProfile = {
   full_name?: string | null
   email?: string | null
   is_cashback_eligible: boolean
+  instagram_handle?: string | null
+  cashback_request_status?: 'none' | 'requested' | 'approved'
   created_at: string
 }

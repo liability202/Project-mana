@@ -46,6 +46,8 @@ export async function POST(req: Request) {
         full_name: body.full_name || null,
         email: body.email || null,
         is_cashback_eligible: Boolean(body.is_cashback_eligible),
+        instagram_handle: body.instagram_handle || null,
+        cashback_request_status: body.cashback_request_status || (body.is_cashback_eligible ? 'approved' : 'none'),
       }, { onConflict: body.user_id ? 'user_id' : 'phone' })
       .select('*')
       .single()

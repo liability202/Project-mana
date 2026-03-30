@@ -30,6 +30,9 @@ export async function POST(req: Request) {
       discount_value: Number(body.discount_value || 0),
       influencer_name: body.influencer_name || null,
       commission_rate: body.commission_rate ? Number(body.commission_rate) : null,
+      min_order_amount: body.min_order_amount ? Number(body.min_order_amount) : 0,
+      max_discount: body.max_discount ? Number(body.max_discount) : null,
+      usage_limit: body.usage_limit ? Number(body.usage_limit) : null,
       is_active: body.is_active ?? true,
     }
 
