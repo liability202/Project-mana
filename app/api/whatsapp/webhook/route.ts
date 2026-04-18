@@ -29,6 +29,9 @@ export async function POST(req: NextRequest) {
     const phone = message.from || ''
     const msgType = message.type
     let userInput = message.text?.body || ''
+    let imageInfo: { mediaId: string; mimeType?: string; caption?: string } | undefined
+    let locationInfo: { latitude?: number; longitude?: number; addressText?: string } | undefined
+    let audioInfo: { mediaId: string; mimeType?: string } | undefined
 
     if (msgType === 'interactive') {
       userInput =
@@ -41,9 +44,45 @@ export async function POST(req: NextRequest) {
       userInput = message.button?.payload || userInput
     }
 
-    handleIncomingMessage(phone, userInput).catch((error) => {
+    if (msgType === 'image') {
+      imageInfo = {
+        mediaId: message.image?.id || '',
+        mimeType: message.image?.mime_type,
+        caption: message.image?.caption,
+      }
+      userInput = message.image?.caption || '__IMAGE_RECEIVED__'
+    }
+
+    if (msgType === 'location') {
+      const lat = message.location?.latitude
+      const lng = message.location?.longitude
+      const name = message.location?.name
+      const address = message.location?.address
+      locationInfo = {
+        latitude: lat,
+        longitude: lng,
+        addressText: [name, address, lat && lng ? `${lat}, ${lng}` : ''].filter(Boolean).join(', '),
+      }
+      userInput = locationInfo.addressText || '__LOCATION_RECEIVED__'
+    }
+
+    if (msgType === 'audio') {
+      audioInfo = {
+        mediaId: message.audio?.id || '',
+        mimeType: message.audio?.mime_type,
+      }
+      userInput = '__AUDIO_RECEIVED__'
+    }
+
+    console.log('PHONE:', phone)
+    console.log('MESSAGE:', userInput)
+    if (imageInfo) console.log('IMAGE:', imageInfo.mediaId)
+
+    try {
+      await handleIncomingMessage(phone, userInput, { imageInfo, locationInfo, audioInfo })
+    } catch (error) {
       console.error('WhatsApp bot handler error:', error)
-    })
+    }
 
     return NextResponse.json({ status: 'ok' })
   } catch (error) {

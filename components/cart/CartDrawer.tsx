@@ -144,11 +144,25 @@ export function CartDrawer() {
                   : formatPrice(shipping)}
               </span>
             </div>
-            {shipping > 0 && (
-              <div className="bg-green-6 border border-green-5 rounded px-3 py-2 text-xs text-green-2 text-center mb-3">
-                Add {formatPrice(FREE_SHIPPING_THRESHOLD - subtotal)} more for free shipping 🚚
-              </div>
-            )}
+            <div className="mb-4 mt-2">
+              {subtotal >= FREE_SHIPPING_THRESHOLD ? (
+                <div className="bg-green-6 border border-green-4 rounded-lg px-3 py-2 text-center">
+                  <div className="text-xs font-bold text-green-2 tracking-wide">🎉 You've unlocked Free Shipping!</div>
+                </div>
+              ) : (
+                <div className="bg-ivory-2 border border-ivory-3 rounded-lg p-3">
+                  <div className="text-xs font-medium text-ink-3 text-center mb-2">
+                    Add <span className="text-green font-bold">{formatPrice(FREE_SHIPPING_THRESHOLD - subtotal)}</span> more for <span className="text-green font-bold">Free Shipping</span>! 🚚
+                  </div>
+                  <div className="h-1.5 w-full bg-ivory-3 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-green transition-all duration-700 ease-out"
+                      style={{ width: `${Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="flex justify-between mb-4 pt-2 border-t border-ivory-3">
               <span className="font-medium text-ink">Total</span>
               <span className="font-serif text-xl text-green">{formatPrice(orderTotal)}</span>

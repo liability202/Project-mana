@@ -23,8 +23,10 @@ type CouponState = {
   valid: boolean
 }
 
+type CustomerType = 'new' | 'returning' | null
+
 export default function CheckoutPage() {
-  const { items, total, clearCart } = useCart()
+  const { items, total, clearCart, hydrated } = useCart()
   const [form, setForm] = useState<FormData>({ name: '', phone: '', email: '', address: '', city: '', state: '', pincode: '' })
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'details' | 'success'>('details')
@@ -36,15 +38,25 @@ export default function CheckoutPage() {
   const [walletEligible, setWalletEligible] = useState(false)
   const [walletLoading, setWalletLoading] = useState(false)
   const [useCashback, setUseCashback] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpStatus, setOtpStatus] = useState<'unverified' | 'code-sent' | 'verified'>('unverified')
+  const [otpLoading, setOtpLoading] = useState(false)
+  const [verifiedPhone, setVerifiedPhone] = useState('')
+  const [verifiedUserId, setVerifiedUserId] = useState<string | null>(null)
+  const [customerType, setCustomerType] = useState<CustomerType>(null)
+  const [otpHint, setOtpHint] = useState('')
 
-  const subtotal = total()
+  const cartItems = hydrated ? items : []
+  const subtotal = hydrated ? total() : 0
   const shipping = shippingCost(subtotal)
   const discount = couponState.discountAmount
   const walletApplied = useCashback ? Math.min(walletBalance, Math.max(0, subtotal - discount)) : 0
   const orderTotal = Math.max(0, subtotal + shipping - discount - walletApplied)
-  const cashbackPreview = walletEligible ? Math.round((orderTotal * 5) / 100) : 0
+  const cashbackPreview = Math.round((orderTotal * 5) / 100)
 
   const normalizedPhone = useMemo(() => form.phone.replace(/\D/g, ''), [form.phone])
+  const isPhoneVerified = otpStatus === 'verified' && verifiedPhone === normalizedPhone
+  const loyaltyAutoApplied = customerType === 'returning' && couponState.code === 'LOYAL12' && couponState.valid
 
   useEffect(() => {
     if (normalizedPhone.length < 10) {
@@ -77,13 +89,166 @@ export default function CheckoutPage() {
     }
   }, [normalizedPhone])
 
+  useEffect(() => {
+    if (!verifiedPhone) return
+    if (normalizedPhone === verifiedPhone) return
+
+    setOtpStatus('unverified')
+    setOtpCode('')
+    setVerifiedPhone('')
+    setVerifiedUserId(null)
+    setCustomerType(null)
+    setOtpHint('')
+    setCouponInput('')
+    setCouponState({ code: '', discountAmount: 0, valid: false })
+  }, [normalizedPhone, verifiedPhone])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const applyCouponCode = async (code: string) => {
+    const normalizedCode = code.trim().toUpperCase()
+    if (!normalizedCode) {
+      showToast('Enter a coupon code')
+      return false
+    }
+
+    setCouponLoading(true)
+    try {
+      const res = await fetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: normalizedCode, subtotal, phone: normalizedPhone }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Invalid coupon')
+
+      setCouponInput(data.coupon.code)
+      setCouponState({
+        code: data.coupon.code,
+        discountAmount: data.discount_amount || 0,
+        valid: true,
+      })
+      if (data.customer_type) setCustomerType(data.customer_type)
+      showToast(`Coupon ${data.coupon.code} applied`)
+      return true
+    } catch (err: any) {
+      setCouponState({ code: '', discountAmount: 0, valid: false })
+      showToast(err.message || 'Invalid coupon')
+      return false
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  const fetchCustomerType = async () => {
+    const res = await fetch(`/api/orders?phone=${normalizedPhone}`)
+    const data = await res.json()
+    if (!res.ok) throw new Error(data?.error || 'Could not check order history')
+    const hasPreviousOrders = Array.isArray(data) && data.length > 0
+    return hasPreviousOrders ? 'returning' : 'new'
+  }
+
+  const sendOtp = async () => {
+    if (normalizedPhone.length !== 10) {
+      showToast('Enter a valid 10-digit phone number')
+      return
+    }
+
+    setOtpLoading(true)
+    try {
+      const res = await fetch('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: normalizedPhone,
+          name: form.name,
+          email: form.email,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Could not send OTP')
+
+      setOtpStatus('code-sent')
+      setOtpCode('')
+      const channelLabel = Array.isArray(data.channels) && data.channels.length > 0
+        ? data.channels.join(' + ')
+        : 'your phone'
+      const hint = data.dev_otp ? `Test OTP: ${data.dev_otp}` : `OTP sent via ${channelLabel}`
+      setOtpHint(hint)
+      showToast(hint)
+    } catch (err: any) {
+      showToast(err.message || 'Could not send OTP')
+    } finally {
+      setOtpLoading(false)
+    }
+  }
+
+  const verifyOtp = async () => {
+    if (normalizedPhone.length !== 10) {
+      showToast('Enter a valid 10-digit phone number')
+      return
+    }
+    if (otpCode.trim().length < 4) {
+      showToast('Enter the OTP you received')
+      return
+    }
+
+    setOtpLoading(true)
+    try {
+      const res = await fetch('/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: normalizedPhone,
+          otp: otpCode.trim(),
+          name: form.name,
+          email: form.email,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'OTP verification failed')
+
+      setOtpStatus('verified')
+      setVerifiedPhone(normalizedPhone)
+      setVerifiedUserId(data.user_id || null)
+      setOtpHint('')
+
+      if (data.latest_order) {
+        setForm(prev => ({
+          ...prev,
+          name: prev.name || data.latest_order.customer_name || '',
+          email: prev.email || data.latest_order.customer_email || '',
+          address: prev.address || data.latest_order.address || '',
+          city: prev.city || data.latest_order.city || '',
+          state: prev.state || data.latest_order.state || '',
+          pincode: prev.pincode || data.latest_order.pincode || '',
+        }))
+      }
+
+      const nextCustomerType = data.customer_type || await fetchCustomerType()
+      setCustomerType(nextCustomerType)
+
+      if (nextCustomerType === 'returning') {
+        await applyCouponCode('LOYAL12')
+      } else {
+        setCouponInput('')
+        setCouponState({ code: '', discountAmount: 0, valid: false })
+      }
+
+      showToast(nextCustomerType === 'returning' ? 'Phone verified. Welcome back! Your details are auto-filled.' : 'Phone verified. You can now add your influencer code.')
+    } catch (err: any) {
+      showToast(err.message || 'OTP verification failed')
+    } finally {
+      setOtpLoading(false)
+    }
   }
 
   const validate = () => {
     if (!form.name.trim()) { showToast('Please enter your name'); return false }
     if (!normalizedPhone || normalizedPhone.length < 10) { showToast('Please enter a valid phone number'); return false }
+    if (!isPhoneVerified) { showToast('Please verify your phone with OTP before checkout'); return false }
     if (!form.address.trim()) { showToast('Please enter your address'); return false }
     if (!form.city.trim()) { showToast('Please enter your city'); return false }
     if (!form.pincode.trim() || form.pincode.length < 6) { showToast('Please enter a valid pincode'); return false }
@@ -91,34 +256,15 @@ export default function CheckoutPage() {
   }
 
   const applyCoupon = async () => {
-    if (!couponInput.trim()) {
-      showToast('Enter a coupon code')
+    if (!isPhoneVerified) {
+      showToast('Verify your phone first to unlock influencer or loyalty discounts')
       return
     }
-    setCouponLoading(true)
-    try {
-      const res = await fetch('/api/coupons/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: couponInput, subtotal }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Invalid coupon')
-      setCouponState({
-        code: data.coupon.code,
-        discountAmount: data.discount_amount || 0,
-        valid: true,
-      })
-      showToast(`Coupon ${data.coupon.code} applied`)
-    } catch (err: any) {
-      setCouponState({ code: '', discountAmount: 0, valid: false })
-      showToast(err.message || 'Invalid coupon')
-    } finally {
-      setCouponLoading(false)
-    }
+    await applyCouponCode(couponInput)
   }
 
   const clearCoupon = () => {
+    if (loyaltyAutoApplied) return
     setCouponInput('')
     setCouponState({ code: '', discountAmount: 0, valid: false })
   }
@@ -134,7 +280,7 @@ export default function CheckoutPage() {
 
   const handlePayment = async () => {
     if (!validate()) return
-    if (items.length === 0) { showToast('Your cart is empty'); return }
+    if (cartItems.length === 0) { showToast('Your cart is empty'); return }
     setLoading(true)
 
     try {
@@ -170,7 +316,8 @@ export default function CheckoutPage() {
               city: form.city,
               state: form.state,
               pincode: form.pincode,
-              items: items.map(i => ({
+              user_id: verifiedUserId,
+              items: cartItems.map(i => ({
                 product_id: i.product_id,
                 product_name: i.product_name,
                 variant_name: i.variant_name,
@@ -210,7 +357,7 @@ export default function CheckoutPage() {
 
   const handleCashOnDelivery = async () => {
     if (!validate()) return
-    if (items.length === 0) { showToast('Your cart is empty'); return }
+    if (cartItems.length === 0) { showToast('Your cart is empty'); return }
     setLoading(true)
 
     try {
@@ -225,7 +372,8 @@ export default function CheckoutPage() {
           city: form.city,
           state: form.state,
           pincode: form.pincode,
-          items: items.map(i => ({
+          user_id: verifiedUserId,
+          items: cartItems.map(i => ({
             product_id: i.product_id,
             product_name: i.product_name,
             variant_name: i.variant_name,
@@ -266,7 +414,7 @@ export default function CheckoutPage() {
           <h1 className="font-serif text-2xl font-light text-ink mb-2">Order Placed!</h1>
           <p className="text-sm text-ink-3 mb-1">Order ID: <strong className="text-ink">{orderId.slice(0, 8).toUpperCase()}</strong></p>
           <p className="text-sm text-ink-3 mb-2">We&apos;ll confirm on WhatsApp shortly.</p>
-          {cashbackPreview > 0 && <p className="text-sm text-green-3 mb-6">You&apos;ll receive {formatPrice(cashbackPreview)} cashback after delivery.</p>}
+          {cashbackPreview > 0 && <p className="text-sm text-green-3 mb-6">You will earn {formatPrice(cashbackPreview)} cashback to your wallet after delivery.</p>}
           <a
             href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=Hi! My order ID is ${orderId.slice(0, 8).toUpperCase()}. Please confirm.`}
             target="_blank"
@@ -297,6 +445,34 @@ export default function CheckoutPage() {
             <div>
               <label className="text-xs text-ink-3 block mb-1.5">WhatsApp Number *</label>
               <input name="phone" value={form.phone} onChange={handleChange} placeholder="+91 98765 43210" type="tel" className="input" />
+              <div className="mt-2 rounded-lg border border-ivory-3 bg-ivory-2 p-3">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  {otpStatus === 'verified' ? (
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-green-6 border border-green-5 rounded-lg text-green-2 w-full font-medium">
+                      <span className="text-lg leading-none">✓</span> Verified
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={sendOtp}
+                      disabled={otpLoading || normalizedPhone.length !== 10}
+                      className="btn-outline justify-center disabled:opacity-50 w-full"
+                    >
+                      <span>{otpLoading ? 'Sending OTP...' : 'Send Verification OTP'}</span>
+                    </button>
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-ink-4">
+                  {isPhoneVerified
+                    ? customerType === 'returning'
+                      ? 'Verified returning customer. Your LOYAL12 discount is auto-applied.'
+                      : 'Verified new customer. You can enter an influencer code below for 10% off.'
+                    : 'Verify your phone first. We will create your account automatically after OTP verification.'}
+                </p>
+                {otpHint && !isPhoneVerified && (
+                  <p className="mt-1 text-xs text-green-3">{otpHint}</p>
+                )}
+              </div>
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs text-ink-3 block mb-1.5">Email (optional)</label>
@@ -322,18 +498,32 @@ export default function CheckoutPage() {
 
           <div className="mt-6 pt-5 border-t border-ivory-3 space-y-5">
             <div>
-              <h3 className="font-sans text-sm font-medium text-ink mb-3">Coupon / Referral Code</h3>
-              <div className="flex gap-2">
-                <input value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} className="input" placeholder="Enter coupon code" />
-                <button type="button" onClick={applyCoupon} disabled={couponLoading} className="btn-primary justify-center px-5">
-                  <span>{couponLoading ? 'Checking...' : 'Apply'}</span>
-                </button>
-              </div>
-              {couponState.valid && (
-                <div className="mt-2 flex items-center justify-between rounded-lg border border-green-5 bg-green-6 px-3 py-2 text-sm text-green-2">
-                  <span>{couponState.code} applied. You saved {formatPrice(couponState.discountAmount)}.</span>
-                  <button type="button" onClick={clearCoupon} className="text-xs underline bg-transparent border-none cursor-pointer">Remove</button>
+              <h3 className="font-sans text-sm font-medium text-ink mb-3">Discounts</h3>
+              {customerType === 'returning' && isPhoneVerified ? (
+                <div className="rounded-lg border border-green-5 bg-green-6 px-4 py-3 text-sm text-green-2">
+                  <div className="font-medium text-green">LOYAL12 auto-filled for your repeat order.</div>
+                  <div className="mt-1 text-green-2">You save {formatPrice(couponState.discountAmount)} automatically on this checkout.</div>
                 </div>
+              ) : (
+                <>
+                  <p className="text-xs text-ink-4 mb-2">
+                    {isPhoneVerified
+                      ? 'First order hai? Apna influencer code enter karke 10% discount le sakte ho.'
+                      : 'Code abhi enter kar sakte ho. Apply karne ke liye phone verification zaroori rahega.'}
+                  </p>
+                  <div className="flex gap-2">
+                    <input value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} className="input" placeholder="Enter influencer code" />
+                    <button type="button" onClick={applyCoupon} disabled={couponLoading} className="btn-primary justify-center px-5">
+                      <span>{couponLoading ? 'Checking...' : 'Apply'}</span>
+                    </button>
+                  </div>
+                  {couponState.valid && (
+                    <div className="mt-2 flex items-center justify-between rounded-lg border border-green-5 bg-green-6 px-3 py-2 text-sm text-green-2">
+                      <span>{couponState.code} applied. You saved {formatPrice(couponState.discountAmount)}.</span>
+                      <button type="button" onClick={clearCoupon} className="text-xs underline bg-transparent border-none cursor-pointer">Remove</button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -350,12 +540,6 @@ export default function CheckoutPage() {
                       <span className="text-sm text-ink-3">Wallet Balance</span>
                       <span className="font-serif text-lg text-green">{formatPrice(walletBalance)}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-ink-3">Cashback Eligibility</span>
-                      <span className={`text-sm font-medium ${walletEligible ? 'text-green-3' : 'text-terra'}`}>
-                        {walletEligible ? 'Eligible' : 'Not eligible yet'}
-                      </span>
-                    </div>
                     <label className="flex items-center gap-3 text-sm text-ink cursor-pointer">
                       <input
                         type="checkbox"
@@ -370,9 +554,8 @@ export default function CheckoutPage() {
                       <div className="text-sm text-green-3">Using {formatPrice(walletApplied)} from wallet.</div>
                     )}
                     <div className="text-xs text-ink-4">
-                      {walletEligible
-                        ? `You will earn ${formatPrice(cashbackPreview)} cashback after this order is marked delivered.`
-                        : 'Cashback is available only for eligible users who follow or complete the required action.'}
+                      You earn 5% cashback on every order.
+                      <br/>You will get {formatPrice(cashbackPreview)} credited to your wallet once this order is delivered.
                     </div>
                   </div>
                 )}
@@ -398,7 +581,7 @@ export default function CheckoutPage() {
           <h2 className="font-serif text-lg font-normal text-ink mb-4">Order Summary</h2>
 
           <div className="flex flex-col gap-3 mb-4 max-h-56 overflow-y-auto">
-            {items.map((item, i) => (
+            {cartItems.map((item, i) => (
               <div key={i} className="flex gap-3">
                 <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-ivory-2">
                   {item.product_image && <Image src={item.product_image} alt={item.product_name} width={56} height={56} className="object-cover w-full h-full" />}
@@ -436,17 +619,17 @@ export default function CheckoutPage() {
               <span className="font-serif text-xl text-green">{formatPrice(orderTotal)}</span>
             </div>
             <div className="text-xs text-ink-4">
-              Cashback after delivery: {walletEligible ? formatPrice(cashbackPreview) : 'Not eligible'}
+              Cashback preview: {formatPrice(cashbackPreview)}
             </div>
           </div>
 
-          <button onClick={handlePayment} disabled={loading || items.length === 0} className="btn-primary w-full justify-center disabled:opacity-50">
+          <button onClick={handlePayment} disabled={loading || cartItems.length === 0} className="btn-primary w-full justify-center disabled:opacity-50">
             <span>{loading ? 'Processing...' : `Pay ${formatPrice(orderTotal)}`}</span>
           </button>
 
           <button
             onClick={handleCashOnDelivery}
-            disabled={loading || items.length === 0}
+            disabled={loading || cartItems.length === 0}
             className="btn-outline w-full justify-center mt-3 disabled:opacity-50"
           >
             <span>{loading ? 'Processing...' : 'Place COD Order'}</span>
@@ -457,6 +640,58 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {otpStatus === 'code-sent' && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00000080] backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[360px] p-6 relative">
+            <button 
+              onClick={() => setOtpStatus('unverified')} 
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-ivory-2 text-ink-3 hover:text-ink hover:bg-ivory-3 transition-colors border-none cursor-pointer"
+            >
+              ✕
+            </button>
+            <h3 className="font-serif text-xl mb-1 text-ink text-center">OTP Verification</h3>
+            <p className="text-sm text-ink-3 text-center mb-6">
+              Code sent to <strong className="text-ink font-medium">+91 {normalizedPhone}</strong>
+            </p>
+            
+            <input
+              value={otpCode}
+              onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="123456"
+              className="input w-full text-center tracking-[0.5em] text-2xl font-bold mb-4 py-3 placeholder:tracking-normal placeholder:font-normal placeholder:text-base outline-none focus:ring-2 focus:ring-green-4 border-2 border-ivory-3"
+              inputMode="numeric"
+              autoFocus
+            />
+            
+            <button
+              type="button"
+              onClick={verifyOtp}
+              disabled={otpLoading || otpCode.trim().length < 4}
+              className="btn-primary w-full justify-center py-3.5 disabled:opacity-50 shadow-md shadow-green/20"
+            >
+              <span>{otpLoading ? 'Verifying...' : 'Verify Code'}</span>
+            </button>
+            
+            <div className="mt-4 text-center">
+              <button 
+                type="button" 
+                onClick={sendOtp} 
+                disabled={otpLoading}
+                className="text-xs font-medium text-green-3 hover:text-green-2 underline bg-transparent border-none cursor-pointer p-0"
+              >
+                Didn't receive it? Resend
+              </button>
+            </div>
+            
+            {otpHint && (
+              <div className="mt-5 p-3 rounded-lg bg-green-6 border border-green-5 text-xs text-center text-green-2">
+                {otpHint}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

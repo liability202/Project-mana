@@ -1,9 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { formatPrice } from '@/lib/utils'
-import type { Coupon, Order, Product } from '@/lib/supabase'
+import type { Coupon, Order, Product, Review } from '@/lib/supabase'
 
-type AdminTab = 'orders' | 'products' | 'coupons' | 'customers'
+type AdminTab = 'orders' | 'products' | 'coupons' | 'customers' | 'reviews'
 type OrderFilter = 'all' | 'pending' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled'
 type CustomerSnapshot = {
   balance: number
@@ -52,6 +52,7 @@ export default function AdminPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [coupons, setCoupons] = useState<Coupon[]>([])
+  const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(false)
   const [orderFilter, setOrderFilter] = useState<OrderFilter>('all')
   const [couponForm, setCouponForm] = useState({
@@ -82,15 +83,17 @@ export default function AdminPage() {
 
   const loadData = async (secret: string) => {
     setLoading(true)
-    const [oRes, pRes, cRes] = await Promise.all([
+    const [oRes, pRes, cRes, rRes] = await Promise.all([
       fetch('/api/orders', { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/products'),
       fetch('/api/coupons', { headers: { authorization: `Bearer ${secret}` } }),
+      fetch('/api/reviews?pending=1', { headers: { authorization: `Bearer ${secret}` } }),
     ])
-    const [o, p, c] = await Promise.all([oRes.json(), pRes.json(), cRes.json()])
+    const [o, p, c, r] = await Promise.all([oRes.json(), pRes.json(), cRes.json(), rRes.json()])
     if (Array.isArray(o)) setOrders(o)
     if (Array.isArray(p)) setProducts(p)
     if (Array.isArray(c)) setCoupons(c)
+    if (Array.isArray(r)) setReviews(r)
     setLoading(false)
   }
 
@@ -200,6 +203,25 @@ export default function AdminPage() {
     setCustomerMessage(`Cashback ${eligible ? 'approved' : 'removed'} for this customer.`)
   }
 
+  const approveReview = async (id: string) => {
+    const secret = localStorage.getItem('mana_admin') || ''
+    const res = await fetch('/api/reviews', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ id }),
+    })
+    if (res.ok) setReviews(prev => prev.filter(review => review.id !== id))
+  }
+
+  const deleteReview = async (id: string) => {
+    const secret = localStorage.getItem('mana_admin') || ''
+    const res = await fetch(`/api/reviews?id=${id}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${secret}` },
+    })
+    if (res.ok) setReviews(prev => prev.filter(review => review.id !== id))
+  }
+
   if (!auth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-ivory px-4">
@@ -233,6 +255,7 @@ export default function AdminPage() {
           <button onClick={() => setTab('products')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'products' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Products</button>
           <button onClick={() => setTab('coupons')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'coupons' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Coupons</button>
           <button onClick={() => setTab('customers')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'customers' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Customers</button>
+          <button onClick={() => setTab('reviews')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'reviews' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Reviews</button>
           <button onClick={() => { localStorage.removeItem('mana_admin'); setAuth(false) }} className="text-xs text-green-4 hover:text-ivory transition-colors">Logout</button>
         </div>
       </div>
@@ -282,7 +305,7 @@ export default function AdminPage() {
                 <div key={order.id} className={`bg-white border rounded-xl p-5 ${overdue ? 'border-terra' : 'border-ivory-3'}`}>
                   <div className="flex items-start justify-between flex-wrap gap-3 mb-3">
                     <div>
-                      <div className="text-xs text-ink-4 mb-0.5">#{order.id.slice(0, 8).toUpperCase()}</div>
+                      <div className="text-xs text-ink-4 mb-0.5">#{order.order_ref || order.id.slice(0, 8).toUpperCase()}</div>
                       <div className="font-medium text-ink">{order.customer_name}</div>
                       <div className="text-sm text-ink-3">{order.customer_phone}</div>
                       <div className="text-xs text-ink-4 mt-0.5">{order.city} - {order.pincode}</div>
@@ -510,7 +533,7 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : tab === 'customers' ? (
           <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
             <div className="bg-white border border-ivory-3 rounded-xl p-5">
               <h2 className="font-serif text-xl text-ink mb-4">Cashback Eligibility</h2>
@@ -551,6 +574,40 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-serif text-xl text-ink">Pending Reviews</h2>
+              <div className="text-sm text-ink-3">{reviews.length} awaiting approval</div>
+            </div>
+            {reviews.length === 0 ? (
+              <div className="bg-white border border-ivory-3 rounded-xl p-6 text-sm text-ink-3">No pending reviews right now.</div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {reviews.map(review => (
+                  <div key={review.id} className="bg-white border border-ivory-3 rounded-xl p-5">
+                    <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
+                      <div>
+                        <div className="font-medium text-ink">{review.product_slug}</div>
+                        <div className="text-xs text-ink-4 mt-1">{review.customer_name} · {review.customer_phone}</div>
+                        <div className="text-xs text-ink-4 mt-1">{new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-terra text-base">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</div>
+                        {review.verified_purchase && <div className="text-xs text-green-3 mt-1">Verified Purchase</div>}
+                      </div>
+                    </div>
+                    {review.title && <div className="font-serif text-lg text-ink mb-2">{review.title}</div>}
+                    <div className="text-sm text-ink-3 leading-[1.8] mb-4">{review.body}</div>
+                    <div className="flex gap-2">
+                      <button onClick={() => approveReview(review.id)} className="btn-primary text-sm py-2 px-4">Approve</button>
+                      <button onClick={() => deleteReview(review.id)} className="btn-outline text-sm py-2 px-4">Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

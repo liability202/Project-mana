@@ -3,7 +3,6 @@ import './globals.css'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/cart/CartDrawer'
-import { WhatsAppButton } from '@/components/ui/WhatsAppButton'
 import { Toaster } from '@/components/ui/Toaster'
 import { ScrollObserver } from '@/components/ScrollObserver'
 
@@ -29,7 +28,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </main>
         <Footer />
-        <WhatsAppButton />
         <Toaster />
       </body>
     </html>

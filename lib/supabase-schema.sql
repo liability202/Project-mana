@@ -96,6 +96,32 @@ create table if not exists kit_orders (
   created_at timestamptz default now()
 );
 
+create table if not exists reviews (
+  id uuid default gen_random_uuid() primary key,
+  product_id text not null,
+  product_slug text not null,
+  customer_name text not null,
+  customer_phone text not null,
+  rating integer check (rating between 1 and 5) not null,
+  title text,
+  body text not null,
+  verified_purchase boolean default false,
+  approved boolean default false,
+  created_at timestamptz default now()
+);
+
+create table if not exists checkout_otps (
+  phone text primary key,
+  otp_hash text not null,
+  expires_at timestamptz not null,
+  resend_available_at timestamptz not null,
+  attempts integer default 0,
+  delivery_channels text[] default '{}',
+  verified_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- USER PROFILES
 create table if not exists user_profiles (
   id uuid default gen_random_uuid() primary key,
@@ -269,7 +295,9 @@ alter table coupons enable row level security;
 alter table wallet enable row level security;
 alter table wallet_transactions enable row level security;
 alter table user_profiles enable row level security;
+alter table reviews enable row level security;
 alter table wa_sessions enable row level security;
+alter table checkout_otps enable row level security;
 
 -- Anyone can read products
 create policy "products_public_read" on products for select using (true);
@@ -288,4 +316,7 @@ create policy "coupons_public_read_active" on coupons for select using (is_activ
 create policy "wallet_own_read" on wallet for select using (auth.uid() = user_id or user_id is null);
 create policy "wallet_txn_own_read" on wallet_transactions for select using (auth.uid() = user_id or user_id is null);
 create policy "profiles_own_read" on user_profiles for select using (auth.uid() = user_id or user_id is null);
+create policy "reviews_public_read_approved" on reviews for select using (approved = true);
+create policy "reviews_public_insert" on reviews for insert with check (true);
 create policy "wa_sessions_service_role_all" on wa_sessions for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+create policy "checkout_otps_service_role_all" on checkout_otps for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');

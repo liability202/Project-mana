@@ -6,6 +6,9 @@ import { supabase } from '@/lib/supabase'
 import { useCart, useCoupon } from '@/lib/store'
 import { formatPrice, formatWeight } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
+import { ReviewForm } from '@/components/product/ReviewForm'
+import { ReviewList } from '@/components/product/ReviewList'
+import { ProductRecommendations } from '@/components/product/ProductRecommendations'
 import type { Product, Variant } from '@/lib/supabase'
 
 export default function ProductPage({ params }: { params: { slug: string } }) {
@@ -14,12 +17,10 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   const [activeVar, setActiveVar]   = useState<Variant | null>(null)
   const [unit, setUnit]             = useState<'g' | 'kg'>('g')
   const [grams, setGrams]           = useState(500)
-  const [couponInput, setCoupon]    = useState('')
-  const [couponMsg, setCouponMsg]   = useState('')
   const [loading, setLoading]       = useState(true)
 
   const addItem = useCart(s => s.addItem)
-  const { apply: applyCoupon } = useCoupon()
+  const cartItems = useCart(s => s.items)
 
   useEffect(() => {
     supabase.from('products').select('*').eq('slug', params.slug).single()
@@ -42,7 +43,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   const galleryImages = activeVar?.images?.length ? activeVar.images : product.images
   const basePrice = activeVar?.price || product.price
   const livePrice = Math.round((basePrice / 500) * grams)
-  const sliderMax = unit === 'kg' ? 20 : 2000
+  const sliderMax = unit === 'kg' ? 5 : 1000
   const sliderMin = unit === 'kg' ? 0.5 : 100
   const sliderStep = unit === 'kg' ? 0.5 : 50
   const sliderVal = unit === 'kg' ? grams / 1000 : grams
@@ -60,13 +61,9 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
       quantity: 1,
     })
     showToast(`✦ ${product.name} added!`)
-    window.dispatchEvent(new CustomEvent('mana:open-cart'))
   }
 
-  const handleCoupon = () => {
-    const ok = applyCoupon(couponInput)
-    setCouponMsg(ok ? `✓ ${couponInput.toUpperCase()} applied!` : '❌ Invalid code. Try MANA10 or WELCOME.')
-  }
+  const inCart = cartItems.some(i => i.product_id === product.id && i.weight_grams === grams)
 
   const QUALITY_TAGS: Record<string, { label: string; cls: string }> = {
     best:    { label: 'Best Quality', cls: 'bg-green text-ivory' },
@@ -189,8 +186,23 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
                 className="w-full mb-1"
                 style={{ background: `linear-gradient(to right,var(--green3) ${Math.max(0, Math.min(100, sliderPct))}%,var(--ivory3) ${Math.max(0, Math.min(100, sliderPct))}%)` }}
               />
-              <div className="flex justify-between text-[.56rem] text-ink-4 mb-3">
-                {unit === 'g' ? ['100g','500g','1kg','1.5kg','2kg'] : ['0.5kg','5kg','10kg','15kg','20kg']}
+              <div className="relative h-5 text-[.56rem] text-ink-4 mb-3 mt-2">
+                {unit === 'g' ? (
+                  <>
+                    <span className="absolute left-0">100g</span>
+                    <span className="absolute font-medium text-ink -translate-x-1/2" style={{ left: '16.6%' }}>250g</span>
+                    <span className="absolute font-medium text-ink -translate-x-1/2" style={{ left: '44.4%' }}>500g</span>
+                    <span className="absolute font-medium text-ink right-0">1kg</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="absolute left-0">0.5kg</span>
+                    <span className="absolute font-medium text-ink -translate-x-1/2" style={{ left: '11.1%' }}>1kg</span>
+                    <span className="absolute font-medium text-ink -translate-x-1/2" style={{ left: '33.3%' }}>2kg</span>
+                    <span className="absolute text-ink-4 -translate-x-1/2" style={{ left: '66.6%' }}>3.5kg</span>
+                    <span className="absolute right-0">5kg</span>
+                  </>
+                )}
               </div>
 
               {/* Input + Live price */}
@@ -216,29 +228,23 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             </div>
           </div>
 
-          {/* Coupon */}
-          <div className="bg-white border border-dashed border-ivory-3 rounded-lg p-4 mb-5">
-            <div className="text-[.62rem] tracking-[.16em] uppercase text-ink-4 mb-2">🏷 Have a discount code?</div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={couponInput}
-                onChange={e => setCoupon(e.target.value.toUpperCase())}
-                placeholder="e.g. MANA10"
-                className="flex-1 px-3 py-2 border border-ivory-3 rounded-md text-sm font-sans text-ink bg-ivory-2 outline-none focus:border-green-3"
-              />
-              <button onClick={handleCoupon} className="btn-primary text-xs py-2 px-4">Apply</button>
-            </div>
-            {couponMsg && (
-              <div className={`text-xs mt-2 ${couponMsg.startsWith('✓') ? 'text-green-3' : 'text-terra'}`}>{couponMsg}</div>
-            )}
+          {/* Coupon Note */}
+          <div className="bg-white border-2 border-dashed border-green-4 rounded-lg p-4 mb-5 text-center shadow-sm">
+            <div className="text-sm font-bold text-green tracking-wide">🏷 Got a discount code?</div>
+            <div className="text-xs text-ink-3 mt-1.5 font-medium">You can apply your coupon code securely at checkout.</div>
           </div>
 
           {/* Actions */}
           <div className="flex gap-3 mb-5 flex-wrap">
-            <button onClick={handleAddToCart} className="btn-primary flex-1 justify-center">
-              <span>Add to Cart</span>
-            </button>
+            {inCart ? (
+              <Link href="/checkout" className="btn-primary flex-1 justify-center bg-green-2 border-green-2 hover:bg-green-3">
+                <span>Proceed to Checkout</span>
+              </Link>
+            ) : (
+              <button onClick={handleAddToCart} className="btn-primary flex-1 justify-center">
+                <span>Add to Cart</span>
+              </button>
+            )}
             <button
               onClick={() => {
                 const msg = `Hi Mana! I want to buy: ${product.name}${activeVar ? ` (${activeVar.name})` : ''} — ${formatWeight(grams)} for ${formatPrice(livePrice)}. Please confirm.`
@@ -267,6 +273,19 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+      
+      <ProductRecommendations 
+        currentSlug={product.slug} 
+        category={product.category} 
+        grams={grams} 
+      />
+
+      <div className="px-[5%] pb-14 max-w-[1400px] mx-auto mt-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_.9fr] gap-8 items-start">
+          <ReviewList productSlug={product.slug} />
+          <ReviewForm productId={product.id} productSlug={product.slug} productName={product.name} />
         </div>
       </div>
     </>

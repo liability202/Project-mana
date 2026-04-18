@@ -84,3 +84,16 @@ export type UserProfile = {
   cashback_request_status?: 'none' | 'requested' | 'approved'
   created_at: string
 }
+export type Review = {
+  id: string
+  product_id: string
+  product_slug: string
+  customer_name: string
+  customer_phone: string
+  rating: number
+  title?: string | null
+  body: string
+  verified_purchase: boolean
+  approved: boolean
+  created_at: string
+}

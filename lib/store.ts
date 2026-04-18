@@ -4,6 +4,8 @@ import { persist } from 'zustand/middleware'
 import type { CartItem } from './supabase'
 
 type CartStore = {
+  hydrated: boolean
+  setHydrated: (value: boolean) => void
   items: CartItem[]
   addItem: (item: CartItem) => void
   removeItem: (productId: string, variantId?: string) => void
@@ -16,6 +18,8 @@ type CartStore = {
 export const useCart = create<CartStore>()(
   persist(
     (set, get) => ({
+      hydrated: false,
+      setHydrated: (value) => set({ hydrated: value }),
       items: [],
 
       addItem: (item) => {
@@ -63,7 +67,12 @@ export const useCart = create<CartStore>()(
 
       count: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
     }),
-    { name: 'mana-cart' }
+    {
+      name: 'mana-cart',
+      onRehydrateStorage: () => (state) => {
+        state?.setHydrated(true)
+      },
+    }
   )
 )
 

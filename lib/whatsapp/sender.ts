@@ -11,9 +11,10 @@ function getHeaders() {
 }
 
 async function postWhatsAppMessage(payload: Record<string, unknown>) {
-  if (!process.env.WHATSAPP_PHONE_NUMBER_ID) {
-    throw new Error('WHATSAPP_PHONE_NUMBER_ID is not configured.')
-  }
+ if (!process.env.WHATSAPP_PHONE_NUMBER_ID) {
+  console.log("⚠️ WhatsApp not configured, skipping send")
+  return
+}
 
   const response = await fetch(WA_URL, {
     method: 'POST',

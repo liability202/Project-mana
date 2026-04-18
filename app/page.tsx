@@ -31,9 +31,9 @@ async function getFeaturedProducts(): Promise<Product[]> {
 
 const CATEGORIES = [
   { name: 'Dry Fruits', slug: 'dry-fruits', pill: 'Most Popular', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/ChatGPT%20Image%20Mar%2024,%202026,%2010_12_09%20PM.png', count: '48 varieties' },
-  { name: 'Herbs',      slug: 'herbs',      pill: 'Ayurvedic',    img: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=500&q=80', count: '36 varieties' },
-  { name: 'Spices',     slug: 'spices',     pill: 'Single Origin', img: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=500&q=80', count: '54 varieties' },
-  { name: 'Pansari',    slug: 'pansari',    pill: 'Traditional',  img: 'https://images.unsplash.com/photo-1615485500704-8e990f9900f7?w=500&q=80', count: '62 varieties' },
+  { name: 'Herbs', slug: 'herbs', pill: 'Ayurvedic', img: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=500&q=80', count: '36 varieties' },
+  { name: 'Spices', slug: 'spices', pill: 'Single Origin', img: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=500&q=80', count: '54 varieties' },
+  { name: 'Pansari', slug: 'pansari', pill: 'Traditional', img: 'https://images.unsplash.com/photo-1615485500704-8e990f9900f7?w=500&q=80', count: '62 varieties' },
 ]
 
 const TESTIMONIALS = [
@@ -65,9 +65,8 @@ export default async function HomePage() {
             Pure · Natural · Curated
           </div>
           <h1 className="font-serif text-[clamp(2.6rem,4.5vw,5rem)] font-light text-ink leading-[1.07] mb-4 tracking-tight animate-fade-up" style={{ animationDelay: '.2s', animationFillMode: 'both' }}>
-            Nature's finest,<br />
-            <em className="not-italic text-green">distilled</em><br />
-            for you.
+            The <em className="not-italic text-green">Essence</em><br />
+            of Nature.
           </h1>
           <p className="text-[.96rem] leading-[1.85] text-ink-3 max-w-[420px] mb-7 animate-fade-up" style={{ animationDelay: '.35s', animationFillMode: 'both' }}>
             Premium dry fruits, Ayurvedic herbs, hand-picked spices and pansari staples — sourced from the finest origins across India and the world.
@@ -77,7 +76,7 @@ export default async function HomePage() {
             <Link href="/kits" className="btn-outline no-underline">View Kits →</Link>
           </div>
           <div className="flex gap-8 pt-7 border-t border-ivory-3 flex-wrap animate-fade-up" style={{ animationDelay: '.65s', animationFillMode: 'both' }}>
-            {[['200+','Products'], ['48K+','Families'], ['100%','Pure & Natural']].map(([n, l]) => (
+            {[['200+', 'Products'], ['48K+', 'Families'], ['100%', 'Pure & Natural']].map(([n, l]) => (
               <div key={l}>
                 <div className="font-serif text-[1.7rem] text-green leading-none">{n}</div>
                 <div className="text-[.6rem] tracking-[.12em] uppercase text-ink-3 mt-1">{l}</div>
