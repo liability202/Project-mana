@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendCashbackCredited, sendOrderConfirmation, sendOrderShipped } from '@/lib/email'
 import {
@@ -102,6 +103,23 @@ export async function POST(req: Request) {
     const cashbackEarned = Math.round((finalAmount * 5) / 100)
     const orderRef = body.order_ref || `MANA${Date.now().toString().slice(-6)}`
 
+    // --- CREATOR / REFERRAL LOGIC ---
+    const refCookie = cookies().get('mana_ref')?.value
+    // Prefer coupon code if it matches a creator, otherwise fallback to cookie
+    const potentialCreatorCode = normalizedCouponCode || refCookie
+    let creatorMatch = null
+    
+    if (potentialCreatorCode) {
+      const { data: creator } = await supabaseAdmin
+        .from('creators')
+        .select('id, code, commission_pct')
+        .eq('code', potentialCreatorCode)
+        .eq('active', true)
+        .maybeSingle()
+      creatorMatch = creator
+    }
+    // ---------------------------------
+
     const insertPayload = {
       order_ref: orderRef,
       user_id: profile.user_id || null,
@@ -201,6 +219,23 @@ export async function POST(req: Request) {
       if (couponUpdateError && !isMissingSchemaError(couponUpdateError)) {
         throw couponUpdateError
       }
+    }
+
+    // Insert commission record if a creator was matched
+    if (creatorMatch && data) {
+      const commPct = creatorMatch.commission_pct || 10
+      const commissionAmt = Math.round((body.subtotal * commPct) / 100)
+      
+      await supabaseAdmin
+        .from('commissions')
+        .insert({
+          creator_id: creatorMatch.id,
+          order_id: data.id,
+          order_total: body.subtotal,
+          commission_pct: commPct,
+          commission_amount: commissionAmt,
+          status: 'pending'
+        })
     }
 
     if (data.customer_email && (data.payment_status === 'paid' || data.payment_status === 'pending')) {
@@ -386,6 +421,53 @@ export async function PUT(req: Request) {
         ).catch(console.error)
       }
     }
+
+    // --- CREATOR COMMISSION STATUS UPDATES ---
+    if (body.status === 'delivered' && existing.status !== 'delivered') {
+      const { data: comm } = await supabaseAdmin
+        .from('commissions')
+        .select('*')
+        .eq('order_id', updated.id)
+        .eq('status', 'pending')
+        .maybeSingle()
+        
+      if (comm) {
+        // Confirm commission
+        await supabaseAdmin
+          .from('commissions')
+          .update({ status: 'confirmed' })
+          .eq('id', comm.id)
+          
+        // Update creator total_earned
+        const { data: creator } = await supabaseAdmin
+          .from('creators')
+          .select('total_earned, phone')
+          .eq('id', comm.creator_id)
+          .single()
+          
+        if (creator) {
+          await supabaseAdmin
+            .from('creators')
+            .update({ total_earned: (creator.total_earned || 0) + comm.commission_amount })
+            .eq('id', comm.creator_id)
+            
+          // Notify creator
+          sendWhatsAppMessage(
+            creator.phone,
+            `Congratulations! You've earned ₹${comm.commission_amount / 100} commission for order ${updated.order_ref || updated.id.slice(0,8).toUpperCase()} ✅\n\nCheck your balance: mana.in/creator`
+          ).catch(console.error)
+        }
+      }
+    }
+
+    if (body.status === 'cancelled' && existing.status !== 'cancelled') {
+        await supabaseAdmin
+          .from('commissions')
+          .update({ status: 'cancelled' })
+          .eq('order_id', updated.id)
+          .eq('status', 'pending')
+    }
+    // ------------------------------------------
 
     return NextResponse.json(updated)
   } catch (err: any) {

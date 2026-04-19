@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { formatPrice } from '@/lib/utils'
 import type { Coupon, Order, Product, Review } from '@/lib/supabase'
 
-type AdminTab = 'orders' | 'products' | 'coupons' | 'customers' | 'reviews'
+type AdminTab = 'orders' | 'products' | 'coupons' | 'customers' | 'reviews' | 'creators'
 type OrderFilter = 'all' | 'pending' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled'
 type CustomerSnapshot = {
   balance: number
@@ -70,6 +70,16 @@ export default function AdminPage() {
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerData, setCustomerData] = useState<CustomerSnapshot | null>(null)
   const [customerMessage, setCustomerMessage] = useState('')
+  const [creators, setCreators] = useState<any[]>([])
+  const [payouts, setPayouts] = useState<any[]>([])
+  const [creatorForm, setCreatorForm] = useState({
+    name: '',
+    phone: '',
+    code: '',
+    commission_pct: '10',
+    tier: 'standard'
+  })
+  const [payoutMessage, setPayoutMessage] = useState('')
 
   const login = () => {
     if (password === process.env.NEXT_PUBLIC_ADMIN_HINT || password.length > 6) {
@@ -83,17 +93,23 @@ export default function AdminPage() {
 
   const loadData = async (secret: string) => {
     setLoading(true)
-    const [oRes, pRes, cRes, rRes] = await Promise.all([
+    const [oRes, pRes, cRes, rRes, crRes, pyRes] = await Promise.all([
       fetch('/api/orders', { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/products'),
       fetch('/api/coupons', { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/reviews?pending=1', { headers: { authorization: `Bearer ${secret}` } }),
+      fetch('/api/admin/creators', { headers: { authorization: `Bearer ${secret}` } }),
+      fetch('/api/admin/payouts', { headers: { authorization: `Bearer ${secret}` } }),
     ])
-    const [o, p, c, r] = await Promise.all([oRes.json(), pRes.json(), cRes.json(), rRes.json()])
+    const [o, p, c, r, cr, py] = await Promise.all([
+      oRes.json(), pRes.json(), cRes.json(), rRes.json(), crRes.json(), pyRes.json()
+    ])
     if (Array.isArray(o)) setOrders(o)
     if (Array.isArray(p)) setProducts(p)
     if (Array.isArray(c)) setCoupons(c)
     if (Array.isArray(r)) setReviews(r)
+    if (Array.isArray(cr)) setCreators(cr)
+    if (Array.isArray(py)) setPayouts(py)
     setLoading(false)
   }
 
@@ -222,6 +238,41 @@ export default function AdminPage() {
     if (res.ok) setReviews(prev => prev.filter(review => review.id !== id))
   }
 
+  const createCreator = async () => {
+    const secret = localStorage.getItem('mana_admin') || ''
+    const res = await fetch('/api/admin/creators', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', authorization: `Bearer ${secret}` },
+      body: JSON.stringify({
+        ...creatorForm,
+        commission_pct: Number(creatorForm.commission_pct)
+      }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setCreators(prev => [data, ...prev])
+      setCreatorForm({ name: '', phone: '', code: '', commission_pct: '10', tier: 'standard' })
+    } else {
+      alert(data.error)
+    }
+  }
+
+  const updatePayoutStatus = async (id: string, status: string) => {
+    const secret = localStorage.getItem('mana_admin') || ''
+    const res = await fetch('/api/admin/payouts', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ id, status }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setPayouts(prev => prev.map(p => p.id === id ? { ...p, status } : p))
+      // Reload creator data to reflect updated paid totals
+      loadData(secret)
+    }
+  }
+
+
   if (!auth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-ivory px-4">
@@ -256,6 +307,7 @@ export default function AdminPage() {
           <button onClick={() => setTab('coupons')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'coupons' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Coupons</button>
           <button onClick={() => setTab('customers')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'customers' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Customers</button>
           <button onClick={() => setTab('reviews')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'reviews' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Reviews</button>
+          <button onClick={() => setTab('creators')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'creators' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Creators</button>
           <button onClick={() => { localStorage.removeItem('mana_admin'); setAuth(false) }} className="text-xs text-green-4 hover:text-ivory transition-colors">Logout</button>
         </div>
       </div>
@@ -531,6 +583,153 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        ) : tab === 'creators' ? (
+          <div className="space-y-8">
+            <div className="flex items-start justify-between gap-6 flex-wrap">
+               <div className="flex-1 min-w-[300px]">
+                  <h2 className="font-serif text-xl text-ink mb-4">Manage Creators</h2>
+                  <div className="bg-white border border-ivory-3 rounded-xl overflow-hidden shadow-soft">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-ivory-2 border-b border-ivory-3 font-serif">
+                        <tr>
+                          <th className="px-4 py-3 text-[.65rem] font-bold uppercase tracking-widest text-ink-4">Name & Code</th>
+                          <th className="px-4 py-3 text-[.65rem] font-bold uppercase tracking-widest text-ink-4">Performance</th>
+                          <th className="px-4 py-3 text-[.65rem] font-bold uppercase tracking-widest text-ink-4 text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-ivory-3">
+                        {creators.map(c => (
+                          <tr key={c.id}>
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-ink">{c.name}</div>
+                              <div className="text-[.68rem] text-green-3 font-bold uppercase tracking-widest mt-0.5">{c.code} · {c.phone}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="text-[.75rem] font-medium"><span className="text-ink-4 uppercase text-[.6rem] font-bold tracking-tighter">Earned</span> {formatPrice(c.total_earned)}</div>
+                              <div className="text-[.75rem] font-medium"><span className="text-ink-4 uppercase text-[.6rem] font-bold tracking-tighter">Paid</span> {formatPrice(c.total_paid)}</div>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                               <span className={`px-2 py-0.5 rounded text-[.6rem] font-bold uppercase tracking-widest ${c.active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                 {c.active ? 'Active' : 'Inactive'}
+                               </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+               </div>
+
+               <div className="w-full lg:w-80 space-y-4">
+                  <div className="bg-white border border-ivory-3 rounded-xl p-5 shadow-soft">
+                    <h3 className="font-serif text-sm text-ink mb-4">Add New Creator</h3>
+                    <div className="space-y-3">
+                      <input 
+                        type="text" placeholder="Full Name" 
+                        value={creatorForm.name} 
+                        onChange={e => setCreatorForm({...creatorForm, name: e.target.value})}
+                        className="input text-xs py-2.5" 
+                      />
+                      <input 
+                        type="text" placeholder="Phone Number" 
+                        value={creatorForm.phone} 
+                        onChange={e => setCreatorForm({...creatorForm, phone: e.target.value})}
+                        className="input text-xs py-2.5" 
+                      />
+                      <input 
+                        type="text" placeholder="Unique Code (e.g. MANA-PRIYA)" 
+                        value={creatorForm.code} 
+                        onChange={e => setCreatorForm({...creatorForm, code: e.target.value.toUpperCase()})}
+                        className="input text-xs py-2.5" 
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input 
+                          type="number" placeholder="Comm %" 
+                          value={creatorForm.commission_pct} 
+                          onChange={e => setCreatorForm({...creatorForm, commission_pct: e.target.value})}
+                          className="input text-xs py-2.5" 
+                        />
+                        <select 
+                          value={creatorForm.tier} 
+                          onChange={e => setCreatorForm({...creatorForm, tier: e.target.value})}
+                          className="input text-xs py-2.5"
+                        >
+                          <option value="standard">Standard</option>
+                          <option value="nano">Nano</option>
+                          <option value="premium">Premium</option>
+                          <option value="custom">Custom</option>
+                        </select>
+                      </div>
+                      <button onClick={createCreator} className="btn-primary w-full text-xs py-3 mt-2">Create Account</button>
+                    </div>
+                  </div>
+               </div>
+            </div>
+
+            <div>
+               <h2 className="font-serif text-xl text-ink mb-4">Payout Requests</h2>
+               <div className="bg-white border border-ivory-3 rounded-xl overflow-hidden shadow-soft">
+                 <table className="w-full text-left text-sm border-collapse">
+                    <thead className="bg-ivory-2 border-b border-ivory-3 font-serif">
+                      <tr>
+                        <th className="px-4 py-4 text-[.65rem] font-bold uppercase tracking-widest text-ink-3">Creator</th>
+                        <th className="px-4 py-4 text-[.65rem] font-bold uppercase tracking-widest text-ink-3">Amount</th>
+                        <th className="px-4 py-4 text-[.65rem] font-bold uppercase tracking-widest text-ink-3">Settlement Method</th>
+                        <th className="px-4 py-4 text-[.65rem] font-bold uppercase tracking-widest text-ink-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ivory-3">
+                      {payouts.length === 0 ? (
+                        <tr><td colSpan={4} className="px-4 py-12 text-center text-ink-4 italic font-serif">No current payout requests to process.</td></tr>
+                      ) : (
+                        payouts.map(p => (
+                          <tr key={p.id} className={`hover:bg-ivory-2/20 transition-colors ${p.status === 'pending' ? 'bg-amber-50/20' : ''}`}>
+                            <td className="px-4 py-4">
+                              <div className="font-medium text-ink">{p.creators?.name}</div>
+                              <div className="text-[.68rem] text-green-3 font-bold uppercase mt-0.5 tracking-widest">{p.creators?.code}</div>
+                            </td>
+                            <td className="px-4 py-4">
+                               <div className="font-serif font-bold text-lg text-ink">{formatPrice(p.amount)}</div>
+                               <div className="text-[.62rem] text-ink-4 mt-0.5 uppercase tracking-tighter">Requested on {new Date(p.created_at).toLocaleDateString()}</div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="p-2.5 bg-ivory-2 rounded-lg border border-ivory-3 inline-block">
+                                {p.upi_id ? (
+                                  <div className="text-[.72rem] font-bold text-ink-2"><span className="text-green-3">UPI</span> {p.upi_id}</div>
+                                ) : (
+                                  <div className="text-[.7rem] text-ink-2">
+                                    <div className="font-bold">A/C: {p.bank_account}</div>
+                                    <div className="text-[.6rem] text-ink-4 mt-0.5 uppercase tracking-widest font-bold">IFSC: {p.bank_ifsc}</div>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                               {p.status === 'pending' ? (
+                                 <button 
+                                  onClick={() => {
+                                    if(confirm(`Confirm payment of ${formatPrice(p.amount)} to ${p.creators?.name}?`)) {
+                                      updatePayoutStatus(p.id, 'processed')
+                                    }
+                                  }}
+                                  className="text-[.62rem] font-bold uppercase tracking-widest bg-green text-ivory px-4 py-2.5 rounded-xl border-none cursor-pointer shadow-soft hover:bg-green-2 transform active:scale-95"
+                                 >
+                                   Mark Paid
+                                 </button>
+                               ) : (
+                                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-600 rounded-lg border border-green-100">
+                                   <span className="text-[.62rem] font-bold uppercase tracking-widest">Processed</span>
+                                 </div>
+                               )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                 </table>
+               </div>
             </div>
           </div>
         ) : tab === 'customers' ? (

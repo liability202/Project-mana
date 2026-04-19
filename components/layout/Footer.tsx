@@ -22,6 +22,7 @@ const COMPANY_LINKS = [
   { label: 'Terms & Conditions', href: '/terms' },
   { label: 'Privacy Policy', href: '/privacy' },
   { label: 'Return Policy', href: '/returns' },
+  { label: 'Creator Portal', href: '/creator' },
 ]
 
 export function Footer() {
