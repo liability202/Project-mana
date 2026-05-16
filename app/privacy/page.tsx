@@ -27,7 +27,7 @@ const sections = [
   {
     title: '4. Who We Share Data With',
     body: [
-      'We share only necessary information with Razorpay for payment processing and with Shiprocket and its delivery partners for order fulfilment. This may include your name, phone number, address, and order-level shipment details.',
+      'We share only necessary information with Cashfree for payment processing and with NimbusPost and its delivery partners for order fulfilment. This may include your name, phone number, address, and order-level shipment details.',
       'We do not sell your data. We do not share your data with third-party advertisers. We do not run ad-tech profiling. Mana products are ad-free.'
     ]
   },
@@ -35,7 +35,7 @@ const sections = [
     title: '5. Data Storage & Security',
     body: [
       'Customer and order information is stored using Supabase infrastructure hosted on AWS or associated cloud environments. We use reasonable administrative, technical, and access-control safeguards to protect the information we store.',
-      'Payment card information is not stored by us. Razorpay handles payment credentials on its secure infrastructure. We never sell your data, and we do not disclose it beyond the limited service providers needed to run the business.'
+      'Payment card information is not stored by us. Cashfree handles payment credentials on its secure infrastructure. We never sell your data, and we do not disclose it beyond the limited service providers needed to run the business.'
     ]
   },
   {

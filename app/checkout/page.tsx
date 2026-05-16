@@ -2,10 +2,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useCart } from '@/lib/store'
-import { formatPrice, shippingCost } from '@/lib/utils'
+import { formatPrice, shippingCost, FREE_SHIPPING_THRESHOLD } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 
-declare global { interface Window { Razorpay: any } }
+declare global {
+  interface Window {
+    Cashfree: any
+  }
+}
 
 type FormData = {
   name: string
@@ -24,6 +28,23 @@ type CouponState = {
 }
 
 type CustomerType = 'new' | 'returning' | null
+type ShippingCheck = {
+  configured: boolean
+  serviceable: boolean | null
+  estimatedDeliveryDate: string | null
+  courierName: string | null
+  availableCourierCount: number
+  message?: string
+}
+
+const ACCOUNT_PHONE_KEY = 'mana_account_phone'
+const COD_CHARGE = 4900 // ₹49 in paise
+const SMALL_ORDER_FEE = 4900 // ₹49 in paise – charged on orders below free-shipping threshold
+
+function rememberAccountPhone(phone: string) {
+  localStorage.setItem(ACCOUNT_PHONE_KEY, phone)
+  document.cookie = `${ACCOUNT_PHONE_KEY}=${phone}; path=/; max-age=${60 * 60 * 24 * 180}; SameSite=Lax`
+}
 
 export default function CheckoutPage() {
   const { items, total, clearCart, hydrated } = useCart()
@@ -45,13 +66,22 @@ export default function CheckoutPage() {
   const [verifiedUserId, setVerifiedUserId] = useState<string | null>(null)
   const [customerType, setCustomerType] = useState<CustomerType>(null)
   const [otpHint, setOtpHint] = useState('')
+  const [shippingCheck, setShippingCheck] = useState<ShippingCheck | null>(null)
+  const [shippingCheckLoading, setShippingCheckLoading] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online')
 
   const cartItems = hydrated ? items : []
   const subtotal = hydrated ? total() : 0
+  const totalWeightGrams = useMemo(
+    () => cartItems.reduce((sum, item) => sum + Number(item.weight_grams || 0) * Number(item.quantity || 1), 0) || 500,
+    [cartItems]
+  )
   const shipping = shippingCost(subtotal)
   const discount = couponState.discountAmount
+  const codCharge = paymentMethod === 'cod' ? COD_CHARGE : 0
+  const smallOrderFee = subtotal < FREE_SHIPPING_THRESHOLD ? SMALL_ORDER_FEE : 0
   const walletApplied = useCashback ? Math.min(walletBalance, Math.max(0, subtotal - discount)) : 0
-  const orderTotal = Math.max(0, subtotal + shipping - discount - walletApplied)
+  const orderTotal = Math.max(0, subtotal + shipping + codCharge + smallOrderFee - discount - walletApplied)
   const cashbackPreview = Math.round((orderTotal * 5) / 100)
 
   const normalizedPhone = useMemo(() => form.phone.replace(/\D/g, ''), [form.phone])
@@ -102,6 +132,35 @@ export default function CheckoutPage() {
     setCouponInput('')
     setCouponState({ code: '', discountAmount: 0, valid: false })
   }, [normalizedPhone, verifiedPhone])
+
+  useEffect(() => {
+    const pincode = form.pincode.trim()
+    if (!/^\d{6}$/.test(pincode)) {
+      setShippingCheck(null)
+      setShippingCheckLoading(false)
+      return
+    }
+
+    let active = true
+    setShippingCheckLoading(true)
+    void fetch(`/api/shipping/serviceability?pincode=${pincode}&grams=${totalWeightGrams}&cod=1`)
+      .then(res => res.json())
+      .then(data => {
+        if (!active) return
+        setShippingCheck(data)
+      })
+      .catch(() => {
+        if (!active) return
+        setShippingCheck(null)
+      })
+      .finally(() => {
+        if (active) setShippingCheckLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [form.pincode, totalWeightGrams])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -214,6 +273,7 @@ export default function CheckoutPage() {
       setVerifiedPhone(normalizedPhone)
       setVerifiedUserId(data.user_id || null)
       setOtpHint('')
+      rememberAccountPhone(normalizedPhone)
 
       if (data.latest_order) {
         setForm(prev => ({
@@ -252,6 +312,7 @@ export default function CheckoutPage() {
     if (!form.address.trim()) { showToast('Please enter your address'); return false }
     if (!form.city.trim()) { showToast('Please enter your city'); return false }
     if (!form.pincode.trim() || form.pincode.length < 6) { showToast('Please enter a valid pincode'); return false }
+    if (shippingCheck?.serviceable === false) { showToast('Delivery is not available on this pincode yet'); return false }
     return true
   }
 
@@ -269,10 +330,10 @@ export default function CheckoutPage() {
     setCouponState({ code: '', discountAmount: 0, valid: false })
   }
 
-  const loadRazorpay = () => new Promise<boolean>(resolve => {
-    if (window.Razorpay) { resolve(true); return }
+  const loadCashfree = () => new Promise<boolean>(resolve => {
+    if (window.Cashfree) { resolve(true); return }
     const script = document.createElement('script')
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js'
     script.onload = () => resolve(true)
     script.onerror = () => resolve(false)
     document.body.appendChild(script)
@@ -284,71 +345,88 @@ export default function CheckoutPage() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/razorpay/create-order', {
+      const gatewayOrderId = `mana_${Date.now()}`
+      const res = await fetch('/api/cashfree/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: orderTotal, currency: 'INR' }),
+        body: JSON.stringify({
+          amount: orderTotal,
+          orderId: gatewayOrderId,
+          customerId: verifiedUserId || normalizedPhone,
+          name: form.name,
+          email: form.email,
+          phone: normalizedPhone,
+          returnUrl: `${window.location.origin}/checkout?cf_order_id={order_id}`,
+          orderNote: `Mana order for ${form.name}`,
+        }),
       })
-      const { orderId: rzpOrderId, error } = await res.json()
+      const { orderId: cashfreeOrderId, paymentSessionId, error } = await res.json()
       if (error) throw new Error(error)
 
-      const loaded = await loadRazorpay()
+      const loaded = await loadCashfree()
       if (!loaded) throw new Error('Failed to load payment gateway')
 
-      const rzp = new window.Razorpay({
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: orderTotal,
-        currency: 'INR',
-        name: 'Mana - The Essence of Nature',
-        description: `Order for ${form.name}`,
-        order_id: rzpOrderId,
-        prefill: { name: form.name, contact: normalizedPhone, email: form.email },
-        theme: { color: '#1C3D2E' },
-        handler: async (response: any) => {
-          const saveRes = await fetch('/api/orders', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              customer_name: form.name,
-              customer_phone: normalizedPhone,
-              customer_email: form.email,
-              address: form.address,
-              city: form.city,
-              state: form.state,
-              pincode: form.pincode,
-              user_id: verifiedUserId,
-              items: cartItems.map(i => ({
-                product_id: i.product_id,
-                product_name: i.product_name,
-                variant_name: i.variant_name,
-                quantity: i.quantity,
-                weight_grams: i.weight_grams,
-                price: i.price,
-              })),
-              subtotal,
-              shipping,
-              coupon_code: couponState.code || null,
-              wallet_amount: walletApplied,
-              payment_id: response.razorpay_payment_id,
-              razorpay_order_id: rzpOrderId,
-              payment_status: 'paid',
-              status: 'confirmed',
-            }),
-          })
-
-          const data = await saveRes.json()
-          if (!saveRes.ok) throw new Error(data?.error || 'Could not save order')
-
-          setOrderId(data.id)
-          clearCart()
-          clearCoupon()
-          setUseCashback(false)
-          setStep('success')
-        },
-        modal: { ondismiss: () => setLoading(false) },
+      const cashfree = window.Cashfree({
+        mode: process.env.NEXT_PUBLIC_CASHFREE_ENV === 'production' ? 'production' : 'sandbox',
       })
 
-      rzp.open()
+      await cashfree.checkout({
+        paymentSessionId,
+        redirectTarget: '_modal',
+      })
+
+      const verificationRes = await fetch('/api/cashfree/verify-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: cashfreeOrderId }),
+      })
+
+      const verification = await verificationRes.json()
+      if (!verificationRes.ok) throw new Error(verification?.error || 'Could not verify payment')
+      if (!verification.isPaid) throw new Error('Payment was not completed')
+
+      const saveRes = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: form.name,
+          customer_phone: normalizedPhone,
+          customer_email: form.email,
+          address: form.address,
+          city: form.city,
+          state: form.state,
+          pincode: form.pincode,
+          user_id: verifiedUserId,
+          items: cartItems.map(i => ({
+            product_id: i.product_id,
+            product_name: i.product_name,
+            variant_name: i.variant_name,
+            quantity: i.quantity,
+            weight_grams: i.weight_grams,
+            price: i.price,
+          })),
+          subtotal,
+          shipping,
+          coupon_code: couponState.code || null,
+          wallet_amount: walletApplied,
+          cod_charge: 0,
+          small_order_fee: smallOrderFee,
+          payment_id: verification.paymentId,
+          cashfree_order_id: verification.orderId,
+          payment_status: 'paid',
+          status: 'confirmed',
+          notes: `Cashfree order ${verification.orderId}`,
+        }),
+      })
+
+      const data = await saveRes.json()
+      if (!saveRes.ok) throw new Error(data?.error || 'Could not save order')
+
+      setOrderId(data.id)
+      clearCart()
+      clearCoupon()
+      setUseCashback(false)
+      setStep('success')
     } catch (err: any) {
       showToast('Payment failed: ' + (err.message || 'Please try again'))
       setLoading(false)
@@ -383,6 +461,8 @@ export default function CheckoutPage() {
           })),
           subtotal,
           shipping,
+          cod_charge: COD_CHARGE,
+          small_order_fee: smallOrderFee,
           coupon_code: couponState.code || null,
           wallet_amount: walletApplied,
           payment_status: 'pending',
@@ -493,6 +573,23 @@ export default function CheckoutPage() {
             <div>
               <label className="text-xs text-ink-3 block mb-1.5">Pincode *</label>
               <input name="pincode" value={form.pincode} onChange={handleChange} placeholder="110001" className="input" maxLength={6} />
+              {shippingCheckLoading ? (
+                <div className="mt-2 text-xs text-ink-4">Checking delivery availability...</div>
+              ) : shippingCheck ? (
+                <div className={`mt-2 rounded-lg border px-3 py-2 text-xs ${shippingCheck.serviceable ? 'border-green-5 bg-green-6 text-green-2' : 'border-terra/30 bg-[#fff1eb] text-terra'}`}>
+                  <div className="font-medium">
+                    {shippingCheck.serviceable ? 'Delivery available' : shippingCheck.configured ? 'Delivery unavailable' : 'NimbusPost check not configured'}
+                  </div>
+                  {shippingCheck.serviceable && (
+                    <div className="mt-1">
+                      Expected by {shippingCheck.estimatedDeliveryDate
+                        ? new Date(shippingCheck.estimatedDeliveryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                        : 'soon'}
+                    </div>
+                  )}
+                  {!shippingCheck.serviceable && shippingCheck.message && <div className="mt-1">{shippingCheck.message}</div>}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -565,14 +662,35 @@ export default function CheckoutPage() {
             <div>
               <h3 className="font-sans text-sm font-medium text-ink mb-3">Payment Method</h3>
               <div className="flex gap-3 flex-wrap">
-                {['UPI / QR', 'Credit / Debit Card', 'Net Banking', 'COD'].map(m => (
-                  <div key={m} className="flex items-center gap-2 px-3 py-2 bg-green-6 border border-green-5 rounded-md text-sm text-green-2">
-                    <span className="w-2 h-2 rounded-full bg-green block" />
-                    {m}
-                  </div>
-                ))}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('online')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border cursor-pointer transition-all ${
+                    paymentMethod === 'online'
+                      ? 'bg-green-6 border-green-4 text-green shadow-sm'
+                      : 'bg-ivory-2 border-ivory-3 text-ink-3 hover:border-green-5'
+                  }`}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full block ${paymentMethod === 'online' ? 'bg-green' : 'bg-ink-4'}`} />
+                  Online Payment
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('cod')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border cursor-pointer transition-all ${
+                    paymentMethod === 'cod'
+                      ? 'bg-green-6 border-green-4 text-green shadow-sm'
+                      : 'bg-ivory-2 border-ivory-3 text-ink-3 hover:border-green-5'
+                  }`}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full block ${paymentMethod === 'cod' ? 'bg-green' : 'bg-ink-4'}`} />
+                  Cash on Delivery
+                </button>
               </div>
-              <p className="text-xs text-ink-4 mt-2">Secure payment powered by Razorpay</p>
+              {paymentMethod === 'cod' && (
+                <p className="text-xs text-terra mt-2">₹49 COD charge will be added to your order.</p>
+              )}
+              <p className="text-xs text-ink-4 mt-2">Secure payment powered by Cashfree</p>
             </div>
           </div>
         </div>
@@ -614,6 +732,16 @@ export default function CheckoutPage() {
               <span>Shipping</span>
               <span>{shipping === 0 ? <span className="text-green-3">Free</span> : formatPrice(shipping)}</span>
             </div>
+            {codCharge > 0 && (
+              <div className="flex justify-between text-sm text-ink-3">
+                <span>COD Charge</span><span>{formatPrice(codCharge)}</span>
+              </div>
+            )}
+            {smallOrderFee > 0 && (
+              <div className="flex justify-between text-sm text-ink-3">
+                <span>Handling Fee</span><span>{formatPrice(smallOrderFee)}</span>
+              </div>
+            )}
             <div className="flex justify-between font-medium text-ink border-t border-ivory-3 pt-2 mt-1">
               <span>Total</span>
               <span className="font-serif text-xl text-green">{formatPrice(orderTotal)}</span>
@@ -621,22 +749,36 @@ export default function CheckoutPage() {
             <div className="text-xs text-ink-4">
               Cashback preview: {formatPrice(cashbackPreview)}
             </div>
+            {shippingCheck?.serviceable && (
+              <div className="text-xs text-green-3">
+                Expected delivery: {shippingCheck.estimatedDeliveryDate
+                  ? new Date(shippingCheck.estimatedDeliveryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                  : 'Will be confirmed soon'}
+              </div>
+            )}
+            {shippingCheck?.serviceable === false && (
+              <div className="text-xs text-terra">
+                This pincode is currently not serviceable for delivery.
+              </div>
+            )}
           </div>
 
-          <button onClick={handlePayment} disabled={loading || cartItems.length === 0} className="btn-primary w-full justify-center disabled:opacity-50">
-            <span>{loading ? 'Processing...' : `Pay ${formatPrice(orderTotal)}`}</span>
-          </button>
-
-          <button
-            onClick={handleCashOnDelivery}
-            disabled={loading || cartItems.length === 0}
-            className="btn-outline w-full justify-center mt-3 disabled:opacity-50"
-          >
-            <span>{loading ? 'Processing...' : 'Place COD Order'}</span>
-          </button>
+          {paymentMethod === 'online' ? (
+            <button onClick={handlePayment} disabled={loading || cartItems.length === 0} className="btn-primary w-full justify-center disabled:opacity-50">
+              <span>{loading ? 'Processing...' : `Pay ${formatPrice(orderTotal)}`}</span>
+            </button>
+          ) : (
+            <button
+              onClick={handleCashOnDelivery}
+              disabled={loading || cartItems.length === 0}
+              className="btn-primary w-full justify-center disabled:opacity-50"
+            >
+              <span>{loading ? 'Processing...' : `Place COD Order · ${formatPrice(orderTotal)}`}</span>
+            </button>
+          )}
 
           <div className="flex items-center justify-center gap-2 mt-3 text-xs text-ink-4">
-            <span>🔒</span> Secured by Razorpay
+            <span>🔒</span> Secured by Cashfree
           </div>
         </div>
       </div>

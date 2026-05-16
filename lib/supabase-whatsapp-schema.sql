@@ -11,7 +11,8 @@ create table if not exists wa_sessions (
 );
 
 alter table orders add column if not exists order_ref text unique;
-alter table orders add column if not exists razorpay_link text;
+alter table orders add column if not exists cashfree_order_id text;
+alter table orders add column if not exists payment_link text;
 
 create index if not exists idx_orders_order_ref on orders(order_ref);
 create index if not exists idx_orders_customer_phone on orders(customer_phone);

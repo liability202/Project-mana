@@ -2,7 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { getWalletSnapshot, normalizePhone } from '@/lib/commerce'
 import { sendWhatsAppButtons, sendWhatsAppList, sendWhatsAppMessage } from './sender'
 import { getAIAdvice, type AdviceHistoryMessage } from './ai'
-import { createRazorpayLink } from './razorpay'
+import { createCashfreePaymentLink } from './cashfree'
 
 type SessionRecord = {
   phone: string
@@ -1580,7 +1580,7 @@ export async function handleIncomingMessage(phone: string, input: string, option
         break
       }
 
-      const paymentLink = await createRazorpayLink({
+      const paymentLink = await createCashfreePaymentLink({
         amount: total,
         description: `MANA - ${selectedItems.map((item) => `${item.productName} ${formatWeight(item.requestedWeightGrams)}`).join(', ')}`,
         orderId: order.id,
@@ -1589,7 +1589,7 @@ export async function handleIncomingMessage(phone: string, input: string, option
 
       await supabaseAdmin
         .from('orders')
-        .update({ razorpay_link: paymentLink })
+        .update({ payment_link: paymentLink })
         .eq('id', order.id)
 
       await transport.sendMessage(

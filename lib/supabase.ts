@@ -18,11 +18,16 @@ export type Order = {
   customer_email?: string; address: string; city: string
   state?: string; pincode: string; items: any[]
   subtotal: number; discount: number; shipping: number; total: number
-  order_ref?: string; razorpay_link?: string
+  order_ref?: string; payment_link?: string
+  shiprocket_order_id?: string | null; shiprocket_shipment_id?: string | null
+  shiprocket_tracking_status?: string | null
+  tracking_number?: string | null; tracking_link?: string | null
+  courier_name?: string | null; expected_delivery?: string | null
+  tracking_events?: any[] | null; tracking_synced_at?: string | null
   coupon_code?: string; discount_amount?: number; final_amount?: number
   wallet_used?: number; cashback_earned?: number
   status: string; payment_status: string
-  payment_id?: string; razorpay_order_id?: string; notes?: string; created_at: string
+  payment_id?: string; cashfree_order_id?: string; notes?: string; created_at: string
   user_id?: string | null
 }
 export type Variant = {

@@ -14,6 +14,17 @@ type SelectedKitProduct = {
   image?: string
 }
 
+type KitSize = {
+  id: string
+  name: string
+  gramsEach: string
+  priceRupees: string
+  comparePriceRupees: string
+  description: string
+}
+
+type WeightMatrix = Record<string, Record<string, string>>
+
 export default function NewAdminKitPage() {
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
@@ -22,13 +33,17 @@ export default function NewAdminKitPage() {
   const [vendor, setVendor] = useState('Mana')
   const [tagsInput, setTagsInput] = useState('bestseller, kit')
   const [imagesInput, setImagesInput] = useState('')
-  const [priceRupees, setPriceRupees] = useState('')
-  const [comparePriceRupees, setComparePriceRupees] = useState('')
   const [pricePerUnit, setPricePerUnit] = useState('per kit')
+  const [kitSizes, setKitSizes] = useState<KitSize[]>([
+    { id: 'small', name: 'Essential', gramsEach: '100', priceRupees: '', comparePriceRupees: '', description: 'Starter size' },
+    { id: 'medium', name: 'Signature', gramsEach: '200', priceRupees: '', comparePriceRupees: '', description: 'Recommended size' },
+    { id: 'large', name: 'Reserve', gramsEach: '500', priceRupees: '', comparePriceRupees: '', description: 'Best value size' },
+  ])
   const [inStock, setInStock] = useState(true)
   const [catalog, setCatalog] = useState<Product[]>([])
   const [search, setSearch] = useState('')
   const [selectedProducts, setSelectedProducts] = useState<SelectedKitProduct[]>([])
+  const [productWeights, setProductWeights] = useState<WeightMatrix>({})
   const [submitting, setSubmitting] = useState(false)
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [error, setError] = useState('')
@@ -67,12 +82,51 @@ export default function NewAdminKitPage() {
     )
   }, [catalog, search])
 
-  const estimatedTotal = selectedProducts.reduce((sum, product) => sum + product.price, 0)
+  const getProductWeight = (productId: string, sizeId: string, fallbackGrams: string) => {
+    return productWeights[productId]?.[sizeId] || fallbackGrams
+  }
+
+  const getSizeTotal = (sizeId: string, fallbackGrams: string) => {
+    return selectedProducts.reduce((sum, product) => {
+      const grams = Math.max(0, Number(getProductWeight(product.id, sizeId, fallbackGrams) || '0'))
+      const pricePerGram = Math.max(1, Math.round(product.price / 500))
+      return sum + Math.round(pricePerGram * grams)
+    }, 0)
+  }
+
+  const estimatedMediumTotal = getSizeTotal(kitSizes[1]?.id || 'medium', kitSizes[1]?.gramsEach || '200')
+  const estimatedTotal = estimatedMediumTotal
+  const priceRupees = kitSizes[1]?.priceRupees || ''
+
+  const updateKitSize = (id: string, next: Partial<KitSize>) => {
+    setKitSizes(prev => prev.map(size => size.id === id ? { ...size, ...next } : size))
+  }
+
+  const updateProductWeight = (productId: string, sizeId: string, grams: string) => {
+    setProductWeights(prev => ({
+      ...prev,
+      [productId]: {
+        ...(prev[productId] || {}),
+        [sizeId]: grams.replace(/[^\d]/g, ''),
+      },
+    }))
+  }
 
   const toggleProduct = (product: Product) => {
     setSelectedProducts(prev => {
       const exists = prev.some(item => item.id === product.id)
-      if (exists) return prev.filter(item => item.id !== product.id)
+      if (exists) {
+        setProductWeights(current => {
+          const next = { ...current }
+          delete next[product.id]
+          return next
+        })
+        return prev.filter(item => item.id !== product.id)
+      }
+      setProductWeights(current => ({
+        ...current,
+        [product.id]: Object.fromEntries(kitSizes.map(size => [size.id, size.gramsEach])),
+      }))
       return [
         ...prev,
         {
@@ -84,6 +138,15 @@ export default function NewAdminKitPage() {
           image: product.images?.[0],
         },
       ]
+    })
+  }
+
+  const removeSelectedProduct = (productId: string) => {
+    setSelectedProducts(prev => prev.filter(item => item.id !== productId))
+    setProductWeights(prev => {
+      const next = { ...prev }
+      delete next[productId]
+      return next
     })
   }
 
@@ -101,32 +164,49 @@ export default function NewAdminKitPage() {
       if (!description.trim()) throw new Error('Description is required.')
       if (!selectedProducts.length) throw new Error('Select at least one product for this kit.')
 
-      const manualPrice = Math.round(Number(priceRupees || '0') * 100)
-      const manualComparePrice = comparePriceRupees ? Math.round(Number(comparePriceRupees) * 100) : null
       const images = imagesInput.split('\n').map(url => url.trim()).filter(Boolean)
       const tags = tagsInput.split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean)
+      const variants = kitSizes.map(size => {
+        const gramsEach = Math.max(0, Number(size.gramsEach || '0'))
+        const computedPrice = getSizeTotal(size.id, size.gramsEach)
+        const manualPrice = Math.round(Number(size.priceRupees || '0') * 100)
+        const price = manualPrice > 0 ? manualPrice : computedPrice
+
+        return {
+          id: `kit-${size.id}`,
+          name: size.name,
+          description: size.description || `${gramsEach}g each`,
+          size_desc: size.description || `${gramsEach}g each`,
+          grams_each: gramsEach,
+          price,
+          compare_price: size.comparePriceRupees ? Math.round(Number(size.comparePriceRupees) * 100) : null,
+          items: selectedProducts.map(product => {
+            const productGrams = Math.max(0, Number(getProductWeight(product.id, size.id, size.gramsEach) || '0'))
+            const pricePerGram = Math.max(1, Math.round(product.price / 500))
+            return {
+              ...product,
+              grams: productGrams,
+              base_price: Math.round(pricePerGram * productGrams),
+              price_per_gram: pricePerGram,
+            }
+          }),
+        }
+      })
+      const defaultVariant = variants[1] || variants[0]
 
       const payload = {
         name: name.trim(),
         slug: effectiveSlug.trim(),
         description: description.trim(),
         category: 'kits',
-        price: manualPrice > 0 ? manualPrice : estimatedTotal,
-        compare_price: manualComparePrice,
+        price: defaultVariant.price,
+        compare_price: defaultVariant.compare_price,
         price_per_unit: pricePerUnit.trim() || 'per kit',
         images,
         tags,
         vendor: vendor.trim() || null,
         in_stock: inStock,
-        variants: [
-          {
-            id: 'kit-default',
-            name: 'Kit',
-            description: `Includes ${selectedProducts.length} products`,
-            price: manualPrice > 0 ? manualPrice : estimatedTotal,
-            items: selectedProducts,
-          },
-        ],
+        variants,
       }
 
       const res = await fetch('/api/products', {
@@ -149,11 +229,15 @@ export default function NewAdminKitPage() {
       setVendor('Mana')
       setTagsInput('bestseller, kit')
       setImagesInput('')
-      setPriceRupees('')
-      setComparePriceRupees('')
       setPricePerUnit('per kit')
+      setKitSizes([
+        { id: 'small', name: 'Essential', gramsEach: '100', priceRupees: '', comparePriceRupees: '', description: 'Starter size' },
+        { id: 'medium', name: 'Signature', gramsEach: '200', priceRupees: '', comparePriceRupees: '', description: 'Recommended size' },
+        { id: 'large', name: 'Reserve', gramsEach: '500', priceRupees: '', comparePriceRupees: '', description: 'Best value size' },
+      ])
       setInStock(true)
       setSelectedProducts([])
+      setProductWeights({})
       setSearch('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -207,14 +291,14 @@ export default function NewAdminKitPage() {
                   <input value={vendor} onChange={e => setVendor(e.target.value)} className="input" placeholder="Mana" />
                 </div>
 
-                <div>
+                <div className="hidden">
                   <label className="text-xs text-ink-3 block mb-1.5">Kit Price (₹)</label>
-                  <input value={priceRupees} onChange={e => setPriceRupees(e.target.value)} className="input" inputMode="decimal" placeholder="Leave blank to use selected products total" />
+                  <input value="" readOnly className="input" inputMode="decimal" placeholder="Use size pricing below" />
                 </div>
 
-                <div>
+                <div className="hidden">
                   <label className="text-xs text-ink-3 block mb-1.5">Compare Price (₹)</label>
-                  <input value={comparePriceRupees} onChange={e => setComparePriceRupees(e.target.value)} className="input" inputMode="decimal" placeholder="Optional" />
+                  <input value="" readOnly className="input" inputMode="decimal" placeholder="Use size compare pricing below" />
                 </div>
 
                 <div>
@@ -236,6 +320,76 @@ export default function NewAdminKitPage() {
                   <label className="text-xs text-ink-3 block mb-1.5">Tags</label>
                   <input value={tagsInput} onChange={e => setTagsInput(e.target.value)} className="input" placeholder="bestseller, premium, kit" />
                 </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-ivory-3 rounded-2xl p-6">
+              <div className="mb-4">
+                <h2 className="font-serif text-xl text-ink">Size & Weight Options</h2>
+                <p className="text-sm text-ink-3 mt-1">Set default grams for each size. Exact per-product grams are controlled in the selected products matrix.</p>
+              </div>
+
+              <div className="space-y-4">
+                {kitSizes.map(size => {
+                  const autoPrice = getSizeTotal(size.id, size.gramsEach)
+                  return (
+                    <div key={size.id} className="rounded-2xl border border-ivory-3 bg-ivory-1 p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                          <label className="text-xs text-ink-3 block mb-1.5">Size Name</label>
+                          <input
+                            value={size.name}
+                            onChange={e => updateKitSize(size.id, { name: e.target.value })}
+                            className="input bg-white"
+                            placeholder="Signature"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-ink-3 block mb-1.5">Default Grams</label>
+                          <input
+                            value={size.gramsEach}
+                            onChange={e => updateKitSize(size.id, { gramsEach: e.target.value.replace(/[^\d]/g, '') })}
+                            className="input bg-white"
+                            inputMode="numeric"
+                            placeholder="200"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-ink-3 block mb-1.5">Selling Price (Rs)</label>
+                          <input
+                            value={size.priceRupees}
+                            onChange={e => updateKitSize(size.id, { priceRupees: e.target.value })}
+                            className="input bg-white"
+                            inputMode="decimal"
+                            placeholder={`Auto ${formatPrice(autoPrice)}`}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-ink-3 block mb-1.5">Compare Price (Rs)</label>
+                          <input
+                            value={size.comparePriceRupees}
+                            onChange={e => updateKitSize(size.id, { comparePriceRupees: e.target.value })}
+                            className="input bg-white"
+                            inputMode="decimal"
+                            placeholder="Optional"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <label className="text-xs text-ink-3 block mb-1.5">Size Description</label>
+                        <input
+                          value={size.description}
+                          onChange={e => updateKitSize(size.id, { description: e.target.value })}
+                          className="input bg-white"
+                          placeholder="Good for 2 months"
+                        />
+                      </div>
+                      <div className="mt-2 text-xs text-ink-4">
+                        Auto estimate: {formatPrice(autoPrice)} using the product weights below. New products start at {size.gramsEach || 0}g for this size.
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
@@ -287,24 +441,45 @@ export default function NewAdminKitPage() {
 
           <div className="space-y-6">
             <div className="bg-white border border-ivory-3 rounded-2xl p-6">
-              <h2 className="font-serif text-xl text-ink mb-4">Selected Products</h2>
+              <h2 className="font-serif text-xl text-ink mb-1">Selected Products</h2>
+              <p className="text-sm text-ink-3 mb-4">Set exact grams for each product in each kit size.</p>
               {selectedProducts.length === 0 ? (
                 <div className="text-sm text-ink-3">No products selected yet.</div>
               ) : (
                 <div className="space-y-3">
                   {selectedProducts.map(product => (
-                    <div key={product.id} className="flex items-center justify-between gap-3 rounded-xl border border-ivory-3 p-3">
+                    <div key={product.id} className="rounded-xl border border-ivory-3 p-3">
+                      <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="font-medium text-ink">{product.name}</div>
                         <div className="text-xs text-ink-4">{product.category} · {product.slug}</div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setSelectedProducts(prev => prev.filter(item => item.id !== product.id))}
+                        onClick={() => removeSelectedProduct(product.id)}
                         className="text-xs text-terra hover:text-terra-2"
                       >
                         Remove
                       </button>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {kitSizes.map(size => (
+                          <div key={size.id}>
+                            <label className="text-[.64rem] text-ink-4 block mb-1">{size.name}</label>
+                            <div className="relative">
+                              <input
+                                value={getProductWeight(product.id, size.id, size.gramsEach)}
+                                onChange={e => updateProductWeight(product.id, size.id, e.target.value)}
+                                className="input bg-ivory pr-8 text-sm"
+                                inputMode="numeric"
+                                placeholder={size.gramsEach}
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[.68rem] text-ink-4">g</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -317,8 +492,18 @@ export default function NewAdminKitPage() {
                 <div><span className="text-ink font-medium">Name:</span> {name || 'Kit name'}</div>
                 <div><span className="text-ink font-medium">Slug:</span> {effectiveSlug || 'kit-slug'}</div>
                 <div><span className="text-ink font-medium">Selected Products:</span> {selectedProducts.length}</div>
-                <div><span className="text-ink font-medium">Estimated Total:</span> {formatPrice(estimatedTotal)}</div>
-                <div><span className="text-ink font-medium">Selling Price:</span> {priceRupees ? `₹${priceRupees}` : formatPrice(estimatedTotal)}</div>
+                <div><span className="text-ink font-medium">Medium Auto Estimate:</span> {formatPrice(estimatedMediumTotal)}</div>
+                <div className="space-y-1 pt-1">
+                  {kitSizes.map(size => {
+                    const autoPrice = getSizeTotal(size.id, size.gramsEach)
+                    return (
+                      <div key={size.id}>
+                        <span className="text-ink font-medium">{size.name || 'Size'}:</span> {size.priceRupees ? `Rs ${size.priceRupees}` : formatPrice(autoPrice)}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="hidden"><span className="text-ink font-medium">Selling Price:</span> {priceRupees ? `₹${priceRupees}` : formatPrice(estimatedTotal)}</div>
               </div>
             </div>
 

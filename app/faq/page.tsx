@@ -12,11 +12,11 @@ const faqGroups = [
     items: [
       {
         q: 'What payment methods do you accept?',
-        a: 'We accept UPI, all major debit and credit cards, net banking, and Cash on Delivery. All online payments are powered securely by Razorpay.'
+        a: 'We accept UPI, all major debit and credit cards, net banking, and Cash on Delivery. All online payments are powered securely by Cashfree.'
       },
       {
         q: 'Is it safe to pay on your website?',
-        a: 'Yes. Payments are processed through Razorpay, which is PCI-DSS compliant. We never store your card details on our servers.'
+        a: 'Yes. Payments are processed through Cashfree, which is PCI-DSS compliant. We never store your card details on our servers.'
       },
       {
         q: 'Can I place a COD order?',
@@ -72,7 +72,7 @@ const faqGroups = [
       },
       {
         q: 'Do you deliver across India?',
-        a: 'Yes. We serve customers across India via Shiprocket and its courier network, subject to pincode coverage.'
+        a: 'Yes. We serve customers across India via NimbusPost and its courier network, subject to pincode coverage.'
       },
       {
         q: 'How do I track my order?',

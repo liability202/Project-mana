@@ -11,6 +11,20 @@ import { ReviewList } from '@/components/product/ReviewList'
 import { ProductRecommendations } from '@/components/product/ProductRecommendations'
 import type { Product, Variant } from '@/lib/supabase'
 
+const ACCOUNT_PHONE_KEY = 'mana_account_phone'
+
+function readAccountPhone() {
+  if (typeof window === 'undefined') return ''
+
+  const stored = window.localStorage.getItem(ACCOUNT_PHONE_KEY)
+  if (stored) return stored
+
+  return document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${ACCOUNT_PHONE_KEY}=`))
+    ?.split('=')[1] || ''
+}
+
 export default function ProductPage({ params }: { params: { slug: string } }) {
   const [product, setProduct]       = useState<Product | null>(null)
   const [activeImg, setActiveImg]   = useState(0)
@@ -18,6 +32,11 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   const [unit, setUnit]             = useState<'g' | 'kg'>('g')
   const [grams, setGrams]           = useState(500)
   const [loading, setLoading]       = useState(true)
+  const [deliveryPincode, setDeliveryPincode] = useState('')
+  const [deliveryCheck, setDeliveryCheck] = useState<any>(null)
+  const [deliveryLoading, setDeliveryLoading] = useState(false)
+  const [canReview, setCanReview] = useState(false)
+  const [reviewCheckLoading, setReviewCheckLoading] = useState(true)
 
   const addItem = useCart(s => s.addItem)
   const cartItems = useCart(s => s.items)
@@ -36,6 +55,79 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   useEffect(() => {
     setActiveImg(0)
   }, [activeVar?.id])
+
+  useEffect(() => {
+    if (!product) {
+      setCanReview(false)
+      setReviewCheckLoading(true)
+      return
+    }
+
+    const savedPhone = readAccountPhone().replace(/\D/g, '').slice(-10)
+    if (savedPhone.length !== 10) {
+      setCanReview(false)
+      setReviewCheckLoading(false)
+      return
+    }
+
+    let active = true
+    setReviewCheckLoading(true)
+    void fetch(`/api/orders?phone=${savedPhone}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!active) return
+        const purchased = Array.isArray(data) && data.some((order: any) =>
+          order?.status !== 'cancelled' &&
+          Array.isArray(order?.items) &&
+          order.items.some((item: any) =>
+            item.product_id === product.id ||
+            item.product_slug === product.slug ||
+            item.product_name === product.name
+          )
+        )
+        setCanReview(purchased)
+      })
+      .catch(() => {
+        if (!active) return
+        setCanReview(false)
+      })
+      .finally(() => {
+        if (active) setReviewCheckLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [product])
+
+  useEffect(() => {
+    const pincode = deliveryPincode.trim()
+    if (!/^\d{6}$/.test(pincode)) {
+      setDeliveryCheck(null)
+      setDeliveryLoading(false)
+      return
+    }
+
+    let active = true
+    setDeliveryLoading(true)
+    void fetch(`/api/shipping/serviceability?pincode=${pincode}&grams=${grams}&cod=1`)
+      .then(res => res.json())
+      .then(data => {
+        if (!active) return
+        setDeliveryCheck(data)
+      })
+      .catch(() => {
+        if (!active) return
+        setDeliveryCheck(null)
+      })
+      .finally(() => {
+        if (active) setDeliveryLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [deliveryPincode, grams])
 
   if (loading) return <ProductSkeleton />
   if (!product) return <div className="section text-center text-ink-3">Product not found. <Link href="/products">Browse all products →</Link></div>
@@ -234,6 +326,40 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             <div className="text-xs text-ink-3 mt-1.5 font-medium">You can apply your coupon code securely at checkout.</div>
           </div>
 
+          <div className="bg-white border border-ivory-3 rounded-xl p-4 mb-5">
+            <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-3">Check Estimated Delivery Date</div>
+            <div className="flex gap-2 flex-wrap">
+              <input
+                value={deliveryPincode}
+                onChange={e => setDeliveryPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Enter pincode"
+                className="input max-w-[220px]"
+              />
+              <div className="text-xs text-ink-4 self-center">Estimate for {formatWeight(grams)}</div>
+            </div>
+            {deliveryLoading ? (
+              <div className="mt-3 text-sm text-ink-3">Checking estimated delivery date...</div>
+            ) : deliveryCheck ? (
+              <div className={`mt-3 rounded-lg border px-3 py-3 text-sm ${deliveryCheck.serviceable ? 'border-green-5 bg-green-6 text-green-2' : 'border-terra/30 bg-[#fff1eb] text-terra'}`}>
+                <div className="font-medium">
+                  {deliveryCheck.serviceable ? 'Delivery available on this pincode' : deliveryCheck.configured ? 'Delivery not available yet' : 'NimbusPost check not configured'}
+                </div>
+                {deliveryCheck.serviceable && (
+                  <div className="mt-1 text-xs">
+                    Expected by {deliveryCheck.estimatedDeliveryDate
+                      ? new Date(deliveryCheck.estimatedDeliveryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                      : 'soon'}
+                  </div>
+                )}
+                {!deliveryCheck.serviceable && deliveryCheck.message && (
+                  <div className="mt-1 text-xs">{deliveryCheck.message}</div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-3 text-xs text-ink-4">Enter your pincode to check the estimated delivery date.</div>
+            )}
+          </div>
+
           {/* Actions */}
           <div className="flex gap-3 mb-5 flex-wrap">
             {inCart ? (
@@ -285,7 +411,27 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
       <div className="px-[5%] pb-14 max-w-[1400px] mx-auto mt-8">
         <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_.9fr] gap-8 items-start">
           <ReviewList productSlug={product.slug} />
-          <ReviewForm productId={product.id} productSlug={product.slug} productName={product.name} />
+          {reviewCheckLoading ? (
+            <div className="bg-white border border-ivory-3 rounded-2xl p-6 shadow-soft">
+              <div className="font-serif text-2xl text-ink mb-2">Write a review</div>
+              <div className="text-sm text-ink-3">Checking whether this account has previously ordered the product...</div>
+            </div>
+          ) : canReview ? (
+            <ReviewForm productId={product.id} productSlug={product.slug} productName={product.name} />
+          ) : (
+            <div className="bg-white border border-ivory-3 rounded-2xl p-6 shadow-soft">
+              <div className="font-serif text-2xl text-ink mb-2">Write a review</div>
+              <div className="text-sm text-ink-3 leading-[1.8]">
+                This section appears only for customers who have already ordered this product using their saved WhatsApp number on this device.
+              </div>
+              <div className="mt-4 rounded-lg border border-ivory-3 bg-ivory-2 px-4 py-3 text-sm text-ink-3 leading-[1.7]">
+                If you have already purchased it, open your account first so this device remembers your number, then come back to this product page.
+              </div>
+              <Link href="/account" className="btn-outline no-underline inline-flex mt-5">
+                Open My Account
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </>

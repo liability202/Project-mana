@@ -102,7 +102,7 @@ export default function CreatorOrdersPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-ink-2 font-medium">
-                        {c.orders?.customer_name?.split(' ')[0]} {c.orders?.customer_name?.split(' ').slice(1).map(n => n?.[0] + '.').join(' ')}
+                        {c.orders?.customer_name?.split(' ')[0]} {c.orders?.customer_name?.split(' ').slice(1).map((n: string) => n?.[0] + '.').join(' ')}
                       </div>
                     </td>
                     <td className="px-6 py-4">

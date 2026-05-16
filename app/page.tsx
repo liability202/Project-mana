@@ -76,7 +76,7 @@ export default async function HomePage() {
             <Link href="/kits" className="btn-outline no-underline">View Kits →</Link>
           </div>
           <div className="flex gap-8 pt-7 border-t border-ivory-3 flex-wrap animate-fade-up" style={{ animationDelay: '.65s', animationFillMode: 'both' }}>
-            {[['200+', 'Products'], ['48K+', 'Families'], ['100%', 'Pure & Natural']].map(([n, l]) => (
+            {[['400+', 'Products'], ['2K+', 'Families'], ['100%', 'Pure & Natural']].map(([n, l]) => (
               <div key={l}>
                 <div className="font-serif text-[1.7rem] text-green leading-none">{n}</div>
                 <div className="text-[.6rem] tracking-[.12em] uppercase text-ink-3 mt-1">{l}</div>
@@ -146,31 +146,43 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── BESTSELLERS ── */}
-      <section className="section bg-white fade-in">
-        <div className="flex justify-between items-end mb-10 flex-wrap gap-4">
-          <div>
-            <div className="eyebrow">Bestsellers</div>
-            <h2 className="section-title">Curated <em className="not-italic text-green">favourites</em></h2>
-          </div>
-          <Link href="/products" className="btn-outline text-sm py-2 px-5 no-underline">View All →</Link>
+      {/* ── KITS ── */}
+      <section className="section bg-terra-4 fade-in">
+        <div className="text-center mb-10">
+          <div className="eyebrow justify-center">Pre-made Kits</div>
+          <h2 className="section-title">Everything <em className="not-italic text-green">together,</em><br />perfectly curated</h2>
         </div>
-        {featuredProducts.length > 0 ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {featuredProducts.map(p => <ProductCard key={p.id} product={p} />)}
-          </div>
-        ) : (
-          <div className="text-center py-16 border-2 border-dashed border-ivory-3 rounded-2xl bg-ivory-2">
-            <div className="text-5xl mb-4">🌿</div>
-            <h3 className="font-serif text-xl text-ink mb-2">Products coming soon</h3>
-            <p className="text-[.84rem] text-ink-3 mb-6 max-w-xs mx-auto">
-              Add your first products in Supabase to see them appear here automatically.
-            </p>
-            <Link href="/products" className="btn-primary no-underline inline-flex">
-              <span>Browse All →</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {[
+            { name: 'Triphala Churna Kit', tag: 'Ayurvedic', price: 58000, save: '18%', img: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=600&q=80', desc: 'Digestive wellness · Complete set' },
+            { name: 'Ladoo Ingredients Kit', tag: "Editor's Pick", price: 74000, save: '22%', img: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&q=80', desc: 'Festival ready · Perfect ladoos' },
+            { name: 'Protein Power Kit', tag: 'High-Protein', price: 124000, save: '15%', img: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=600&q=80', desc: 'Seeds, berries & nuts' },
+            { name: 'Daily Wellness Kit', tag: 'Daily Wellness', price: 89000, save: '20%', img: 'https://images.unsplash.com/photo-1574226516831-e1dff420e562?w=600&q=80', desc: 'Balanced & complete' },
+          ].map(kit => (
+            <Link key={kit.name} href="/kits" className="card no-underline group flex flex-col">
+              <div className="aspect-[4/3] overflow-hidden">
+                <Image src={kit.img} alt={kit.name} width={600} height={450} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
+              </div>
+              <div className="p-4 flex flex-col flex-1">
+                <div className="text-[.56rem] tracking-wide uppercase bg-green-6 text-green-2 px-1.5 py-0.5 rounded-sm inline-block mb-2 font-medium w-fit">{kit.tag}</div>
+                <div className="font-serif text-[1.1rem] text-ink mb-1 leading-tight">{kit.name}</div>
+                <div className="text-[.74rem] text-ink-3 mb-3">{kit.desc}</div>
+                <div className="mt-auto flex items-center justify-between pt-3 border-t border-ivory-3">
+                  <div>
+                    <div className="font-serif text-[1.2rem] text-green leading-none">{formatPrice(kit.price)}</div>
+                    <div className="text-[.58rem] text-ink-4 mt-0.5">per 500g kit</div>
+                  </div>
+                  <span className="text-[.58rem] bg-terra-4 text-terra border border-terra-3 px-2 py-0.5 rounded-sm font-medium">Save {kit.save}</span>
+                </div>
+              </div>
             </Link>
-          </div>
-        )}
+          ))}
+        </div>
+        <div className="text-center">
+          <Link href="/kits" className="btn-primary no-underline inline-flex items-center gap-2">
+            <span>View All Kit →</span>
+          </Link>
+        </div>
       </section>
 
       {/* ── QUALITY PROMISE ── */}
@@ -210,43 +222,31 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── KITS ── */}
-      <section className="section bg-terra-4 fade-in">
-        <div className="text-center mb-10">
-          <div className="eyebrow justify-center">Pre-made Kits</div>
-          <h2 className="section-title">Everything <em className="not-italic text-green">together,</em><br />perfectly curated</h2>
+      {/* ── BESTSELLERS ── */}
+      <section className="section bg-white fade-in">
+        <div className="flex justify-between items-end mb-10 flex-wrap gap-4">
+          <div>
+            <div className="eyebrow">Bestsellers</div>
+            <h2 className="section-title">Curated <em className="not-italic text-green">favourites</em></h2>
+          </div>
+          <Link href="/products" className="btn-outline text-sm py-2 px-5 no-underline">View All →</Link>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {[
-            { name: 'Triphala Churna Kit', tag: 'Ayurvedic', price: 58000, save: '18%', img: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=600&q=80', desc: 'Digestive wellness · Complete set' },
-            { name: 'Ladoo Ingredients Kit', tag: "Editor's Pick", price: 74000, save: '22%', img: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&q=80', desc: 'Festival ready · Perfect ladoos' },
-            { name: 'Protein Power Kit', tag: 'High-Protein', price: 124000, save: '15%', img: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=600&q=80', desc: 'Seeds, berries & nuts' },
-            { name: 'Daily Wellness Kit', tag: 'Daily Wellness', price: 89000, save: '20%', img: 'https://images.unsplash.com/photo-1574226516831-e1dff420e562?w=600&q=80', desc: 'Balanced & complete' },
-          ].map(kit => (
-            <Link key={kit.name} href="/kits" className="card no-underline group flex flex-col">
-              <div className="aspect-[4/3] overflow-hidden">
-                <Image src={kit.img} alt={kit.name} width={600} height={450} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div className="p-4 flex flex-col flex-1">
-                <div className="text-[.56rem] tracking-wide uppercase bg-green-6 text-green-2 px-1.5 py-0.5 rounded-sm inline-block mb-2 font-medium w-fit">{kit.tag}</div>
-                <div className="font-serif text-[1.1rem] text-ink mb-1 leading-tight">{kit.name}</div>
-                <div className="text-[.74rem] text-ink-3 mb-3">{kit.desc}</div>
-                <div className="mt-auto flex items-center justify-between pt-3 border-t border-ivory-3">
-                  <div>
-                    <div className="font-serif text-[1.2rem] text-green leading-none">{formatPrice(kit.price)}</div>
-                    <div className="text-[.58rem] text-ink-4 mt-0.5">per 500g kit</div>
-                  </div>
-                  <span className="text-[.58rem] bg-terra-4 text-terra border border-terra-3 px-2 py-0.5 rounded-sm font-medium">Save {kit.save}</span>
-                </div>
-              </div>
+        {featuredProducts.length > 0 ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {featuredProducts.map(p => <ProductCard key={p.id} product={p} />)}
+          </div>
+        ) : (
+          <div className="text-center py-16 border-2 border-dashed border-ivory-3 rounded-2xl bg-ivory-2">
+            <div className="text-5xl mb-4">🌿</div>
+            <h3 className="font-serif text-xl text-ink mb-2">Products coming soon</h3>
+            <p className="text-[.84rem] text-ink-3 mb-6 max-w-xs mx-auto">
+              Add your first products in Supabase to see them appear here automatically.
+            </p>
+            <Link href="/products" className="btn-primary no-underline inline-flex">
+              <span>Browse All →</span>
             </Link>
-          ))}
-        </div>
-        <div className="text-center">
-          <Link href="/kits" className="btn-primary no-underline inline-flex items-center gap-2">
-            <span>Build Your Custom Kit →</span>
-          </Link>
-        </div>
+          </div>
+        )}
       </section>
 
       {/* ── CHAT & BUY ── */}

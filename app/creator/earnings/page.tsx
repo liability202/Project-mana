@@ -6,7 +6,8 @@ import {
   Wallet, 
   Clock, 
   ArrowUpRight, 
-  CreditCard 
+  CreditCard,
+  MessageCircle 
 } from 'lucide-react'
 import { formatPrice } from '@/lib/utils'
 

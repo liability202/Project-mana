@@ -15,6 +15,17 @@ type CustomerSnapshot = {
   }
 }
 
+type ShipFormState = {
+  id: string
+  orderRef: string
+  weight_grams: string
+  length_cm: string
+  breadth_cm: string
+  height_cm: string
+  courier_id: string
+  generate_pickup: boolean
+} | null
+
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
   confirmed: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -72,6 +83,8 @@ export default function AdminPage() {
   const [customerMessage, setCustomerMessage] = useState('')
   const [creators, setCreators] = useState<any[]>([])
   const [payouts, setPayouts] = useState<any[]>([])
+  const [shipForm, setShipForm] = useState<ShipFormState>(null)
+  const [shipLoading, setShipLoading] = useState(false)
   const [creatorForm, setCreatorForm] = useState({
     name: '',
     phone: '',
@@ -131,6 +144,59 @@ export default function AdminPage() {
     const updated = await res.json()
     if (res.ok) {
       setOrders(prev => prev.map(order => order.id === id ? updated : order))
+    }
+  }
+
+  const refreshNimbusTracking = async (id: string) => {
+    const secret = localStorage.getItem('mana_admin') || ''
+    const res = await fetch(`/api/shipping/track?orderId=${id}`, {
+      headers: { authorization: `Bearer ${secret}` },
+    })
+    const data = await res.json()
+    if (res.ok && data?.order) {
+      setOrders(prev => prev.map(order => order.id === id ? data.order : order))
+    }
+  }
+
+  const openShipOrder = (order: Order) => {
+    const inferredWeight = Array.isArray(order.items)
+      ? order.items.reduce((sum: number, item: any) => sum + Number(item.weight_grams || 0) * Number(item.quantity || 1), 0) || 500
+      : 500
+
+    setShipForm({
+      id: order.id,
+      orderRef: order.order_ref || order.id.slice(0, 8).toUpperCase(),
+      weight_grams: String(inferredWeight),
+      length_cm: '20',
+      breadth_cm: '15',
+      height_cm: '12',
+      courier_id: '',
+      generate_pickup: true,
+    })
+  }
+
+  const submitShipOrder = async () => {
+    if (!shipForm) return
+    const secret = localStorage.getItem('mana_admin') || ''
+    setShipLoading(true)
+    try {
+      const res = await fetch('/api/admin/orders/ship', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          authorization: `Bearer ${secret}`,
+        },
+        body: JSON.stringify(shipForm),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Could not ship this order.')
+
+      setOrders(prev => prev.map(order => order.id === data.id ? data : order))
+      setShipForm(null)
+    } catch (error: any) {
+      alert(error.message || 'Could not ship this order.')
+    } finally {
+      setShipLoading(false)
     }
   }
 
@@ -412,6 +478,25 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3 text-xs">
+                    <div className="rounded-lg bg-ivory-2 p-3">
+                      <div className="text-ink-4 mb-1">Courier</div>
+                      <div className="font-medium text-ink">{order.courier_name || 'Pending'}</div>
+                    </div>
+                    <div className="rounded-lg bg-ivory-2 p-3">
+                      <div className="text-ink-4 mb-1">Tracking No.</div>
+                      <div className="font-medium text-ink">{order.tracking_number || 'Pending'}</div>
+                    </div>
+                    <div className="rounded-lg bg-ivory-2 p-3">
+                      <div className="text-ink-4 mb-1">Expected Delivery</div>
+                      <div className="font-medium text-ink">{order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString('en-IN') : 'Pending'}</div>
+                    </div>
+                    <div className="rounded-lg bg-ivory-2 p-3">
+                      <div className="text-ink-4 mb-1">NimbusPost Status</div>
+                      <div className="font-medium text-ink">{order.shiprocket_tracking_status || 'Not synced yet'}</div>
+                    </div>
+                  </div>
+
                   <div className="flex flex-col gap-1 mb-3 text-sm text-ink-3">
                     {(order.items as any[]).map((item, i) => (
                       <div key={i} className="flex justify-between">
@@ -425,12 +510,26 @@ export default function AdminPage() {
                     {['pending', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled'].map(status => (
                       <button
                         key={status}
-                        onClick={() => updateOrderStatus(order.id, status)}
+                        onClick={() => status === 'shipped' ? openShipOrder(order) : updateOrderStatus(order.id, status)}
                         className={`text-xs px-3 py-1 rounded-md border transition-all cursor-pointer ${order.status === status ? 'bg-green text-ivory border-green' : 'bg-transparent text-ink-3 border-ivory-3 hover:border-green-4 hover:text-green'}`}
                       >
                         {status}
                       </button>
                     ))}
+                    {order.status !== 'shipped' && order.status !== 'delivered' && order.status !== 'cancelled' && (
+                      <button
+                        onClick={() => openShipOrder(order)}
+                        className="text-xs px-3 py-1 rounded-md border transition-all cursor-pointer bg-green text-ivory border-green hover:bg-green-2"
+                      >
+                        Ship Order
+                      </button>
+                    )}
+                    <button
+                      onClick={() => refreshNimbusTracking(order.id)}
+                      className="text-xs px-3 py-1 rounded-md border transition-all cursor-pointer bg-white text-green border-green-5 hover:bg-green-6"
+                    >
+                      Sync NimbusPost
+                    </button>
                   </div>
                 </div>
               )})}
@@ -810,6 +909,93 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      {shipForm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00000080] backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[520px] p-6 relative">
+            <button
+              onClick={() => !shipLoading && setShipForm(null)}
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-ivory-2 text-ink-3 hover:text-ink hover:bg-ivory-3 transition-colors border-none cursor-pointer"
+            >
+              ×
+            </button>
+            <h3 className="font-serif text-2xl text-ink mb-1">Ship Order</h3>
+            <p className="text-sm text-ink-3 mb-5">Enter parcel details for order #{shipForm.orderRef} before creating the shipment in NimbusPost.</p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="text-xs text-ink-3 block mb-1.5">Parcel Weight (grams)</label>
+                <input
+                  value={shipForm.weight_grams}
+                  onChange={e => setShipForm(prev => prev ? { ...prev, weight_grams: e.target.value } : prev)}
+                  className="input"
+                  inputMode="numeric"
+                  placeholder="500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-ink-3 block mb-1.5">Length (cm)</label>
+                <input
+                  value={shipForm.length_cm}
+                  onChange={e => setShipForm(prev => prev ? { ...prev, length_cm: e.target.value } : prev)}
+                  className="input"
+                  inputMode="decimal"
+                  placeholder="20"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-ink-3 block mb-1.5">Breadth (cm)</label>
+                <input
+                  value={shipForm.breadth_cm}
+                  onChange={e => setShipForm(prev => prev ? { ...prev, breadth_cm: e.target.value } : prev)}
+                  className="input"
+                  inputMode="decimal"
+                  placeholder="15"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-ink-3 block mb-1.5">Height (cm)</label>
+                <input
+                  value={shipForm.height_cm}
+                  onChange={e => setShipForm(prev => prev ? { ...prev, height_cm: e.target.value } : prev)}
+                  className="input"
+                  inputMode="decimal"
+                  placeholder="12"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-ink-3 block mb-1.5">Courier ID (optional)</label>
+                <input
+                  value={shipForm.courier_id}
+                  onChange={e => setShipForm(prev => prev ? { ...prev, courier_id: e.target.value } : prev)}
+                  className="input"
+                  inputMode="numeric"
+                  placeholder="Auto-select fastest"
+                />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-3 text-sm text-ink cursor-pointer mt-4">
+              <input
+                type="checkbox"
+                checked={shipForm.generate_pickup}
+                onChange={e => setShipForm(prev => prev ? { ...prev, generate_pickup: e.target.checked } : prev)}
+                className="h-4 w-4 accent-[var(--green)]"
+              />
+              Generate pickup request immediately
+            </label>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShipForm(null)} disabled={shipLoading} className="btn-outline flex-1 justify-center">
+                Cancel
+              </button>
+              <button onClick={submitShipOrder} disabled={shipLoading} className="btn-primary flex-1 justify-center">
+                <span>{shipLoading ? 'Shipping...' : 'Create Shipment'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,4 +1,0 @@
-[
-  {"id":"v1","name":"Special","description":"medium-size,white","price":120000,"quality_tag":"basic"},
-  {"id":"v2","name":"Premium","description":"Large,juicy","price":140000,"quality_tag":"popular"},
-  {"id":"v3","name":"DoubleSpecial","description":"Jumbo Size","price":170000,"quality_tag":"best"}

@@ -8,6 +8,94 @@ import { formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 import { Package, Wallet, Clock, ChevronRight } from 'lucide-react'
 
+const ACCOUNT_PHONE_KEY = 'mana_account_phone'
+const ACCOUNT_COOKIE_KEY = 'mana_account_phone'
+const STATUS_STEPS = [
+  { key: 'pending', label: 'Placed' },
+  { key: 'confirmed', label: 'Confirmed' },
+  { key: 'packed', label: 'Packed' },
+  { key: 'shipped', label: 'Shipped' },
+  { key: 'delivered', label: 'Delivered' },
+]
+
+function saveAccountPhone(phone: string) {
+  localStorage.setItem(ACCOUNT_PHONE_KEY, phone)
+  document.cookie = `${ACCOUNT_COOKIE_KEY}=${phone}; path=/; max-age=${60 * 60 * 24 * 180}; SameSite=Lax`
+}
+
+function readAccountPhone() {
+  const stored = localStorage.getItem(ACCOUNT_PHONE_KEY)
+  if (stored) return stored
+
+  return document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${ACCOUNT_COOKIE_KEY}=`))
+    ?.split('=')[1] || ''
+}
+
+function clearAccountPhone() {
+  localStorage.removeItem(ACCOUNT_PHONE_KEY)
+  document.cookie = `${ACCOUNT_COOKIE_KEY}=; path=/; max-age=0; SameSite=Lax`
+}
+
+function getStatusIndex(status: string) {
+  if (status === 'cancelled') return -1
+  const index = STATUS_STEPS.findIndex((step) => step.key === status)
+  return index >= 0 ? index : 0
+}
+
+function TrackingTimeline({ status }: { status: string }) {
+  if (status === 'cancelled') {
+    return (
+      <div className="mt-4 rounded-lg border border-terra/30 bg-terra/10 px-3 py-2 text-sm text-terra">
+        This order has been cancelled.
+      </div>
+    )
+  }
+
+  const activeIndex = getStatusIndex(status)
+
+  return (
+    <div className="mt-4 grid grid-cols-5 gap-2 text-[.62rem]">
+      {STATUS_STEPS.map((step, index) => {
+        const done = index <= activeIndex
+        return (
+          <div key={step.key} className="flex flex-col items-center text-center gap-1">
+            <div className={`h-2 w-full rounded-full ${done ? 'bg-green' : 'bg-ivory-4'}`} />
+            <span className={done ? 'text-green-3 font-medium' : 'text-ink-4'}>{step.label}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function TrackingDetails({ order, formatDate }: { order: any; formatDate: (value: string) => string }) {
+  const expectedDelivery = order.expected_delivery ? formatDate(order.expected_delivery) : 'Not available yet'
+
+  return (
+    <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2">
+        <div className="text-[.62rem] tracking-widest uppercase text-ink-4">Courier</div>
+        <div className="text-sm text-ink mt-1">{order.courier_name || (order.status === 'shipped' ? 'Assigned soon' : 'After dispatch')}</div>
+      </div>
+      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2">
+        <div className="text-[.62rem] tracking-widest uppercase text-ink-4">Tracking No.</div>
+        <div className="text-sm text-ink mt-1">{order.tracking_number || 'Not available yet'}</div>
+      </div>
+      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2">
+        <div className="text-[.62rem] tracking-widest uppercase text-ink-4">Expected Delivery</div>
+        <div className="text-sm text-ink mt-1">{expectedDelivery}</div>
+      </div>
+      {order.tracking_link && (
+        <a href={order.tracking_link} target="_blank" rel="noopener noreferrer" className="sm:col-span-3 btn-outline text-center no-underline justify-center">
+          Track with courier
+        </a>
+      )}
+    </div>
+  )
+}
+
 export default function ProfilePage() {
   // Auth State
   const [phone, setPhone] = useState('')
@@ -16,6 +104,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false)
   const [otpHint, setOtpHint] = useState('')
   const [verifiedPhone, setVerifiedPhone] = useState('')
+  const [initializing, setInitializing] = useState(true)
 
   // Dashboard Data State
   const [walletBalance, setWalletBalance] = useState(0)
@@ -27,6 +116,22 @@ export default function ProfilePage() {
   const router = useRouter()
 
   const normalizedPhone = phone.replace(/\D/g, '').slice(-10)
+
+  useEffect(() => {
+    const rememberedPhone = readAccountPhone().replace(/\D/g, '').slice(-10)
+
+    if (rememberedPhone.length === 10) {
+      setPhone(rememberedPhone)
+      setVerifiedPhone(rememberedPhone)
+      setStep('dashboard')
+      void fetchDashboardData(rememberedPhone)
+      setInitializing(false)
+      return
+    }
+
+    setDataLoading(false)
+    setInitializing(false)
+  }, [])
 
   const sendOtp = async () => {
     if (normalizedPhone.length !== 10) {
@@ -79,6 +184,7 @@ export default function ProfilePage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'OTP verification failed')
 
+      saveAccountPhone(normalizedPhone)
       setVerifiedPhone(normalizedPhone)
       setStep('dashboard')
       showToast('Successfully logged in')
@@ -97,7 +203,7 @@ export default function ProfilePage() {
       const walletRes = await fetch(`/api/wallet?phone=${userPhone}`)
       const walletData = await walletRes.json()
       if (walletRes.ok && walletData.wallet) {
-        setWalletBalance(walletData.wallet.balance || 0)
+        setWalletBalance(walletData.balance || walletData.wallet.balance || 0)
       }
 
       // Fetch Orders
@@ -150,6 +256,30 @@ export default function ProfilePage() {
       case 'shipped': return 'text-blue-600 bg-blue-50 border-blue-200'
       default: return 'text-ink-2 bg-ivory-3 border-ivory-4'
     }
+  }
+
+  const logout = () => {
+    clearAccountPhone()
+    setStep('login')
+    setVerifiedPhone('')
+    setPhone('')
+    setOtpCode('')
+    setOtpHint('')
+    setOrders([])
+    setWalletBalance(0)
+  }
+
+  if (initializing) {
+    return (
+      <div className="min-h-[70vh] bg-ivory pt-12 pb-24">
+        <div className="max-w-4xl mx-auto px-[5%]">
+          <div className="max-w-md mx-auto bg-white border border-ivory-3 rounded-2xl p-8 shadow-soft">
+            <h1 className="font-serif text-2xl text-ink mb-2">Opening your profile...</h1>
+            <p className="text-sm text-ink-3">Loading your saved account and latest orders.</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -226,12 +356,7 @@ export default function ProfilePage() {
                 <p className="text-ink-4 text-sm mt-1">+91 {verifiedPhone.replace(/(\d{5})(\d{5})/, '$1 $2')}</p>
               </div>
               <button 
-                onClick={() => {
-                  setStep('login')
-                  setVerifiedPhone('')
-                  setPhone('')
-                  setOtpCode('')
-                }}
+                onClick={logout}
                 className="text-sm font-medium text-ink-3 hover:text-terra transition-colors px-4 py-2 border border-ivory-3 rounded-lg bg-white"
               >
                 Log out
@@ -311,6 +436,11 @@ export default function ProfilePage() {
                                 {(order.status || 'Processing').replace('_', ' ')}
                               </span>
                             </div>
+                          </div>
+
+                          <div className="px-5 pt-4">
+                            <TrackingTimeline status={order.status || 'pending'} />
+                            <TrackingDetails order={order} formatDate={formatDate} />
                           </div>
 
                           {/* Order Items */}

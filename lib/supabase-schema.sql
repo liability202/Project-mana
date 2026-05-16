@@ -43,8 +43,8 @@ create table if not exists orders (
   payment_status text default 'pending'
     check (payment_status in ('pending','paid','failed','refunded')),
   payment_id text,
-  razorpay_order_id text,
-  razorpay_link text,
+  cashfree_order_id text,
+  payment_link text,
   notes text,
   created_at timestamptz default now()
 );
@@ -183,8 +183,20 @@ alter table orders add column if not exists discount_amount integer default 0;
 alter table orders add column if not exists final_amount integer default 0;
 alter table orders add column if not exists cashback_earned integer default 0;
 alter table orders add column if not exists wallet_used integer default 0;
+alter table orders add column if not exists cod_charge integer default 0;
+alter table orders add column if not exists small_order_fee integer default 0;
 alter table orders add column if not exists order_ref text unique;
-alter table orders add column if not exists razorpay_link text;
+alter table orders add column if not exists cashfree_order_id text;
+alter table orders add column if not exists payment_link text;
+alter table orders add column if not exists tracking_number text;
+alter table orders add column if not exists tracking_link text;
+alter table orders add column if not exists courier_name text;
+alter table orders add column if not exists expected_delivery date;
+alter table orders add column if not exists shiprocket_order_id text;
+alter table orders add column if not exists shiprocket_shipment_id text;
+alter table orders add column if not exists shiprocket_tracking_status text;
+alter table orders add column if not exists tracking_events jsonb default '[]'::jsonb;
+alter table orders add column if not exists tracking_synced_at timestamptz;
 
 create index if not exists idx_coupons_code on coupons(code);
 create index if not exists idx_wallet_phone on wallet(phone);
@@ -193,6 +205,7 @@ create index if not exists idx_wallet_transactions_wallet_id on wallet_transacti
 create index if not exists idx_orders_coupon_code on orders(coupon_code);
 create index if not exists idx_orders_order_ref on orders(order_ref);
 create index if not exists idx_orders_customer_phone on orders(customer_phone);
+create index if not exists idx_orders_shiprocket_shipment_id on orders(shiprocket_shipment_id);
 create index if not exists idx_wa_sessions_updated_at on wa_sessions(updated_at);
 
 -- ── SAMPLE PRODUCTS (run this to populate your store) ──

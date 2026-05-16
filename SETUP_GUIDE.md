@@ -3,7 +3,7 @@
 ## What's built
 - Next.js 14 fullstack app (frontend + API routes)
 - Supabase database (products, orders, appointments)
-- Razorpay payments (UPI, cards, COD)
+- Cashfree payments (UPI, cards, net banking, COD)
 - Vercel hosting (free)
 - Admin panel at /admin
 
@@ -29,14 +29,20 @@ Download from nodejs.org → install version 18 or higher.
 
 ---
 
-## Step 3 — Set up Razorpay (free to create)
+## Step 3 — Set up Cashfree
 
-1. Go to razorpay.com → create account
-2. Complete KYC (need PAN, bank account, GST)
-3. For testing: Dashboard → Settings → API Keys → Generate Test Key
-4. Copy Key ID → RAZORPAY_KEY_ID and NEXT_PUBLIC_RAZORPAY_KEY_ID
-5. Copy Key Secret → RAZORPAY_KEY_SECRET
-6. When ready to go live: generate Live Keys and replace
+1. Go to cashfree.com → create a merchant account
+2. Complete merchant activation / KYC in the Cashfree dashboard
+3. In Cashfree Dashboard → Developers → API Keys:
+   - copy App ID → CASHFREE_APP_ID
+   - copy Secret Key → CASHFREE_SECRET_KEY
+4. In Cashfree Dashboard → Developers → Domain Whitelisting:
+   - add http://localhost:3000 for local testing
+   - add your live site domain later, for example https://your-site.vercel.app
+5. Choose mode:
+   - testing → CASHFREE_ENV=sandbox
+   - live → CASHFREE_ENV=production
+6. When you are ready to go live, replace sandbox credentials with production credentials and keep the live domain whitelisted
 
 ---
 
@@ -48,10 +54,11 @@ Open `.env.local` and replace all placeholder values:
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxx
 SUPABASE_SERVICE_ROLE_KEY=eyJxxx
-RAZORPAY_KEY_ID=rzp_test_xxx
-RAZORPAY_KEY_SECRET=xxx
-RAZORPAY_WEBHOOK_SECRET=xxx
-NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_xxx
+CASHFREE_APP_ID=your_cashfree_app_id
+CASHFREE_SECRET_KEY=your_cashfree_secret_key
+CASHFREE_ENV=sandbox
+CASHFREE_API_VERSION=2025-01-01
+NEXT_PUBLIC_CASHFREE_ENV=sandbox
 NEXT_PUBLIC_WHATSAPP_NUMBER=919876543210   ← your number, no + or spaces
 NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD=999
 ADMIN_SECRET=pick-a-strong-password
@@ -131,7 +138,7 @@ Option B — Through Supabase dashboard:
 | /products/mamra-almonds | Product detail |
 | /kits | Kit builder |
 | /cart | Cart (auto-opens drawer) |
-| /checkout | Checkout + Razorpay |
+| /checkout | Checkout + Cashfree |
 | /about | About Us |
 | /appointment | Video booking |
 | /search?q=almonds | Search results |
@@ -168,7 +175,7 @@ Open `components/layout/Footer.tsx` → edit the link arrays at top.
 | Database | Supabase | Free (500MB) |
 | Auth | Supabase Auth | Free |
 | Images | Supabase Storage | Free (1GB) |
-| Payments | Razorpay | 2% per transaction |
+| Payments | Cashfree | As per your Cashfree plan |
 | Hosting | Vercel | Free |
 | Domain | Your existing domain | Already have |
 | **Total** | | **₹0 + 2% transaction fee** |
@@ -177,3 +184,4 @@ Upgrade path when you scale:
 - Supabase Pro: ~₹1,700/month (8GB DB, more storage)
 - Vercel Pro: ~₹1,700/month (more bandwidth)
 - Total at scale: ~₹3,400/month — within your ₹5,000/yr budget with the free tier lasting a long time
+
