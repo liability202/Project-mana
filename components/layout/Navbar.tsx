@@ -42,7 +42,7 @@ export function Navbar() {
 
   return (
     <>
-      <nav className={`sticky top-0 z-50 flex h-[62px] items-center justify-between border-b border-ivory-3 bg-ivory/96 px-[5%] backdrop-blur-lg transition-shadow duration-300 ${scrolled ? 'shadow-soft' : ''}`}>
+      <nav className={`sticky top-0 z-50 flex h-[62px] items-center justify-between border-b border-ivory-3 bg-white/95 px-[5%] backdrop-blur-md transition-all duration-300 ${scrolled ? 'shadow-soft' : ''}`}>
         <Link href="/" className="flex items-center gap-3 no-underline">
           <div className="h-9 w-9 flex-shrink-0">
             <Image

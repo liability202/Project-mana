@@ -57,56 +57,68 @@ export default async function HomePage() {
   return (
     <>
       {/* ── HERO ── */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 min-h-0 items-center px-[5%] py-12 lg:py-16 bg-ivory relative overflow-hidden gap-14">
-        <div className="absolute right-[-120px] top-[-120px] w-[500px] h-[500px] rounded-full bg-green-6 pointer-events-none z-0" />
-        <div className="relative z-10">
-          <div className="flex items-center gap-2.5 text-[.62rem] tracking-[.38em] uppercase text-terra mb-4 animate-fade-up" style={{ animationDelay: '.1s', animationFillMode: 'both' }}>
-            <span className="w-5 h-px bg-terra block" />
+      <section className="relative flex items-center justify-center min-h-[85vh] px-[5%] py-20 overflow-hidden text-center">
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes kenburns {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.15); }
+          }
+          .animate-kenburns {
+            animation: kenburns 30s ease-in-out infinite alternate;
+          }
+        `}} />
+        
+        {/* Cinematic Background */}
+        <div className="absolute inset-0 z-0 bg-ink">
+          <Image
+            src="https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=2000&q=80"
+            alt="Premium Spices Background"
+            fill
+            className="object-cover object-center opacity-80 animate-kenburns"
+            priority
+          />
+          {/* Elegant Dark Overlay ensuring text readability on all devices */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/40" />
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col items-center mt-8">
+          <div className="flex items-center gap-3 text-[.65rem] tracking-[.4em] uppercase text-ivory/90 font-medium mb-6 animate-fade-up" style={{ animationDelay: '.1s', animationFillMode: 'both' }}>
+            <span className="w-8 h-px bg-ivory/60 block" />
             Pure · Natural · Curated
+            <span className="w-8 h-px bg-ivory/60 block" />
           </div>
-          <h1 className="font-serif text-[clamp(2.6rem,4.5vw,5rem)] font-light text-ink leading-[1.07] mb-4 tracking-tight animate-fade-up" style={{ animationDelay: '.2s', animationFillMode: 'both' }}>
-            The <em className="not-italic text-green">Essence</em><br />
+          
+          <h1 className="font-serif text-[clamp(2.8rem,7vw,6rem)] font-light text-white leading-[1.05] tracking-tight mb-6 animate-fade-up" style={{ animationDelay: '.2s', animationFillMode: 'both' }}>
+            The <em className="not-italic text-green-4">Essence</em><br />
             of Nature.
           </h1>
-          <p className="text-[.96rem] leading-[1.85] text-ink-3 max-w-[420px] mb-7 animate-fade-up" style={{ animationDelay: '.35s', animationFillMode: 'both' }}>
-            Premium dry fruits, Ayurvedic herbs, hand-picked spices and pansari staples — sourced from the finest origins across India and the world.
+          
+          <p className="text-[1.05rem] md:text-[1.2rem] leading-[1.8] text-ivory-3 max-w-[580px] mx-auto mb-10 animate-fade-up font-light" style={{ animationDelay: '.35s', animationFillMode: 'both' }}>
+            Premium dry fruits, Ayurvedic herbs, hand-picked spices and pansari staples — sourced directly from the finest origins across India.
           </p>
-          <div className="flex gap-3 flex-wrap mb-8 animate-fade-up" style={{ animationDelay: '.5s', animationFillMode: 'both' }}>
-            <Link href="/products" className="btn-primary no-underline"><span>Shop Now</span></Link>
-            <Link href="/kits" className="btn-outline no-underline">View Kits →</Link>
+          
+          <div className="flex gap-5 flex-col sm:flex-row justify-center w-full sm:w-auto animate-fade-up px-4 sm:px-0" style={{ animationDelay: '.5s', animationFillMode: 'both' }}>
+            <Link href="/products" className="btn-primary no-underline px-10 py-4 text-[.95rem] shadow-xl shadow-green/20 hover:shadow-green/40 hover:-translate-y-1 transition-all bg-green hover:bg-green-4 text-white border-none w-full sm:w-auto flex items-center justify-center">
+              <span>Curate Your Pantry</span>
+            </Link>
+            <Link href="/kits" className="btn-outline no-underline px-10 py-4 text-[.95rem] border-white/40 text-white hover:bg-white hover:text-ink transition-all w-full sm:w-auto backdrop-blur-sm bg-white/5 flex items-center justify-center">
+              Explore Our Kits
+            </Link>
           </div>
-          <div className="flex gap-8 pt-7 border-t border-ivory-3 flex-wrap animate-fade-up" style={{ animationDelay: '.65s', animationFillMode: 'both' }}>
-            {[['400+', 'Products'], ['2K+', 'Families'], ['100%', 'Pure & Natural']].map(([n, l]) => (
-              <div key={l}>
-                <div className="font-serif text-[1.7rem] text-green leading-none">{n}</div>
-                <div className="text-[.6rem] tracking-[.12em] uppercase text-ink-3 mt-1">{l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="relative z-10 hidden lg:flex items-center justify-center">
-          <div className="relative w-full max-w-[460px] h-[460px] mx-auto">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[255px] h-[255px] rounded-full overflow-hidden border-4 border-white shadow-medium animate-bob">
-              <Image src="https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/ChatGPT%20Image%20Mar%2024,%202026,%2010_12_09%20PM.png" alt="dry fruits" fill className="object-cover" />
-            </div>
+          
+          <div className="flex gap-10 sm:gap-16 pt-12 mt-12 border-t border-white/15 flex-wrap justify-center animate-fade-up w-full" style={{ animationDelay: '.65s', animationFillMode: 'both' }}>
             {[
-              { cls: 'top-[3%] left-[3%]', src: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/ChatGPT%20Image%20Mar%2024,%202026,%2010_12_24%20PM.png', alt: 'almonds' },
-              { cls: 'top-[3%] right-[3%]', src: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/ChatGPT%20Image%20Mar%2024,%202026,%2010_12_55%20PM.png', alt: 'herbs' },
-              { cls: 'bottom-[3%] left-[7%]', src: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=220&q=80', alt: 'spices' },
-              { cls: 'bottom-[3%] right-[5%]', src: 'https://images.unsplash.com/photo-1574226516831-e1dff420e562?w=220&q=80', alt: 'walnuts' },
-            ].map((img, i) => (
-              <div key={i} className={`absolute ${img.cls} w-[118px] h-[118px] rounded-full overflow-hidden border-[3px] border-white shadow-soft`}>
-                <Image src={img.src} alt={img.alt} fill className="object-cover" />
+              ['400+', 'Premium Products'], 
+              ['10K+', 'Happy Families'], 
+              ['100%', 'Pure & Natural']
+            ].map(([n, l]) => (
+              <div key={l} className="flex flex-col items-center gap-1.5">
+                <div className="font-serif text-[1.8rem] sm:text-[2.2rem] text-green-4 leading-none drop-shadow-lg">{n}</div>
+                <div className="text-[.6rem] sm:text-[.65rem] tracking-[.2em] uppercase text-ivory/70 font-medium">{l}</div>
               </div>
             ))}
-            <div className="absolute top-[18%] left-[-8%] bg-white border border-ivory-3 rounded-full px-3.5 py-1.5 text-[.68rem] text-ink-2 flex items-center gap-1.5 shadow-soft whitespace-nowrap z-10">
-              <span className="w-1.5 h-1.5 rounded-full bg-terra animate-pulse-dot" />
-              Organic Certified
-            </div>
-            <div className="absolute bottom-[22%] right-[-6%] bg-white border border-ivory-3 rounded-full px-3.5 py-1.5 text-[.68rem] text-ink-2 flex items-center gap-1.5 shadow-soft whitespace-nowrap z-10">
-              <span className="w-1.5 h-1.5 rounded-full bg-terra animate-pulse-dot" />
-              Lab Tested ✓
-            </div>
           </div>
         </div>
       </section>
