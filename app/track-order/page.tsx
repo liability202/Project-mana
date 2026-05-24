@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { formatPrice } from '@/lib/utils'
 
@@ -34,7 +34,7 @@ function formatDate(value?: string | null) {
   })
 }
 
-export default function TrackOrderPage() {
+function TrackOrderContent() {
   const searchParams = useSearchParams()
   const [orderRef, setOrderRef] = useState('')
   const [phone, setPhone] = useState('')
@@ -144,5 +144,13 @@ function Meta({ label, value }: { label: string; value: string }) {
       <div className="text-[.62rem] tracking-widest uppercase text-ink-4">{label}</div>
       <div className="text-sm text-ink mt-1">{value}</div>
     </div>
+  )
+}
+
+export default function TrackOrderPage() {
+  return (
+    <Suspense fallback={<div className="px-[5%] py-20 text-center text-ink-3">Loading tracking details...</div>}>
+      <TrackOrderContent />
+    </Suspense>
   )
 }
