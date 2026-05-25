@@ -195,7 +195,7 @@ export async function deliverOtp(phone: string, code: string) {
     errors.push(error.message || 'SMS delivery failed')
   }
 
-  if (channels.length === 0 && process.env.NODE_ENV !== 'production') {
+  if (channels.length === 0 && (process.env.NODE_ENV !== 'production' || process.env.ENABLE_TEST_OTP === 'true')) {
     channels.push('dev')
   }
 
@@ -257,7 +257,7 @@ export async function verifyOtpCode(
     throw new Error('Too many invalid attempts. Please request a new OTP.')
   }
 
-  const isTestOtp = process.env.NODE_ENV !== 'production' && params.otp === '111111'
+  const isTestOtp = (process.env.NODE_ENV !== 'production' || process.env.ENABLE_TEST_OTP === 'true') && params.otp === '111111'
 
   if (!isTestOtp) {
     if (hashOtp(normalized, params.otp) !== record.otp_hash) {
