@@ -31,9 +31,9 @@ async function getFeaturedProducts(): Promise<Product[]> {
 
 const CATEGORIES = [
   { name: 'Dry Fruits', slug: 'dry-fruits', pill: 'Most Popular', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/ChatGPT%20Image%20Mar%2024,%202026,%2010_12_09%20PM.png', count: '48 varieties' },
-  { name: 'Herbs', slug: 'herbs', pill: 'Ayurvedic', img: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=500&q=80', count: '36 varieties' },
-  { name: 'Spices', slug: 'spices', pill: 'Single Origin', img: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=500&q=80', count: '54 varieties' },
-  { name: 'Pansari', slug: 'pansari', pill: 'Traditional', img: 'https://images.unsplash.com/photo-1615485500704-8e990f9900f7?w=500&q=80', count: '62 varieties' },
+  { name: 'Herbs', slug: 'herbs', pill: 'Ayurvedic', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/ChatGPT%20Image%20May%2025,%202026,%2012_01_45%20PM.png', count: '36 varieties' },
+  { name: 'Spices', slug: 'spices', pill: 'Single Origin', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/ChatGPT%20Image%20May%2025,%202026,%2012_08_37%20PM.png', count: '54 varieties' },
+  { name: 'Pansari', slug: 'pansari', pill: 'Traditional', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/Pansari%20category.png', count: '62 varieties' },
 ]
 
 const TESTIMONIALS = [
@@ -71,7 +71,7 @@ export default async function HomePage() {
         {/* Cinematic Background */}
         <div className="absolute inset-0 z-0 bg-ink">
           <Image
-            src="https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=2000&q=80"
+            src="https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/hero%20banner.png"
             alt="Premium Spices Background"
             fill
             className="object-cover object-center opacity-80 animate-kenburns"
@@ -86,7 +86,7 @@ export default async function HomePage() {
         <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col items-center mt-8">
           <div className="flex items-center gap-3 text-[.65rem] tracking-[.4em] uppercase text-ivory/90 font-medium mb-6 animate-fade-up" style={{ animationDelay: '.1s', animationFillMode: 'both' }}>
             <span className="w-8 h-px bg-ivory/60 block" />
-            Pure · Natural · Curated
+            Pure · Natural · Handpicked
             <span className="w-8 h-px bg-ivory/60 block" />
           </div>
           
@@ -96,12 +96,12 @@ export default async function HomePage() {
           </h1>
           
           <p className="text-[1.05rem] md:text-[1.2rem] leading-[1.8] text-ivory-3 max-w-[580px] mx-auto mb-10 animate-fade-up font-light" style={{ animationDelay: '.35s', animationFillMode: 'both' }}>
-            Premium dry fruits, Ayurvedic herbs, hand-picked spices and pansari staples — sourced directly from the finest origins across India.
+            Premium dry fruits, Ayurvedic herbs, hand-picked spices and pansari staples — sourced directly from the finest origins across World.
           </p>
           
           <div className="flex gap-5 flex-col sm:flex-row justify-center w-full sm:w-auto animate-fade-up px-4 sm:px-0" style={{ animationDelay: '.5s', animationFillMode: 'both' }}>
             <Link href="/products" className="btn-primary no-underline px-10 py-4 text-[.95rem] shadow-xl shadow-green/20 hover:shadow-green/40 hover:-translate-y-1 transition-all bg-green hover:bg-green-4 text-white border-none w-full sm:w-auto flex items-center justify-center">
-              <span>Curate Your Pantry</span>
+              <span>view collection</span>
             </Link>
             <Link href="/kits" className="btn-outline no-underline px-10 py-4 text-[.95rem] border-white/40 text-white hover:bg-white hover:text-ink transition-all w-full sm:w-auto backdrop-blur-sm bg-white/5 flex items-center justify-center">
               Explore Our Kits
