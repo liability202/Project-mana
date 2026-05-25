@@ -1,4 +1,5 @@
-const WA_URL = `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`
+const WHATSAPP_GRAPH_API_VERSION = process.env.WHATSAPP_GRAPH_API_VERSION || 'v25.0'
+const WA_URL = `https://graph.facebook.com/${WHATSAPP_GRAPH_API_VERSION}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`
 
 function getHeaders() {
   const token = process.env.WHATSAPP_TOKEN

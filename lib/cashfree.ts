@@ -8,9 +8,16 @@ function getCashfreeBaseUrl() {
 function getCashfreeHeaders() {
   const clientId = process.env.CASHFREE_APP_ID
   const clientSecret = process.env.CASHFREE_SECRET_KEY
+  const mode = (process.env.CASHFREE_ENV || 'sandbox').toLowerCase()
 
   if (!clientId || !clientSecret) {
     throw new Error('Cashfree credentials are not configured.')
+  }
+  if (mode !== 'production' && clientSecret.includes('_prod_')) {
+    throw new Error('Cashfree is set to sandbox, but production credentials are configured. Use sandbox keys or set CASHFREE_ENV and NEXT_PUBLIC_CASHFREE_ENV to production.')
+  }
+  if (mode === 'production' && clientSecret.includes('_test_')) {
+    throw new Error('Cashfree is set to production, but sandbox credentials are configured. Use production keys or set CASHFREE_ENV and NEXT_PUBLIC_CASHFREE_ENV to sandbox.')
   }
 
   return {

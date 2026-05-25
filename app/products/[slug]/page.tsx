@@ -13,6 +13,16 @@ import type { Product, Variant } from '@/lib/supabase'
 
 const ACCOUNT_PHONE_KEY = 'mana_account_phone'
 
+function getPresetWeights(category?: string) {
+  if (category === 'herbs' || category === 'spices') return [100, 200, 500, 1000]
+  return [100, 250, 500, 1000]
+}
+
+function getDefaultWeight(category?: string) {
+  if (category === 'herbs' || category === 'spices') return 200
+  return 250
+}
+
 function readAccountPhone() {
   if (typeof window === 'undefined') return ''
 
@@ -30,7 +40,8 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   const [activeImg, setActiveImg]   = useState(0)
   const [activeVar, setActiveVar]   = useState<Variant | null>(null)
   const [unit, setUnit]             = useState<'g' | 'kg'>('g')
-  const [grams, setGrams]           = useState(500)
+  const [grams, setGrams]           = useState(250)
+  const [customWeight, setCustomWeight] = useState(false)
   const [loading, setLoading]       = useState(true)
   const [deliveryPincode, setDeliveryPincode] = useState('')
   const [deliveryCheck, setDeliveryCheck] = useState<any>(null)
@@ -47,6 +58,8 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
         if (data) {
           setProduct(data)
           setActiveVar(data.variants?.[0] || null)
+          setGrams(getDefaultWeight(data.category))
+          setCustomWeight(false)
         }
         setLoading(false)
       })
@@ -135,10 +148,12 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   const galleryImages = activeVar?.images?.length ? activeVar.images : product.images
   const basePrice = activeVar?.price || product.price
   const livePrice = Math.round((basePrice / 500) * grams)
-  const sliderMax = unit === 'kg' ? 5 : 1000
-  const sliderMin = unit === 'kg' ? 0.5 : 100
-  const sliderStep = unit === 'kg' ? 0.5 : 50
-  const sliderVal = unit === 'kg' ? grams / 1000 : grams
+  const presetWeights = getPresetWeights(product.category)
+  const presetIndex = Math.max(0, presetWeights.findIndex(weight => weight === grams))
+  const sliderMax = customWeight ? (unit === 'kg' ? 5 : 1000) : presetWeights.length - 1
+  const sliderMin = customWeight ? (unit === 'kg' ? 0.5 : 100) : 0
+  const sliderStep = customWeight ? (unit === 'kg' ? 0.5 : 50) : 1
+  const sliderVal = customWeight ? (unit === 'kg' ? grams / 1000 : grams) : (presetIndex >= 0 ? presetIndex : 0)
   const sliderPct = ((sliderVal - sliderMin) / (sliderMax - sliderMin)) * 100
 
   const handleAddToCart = () => {
@@ -248,20 +263,43 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
           <div className="mb-5">
             <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-3">Select Quantity</div>
             <div className="bg-ivory-2 border border-ivory-3 rounded-xl p-4">
-              {/* Unit toggle */}
-              <div className="flex border border-ivory-3 rounded-md overflow-hidden w-fit mb-4 bg-white">
-                {(['g', 'kg'] as const).map(u => (
-                  <button
-                    key={u}
-                    onClick={() => {
-                      setUnit(u)
-                      if (u === 'kg') setGrams(Math.max(500, Math.round(grams / 500) * 500))
-                    }}
-                    className={`px-4 py-1.5 text-xs border-none cursor-pointer font-sans transition-all ${unit === u ? 'bg-green text-ivory font-medium' : 'bg-transparent text-ink-3'}`}
-                  >
-                    {u === 'g' ? 'Grams' : 'Kilograms'}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                {customWeight ? (
+                  <div className="flex border border-ivory-3 rounded-md overflow-hidden w-fit bg-white">
+                    {(['g', 'kg'] as const).map(u => (
+                      <button
+                        key={u}
+                        onClick={() => {
+                          setUnit(u)
+                          if (u === 'kg') setGrams(Math.max(500, Math.round(grams / 500) * 500))
+                        }}
+                        className={`px-4 py-1.5 text-xs border-none cursor-pointer font-sans transition-all ${unit === u ? 'bg-green text-ivory font-medium' : 'bg-transparent text-ink-3'}`}
+                      >
+                        {u === 'g' ? 'Grams' : 'Kilograms'}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-ink-3">
+                    Preset weights for {product.category.replace('-', ' ')}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customWeight) {
+                      const nearestPreset = presetWeights.reduce((nearest, weight) =>
+                        Math.abs(weight - grams) < Math.abs(nearest - grams) ? weight : nearest
+                      , presetWeights[0])
+                      setGrams(nearestPreset)
+                    }
+                    setCustomWeight(value => !value)
+                    setUnit('g')
+                  }}
+                  className="border border-green-4 bg-white text-green px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer hover:bg-green-6 transition-colors"
+                >
+                  {customWeight ? 'Use Preset Weights' : 'Customize Weight'}
+                </button>
               </div>
 
               {/* Slider */}
@@ -273,13 +311,30 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
                 value={sliderVal}
                 onChange={e => {
                   const v = parseFloat(e.target.value)
-                  setGrams(unit === 'kg' ? Math.round(v * 1000) : Math.round(v))
+                  if (customWeight) {
+                    setGrams(unit === 'kg' ? Math.round(v * 1000) : Math.round(v))
+                    return
+                  }
+                  setGrams(presetWeights[Math.round(v)] || presetWeights[0])
                 }}
                 className="w-full mb-1"
                 style={{ background: `linear-gradient(to right,var(--green3) ${Math.max(0, Math.min(100, sliderPct))}%,var(--ivory3) ${Math.max(0, Math.min(100, sliderPct))}%)` }}
               />
               <div className="relative h-5 text-[.56rem] text-ink-4 mb-3 mt-2">
-                {unit === 'g' ? (
+                {!customWeight ? (
+                  presetWeights.map((weight, index) => (
+                    <span
+                      key={weight}
+                      className={`absolute font-medium ${grams === weight ? 'text-green' : 'text-ink'}`}
+                      style={{
+                        left: `${(index / (presetWeights.length - 1)) * 100}%`,
+                        transform: index === 0 ? 'none' : index === presetWeights.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
+                      }}
+                    >
+                      {formatWeight(weight)}
+                    </span>
+                  ))
+                ) : unit === 'g' ? (
                   <>
                     <span className="absolute left-0">100g</span>
                     <span className="absolute font-medium text-ink -translate-x-1/2" style={{ left: '16.6%' }}>250g</span>
@@ -302,14 +357,16 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
                 <input
                   type="number"
                   value={unit === 'kg' ? (grams / 1000).toFixed(1) : grams}
-                  min={sliderMin}
-                  max={sliderMax}
-                  step={sliderStep}
+                  min={customWeight ? sliderMin : presetWeights[0]}
+                  max={customWeight ? sliderMax : presetWeights[presetWeights.length - 1]}
+                  step={customWeight ? sliderStep : 1}
+                  readOnly={!customWeight}
                   onChange={e => {
+                    if (!customWeight) return
                     const v = parseFloat(e.target.value) || 0
                     setGrams(unit === 'kg' ? Math.round(v * 1000) : Math.round(v))
                   }}
-                  className="w-24 text-center px-3 py-2 border border-ivory-3 rounded-md font-sans text-sm text-ink bg-white outline-none focus:border-green-3"
+                  className={`w-24 text-center px-3 py-2 border border-ivory-3 rounded-md font-sans text-sm text-ink bg-white outline-none focus:border-green-3 ${customWeight ? '' : 'cursor-default'}`}
                 />
                 <span className="text-sm text-ink-3">{unit}</span>
                 <div className="ml-auto text-right">

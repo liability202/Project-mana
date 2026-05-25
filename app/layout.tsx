@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   title: 'Mana – The Essence of Nature',
   description: 'Premium dry fruits, Ayurvedic herbs, hand-picked spices and pansari staples from MK and Sons, Ghaziabad. Lab tested, packed fresh to order.',
   keywords: 'dry fruits online, Mamra almonds, Ashwagandha, spices, herbs, Ghaziabad',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+  },
   openGraph: {
     title: 'Mana – The Essence of Nature',
     description: 'Premium dry fruits, Ayurvedic herbs and spices. Packed fresh to order.',
