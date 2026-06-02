@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { matchCatalogProducts } from '@/lib/product-search'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -17,10 +18,14 @@ export async function GET(req: Request) {
   if (id) query = query.eq('id', id)
   if (category) query = query.eq('category', category)
   if (tag) query = query.contains('tags', [tag])
-  if (q) query = query.ilike('name', `%${q}%`)
-
-  const { data, error } = await query.order('created_at', { ascending: false }).limit(limit)
+  const fetchLimit = q ? Math.max(200, limit) : limit
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(fetchLimit)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (q) {
+    return NextResponse.json(matchCatalogProducts(data || [], q, limit).map(match => match.product))
+  }
+
   return NextResponse.json(data)
 }
 

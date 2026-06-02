@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { X, Search } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { calcPriceForWeight, formatPrice } from '@/lib/utils'
 import type { Product } from '@/lib/supabase'
 
@@ -28,13 +27,9 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
     clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
-      const { data } = await supabase
-        .from('products')
-        .select('*')
-        .or(`name.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`)
-        .eq('in_stock', true)
-        .limit(8)
-      setResults(data || [])
+      const res = await fetch(`/api/products?q=${encodeURIComponent(query)}&limit=8`)
+      const data = await res.json()
+      setResults(Array.isArray(data) ? data : [])
       setLoading(false)
     }, 260)
   }, [query])

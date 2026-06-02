@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { ProductCard } from '@/components/product/ProductCard'
 import { SortSelect } from '@/components/product/SortSelect'
+import { matchCatalogProducts } from '@/lib/product-search'
 import type { Product } from '@/lib/supabase'
 
 export const revalidate = 60
@@ -21,11 +22,11 @@ async function getProducts(params: Props['searchParams']): Promise<Product[]> {
   let query = supabase.from('products').select('*').eq('in_stock', true)
   if (params.category) query = query.eq('category', params.category)
   if (params.tag && params.tag !== 'All') query = query.contains('tags', [params.tag.toLowerCase()])
-  if (params.q) query = query.ilike('name', `%${params.q}%`)
   if (params.sort === 'price-asc') query = query.order('price', { ascending: true })
   else if (params.sort === 'price-desc') query = query.order('price', { ascending: false })
   else query = query.order('created_at', { ascending: false })
-  const { data } = await query.limit(24)
+  const { data } = await query.limit(params.q ? 200 : 24)
+  if (params.q) return matchCatalogProducts(data || [], params.q, 24).map(match => match.product)
   return data || []
 }
 
