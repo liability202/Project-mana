@@ -39,7 +39,7 @@ type ShippingCheck = {
 
 const ACCOUNT_PHONE_KEY = 'mana_account_phone'
 const COD_CHARGE = 4900 // ₹49 in paise
-const SMALL_ORDER_FEE = 4900 // ₹49 in paise – charged on orders below free-shipping threshold
+const SMALL_ORDER_FEE = 1900 // ₹19 in paise – charged on orders below ₹500
 
 function rememberAccountPhone(phone: string) {
   localStorage.setItem(ACCOUNT_PHONE_KEY, phone)
@@ -79,7 +79,7 @@ export default function CheckoutPage() {
   const shipping = shippingCost(subtotal)
   const discount = couponState.discountAmount
   const codCharge = paymentMethod === 'cod' ? COD_CHARGE : 0
-  const smallOrderFee = subtotal < FREE_SHIPPING_THRESHOLD ? SMALL_ORDER_FEE : 0
+  const smallOrderFee = subtotal < 50000 ? SMALL_ORDER_FEE : 0
   const walletApplied = useCashback ? Math.min(walletBalance, Math.max(0, subtotal - discount)) : 0
   const orderTotal = Math.max(0, subtotal + shipping + codCharge + smallOrderFee - discount - walletApplied)
   const cashbackPreview = Math.round((orderTotal * 5) / 100)
