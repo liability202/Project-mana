@@ -12,8 +12,6 @@ export function ProductCard({ product }: { product: Product }) {
   const firstVariant = product.variants?.[0]
   const basePrice = firstVariant?.price || product.price
   const baseWeight = parseBaseWeightGrams(product.price_per_unit)
-  const displayWeight = 500
-  const displayPrice = calcPriceForWeight(basePrice, product.price_per_unit, displayWeight)
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -23,8 +21,8 @@ export function ProductCard({ product }: { product: Product }) {
       product_image: product.images?.[0] || '',
       variant_id: firstVariant?.id,
       variant_name: firstVariant?.name,
-      weight_grams: displayWeight,
-      price: displayPrice,
+      weight_grams: baseWeight,
+      price: basePrice,
       quantity: 1,
     })
     showToast(`✦ ${product.name} added to cart`)
@@ -90,10 +88,9 @@ export function ProductCard({ product }: { product: Product }) {
         )}
         <div className="mt-auto flex items-center justify-between gap-2 flex-wrap">
           <div>
-            <div className="font-serif text-[1.18rem] text-green leading-none">{formatPrice(displayPrice)}</div>
-            <div className="text-[.6rem] text-ink-4 mt-0.5">for 500g</div>
-            {baseWeight !== displayWeight && (
-              <div className="text-[.56rem] text-ink-4 mt-0.5">{formatPrice(basePrice)} {product.price_per_unit}</div>
+            <div className="font-serif text-[1.18rem] text-green leading-none">{formatPrice(basePrice)}</div>
+            {product.price_per_unit && (
+              <div className="text-[.6rem] text-ink-4 mt-0.5">{product.price_per_unit}</div>
             )}
           </div>
           <button

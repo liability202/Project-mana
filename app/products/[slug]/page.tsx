@@ -462,7 +462,6 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
       <ProductRecommendations 
         currentSlug={product.slug} 
         category={product.category} 
-        grams={grams} 
       />
 
       <div className="px-[5%] pb-14 max-w-[1400px] mx-auto mt-8">

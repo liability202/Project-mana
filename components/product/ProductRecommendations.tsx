@@ -6,18 +6,16 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useCart } from '@/lib/store'
-import { calcPriceForWeight, formatPrice } from '@/lib/utils'
+import { formatPrice, parseBaseWeightGrams } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 import type { Product } from '@/lib/supabase'
 
 export function ProductRecommendations({ 
   currentSlug, 
-  category, 
-  grams = 500 
+  category
 }: { 
   currentSlug: string
   category: string
-  grams?: number
 }) {
   const [items, setItems] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -88,11 +86,10 @@ export function ProductRecommendations({
         {items.map(product => {
           const defaultVariant = product.variants?.[0]
           const basePrice = defaultVariant?.price || product.price
-          // Calculate price matching the requested grams if it's not a kit
-          const calculatedPrice = product.category === 'kits' ? basePrice : calcPriceForWeight(basePrice, product.price_per_unit, grams)
+          const baseWeight = parseBaseWeightGrams(product.price_per_unit)
           
-          // Check if this specific item + weight is in cart
-          const inCart = cartItems.some(i => i.product_id === product.id && i.weight_grams === grams)
+          // Check if this specific item is in cart
+          const inCart = cartItems.some(i => i.product_id === product.id)
 
           return (
             <div 
@@ -118,12 +115,12 @@ export function ProductRecommendations({
                   {product.name}
                 </Link>
                 <div className="text-xs text-ink-3 mb-3">
-                  {product.category === 'kits' ? 'Full Kit' : `${grams >= 1000 ? (grams / 1000).toFixed(1) + 'kg' : grams + 'g'}`}
+                  {product.category === 'kits' ? 'Full Kit' : (product.price_per_unit || '')}
                 </div>
                 
                 <div className="mt-auto flex items-center justify-between gap-2">
                   <div className="font-serif text-lg text-green leading-none">
-                    {formatPrice(calculatedPrice)}
+                    {formatPrice(basePrice)}
                   </div>
                   
                   {inCart ? (
@@ -142,8 +139,8 @@ export function ProductRecommendations({
                           product_image: product.images?.[0] || '',
                           variant_id: defaultVariant?.id,
                           variant_name: defaultVariant?.name,
-                          weight_grams: product.category === 'kits' ? 1000 : grams,
-                          price: calculatedPrice,
+                          weight_grams: product.category === 'kits' ? 1000 : baseWeight,
+                          price: basePrice,
                           quantity: 1,
                         })
                         // Use showToast directly
