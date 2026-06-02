@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useCart } from '@/lib/store'
-import { formatPrice } from '@/lib/utils'
+import { calcPriceForWeight, formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 import type { Product } from '@/lib/supabase'
 
@@ -89,7 +89,7 @@ export function ProductRecommendations({
           const defaultVariant = product.variants?.[0]
           const basePrice = defaultVariant?.price || product.price
           // Calculate price matching the requested grams if it's not a kit
-          const calculatedPrice = product.category === 'kits' ? basePrice : Math.round((basePrice / 500) * grams)
+          const calculatedPrice = product.category === 'kits' ? basePrice : calcPriceForWeight(basePrice, product.price_per_unit, grams)
           
           // Check if this specific item + weight is in cart
           const inCart = cartItems.some(i => i.product_id === product.id && i.weight_grams === grams)

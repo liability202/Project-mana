@@ -57,7 +57,7 @@ function roundToStep(value: number, step = 25) {
 
 function pricePerGram(item: KitItem) {
   if (item.price_per_gram && item.price_per_gram > 0) return item.price_per_gram
-  return Math.max(1, Math.round((item.price || 0) / 500))
+  return (item.price || 0) / 500
 }
 
 function getBasePrice(item: KitItem, grams: number) {

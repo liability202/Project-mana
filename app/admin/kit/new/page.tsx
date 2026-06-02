@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { formatPrice, slugify } from '@/lib/utils'
+import { calcPriceForWeight, formatPrice, parseBaseWeightGrams, slugify } from '@/lib/utils'
 import type { Product } from '@/lib/supabase'
 
 type SelectedKitProduct = {
@@ -10,6 +10,7 @@ type SelectedKitProduct = {
   name: string
   slug: string
   price: number
+  price_per_unit: string
   category: string
   image?: string
 }
@@ -89,8 +90,7 @@ export default function NewAdminKitPage() {
   const getSizeTotal = (sizeId: string, fallbackGrams: string) => {
     return selectedProducts.reduce((sum, product) => {
       const grams = Math.max(0, Number(getProductWeight(product.id, sizeId, fallbackGrams) || '0'))
-      const pricePerGram = Math.max(1, Math.round(product.price / 500))
-      return sum + Math.round(pricePerGram * grams)
+      return sum + calcPriceForWeight(product.price, product.price_per_unit, grams)
     }, 0)
   }
 
@@ -134,6 +134,7 @@ export default function NewAdminKitPage() {
           name: product.name,
           slug: product.slug,
           price: product.price,
+          price_per_unit: product.price_per_unit,
           category: product.category,
           image: product.images?.[0],
         },
@@ -182,7 +183,7 @@ export default function NewAdminKitPage() {
           compare_price: size.comparePriceRupees ? Math.round(Number(size.comparePriceRupees) * 100) : null,
           items: selectedProducts.map(product => {
             const productGrams = Math.max(0, Number(getProductWeight(product.id, size.id, size.gramsEach) || '0'))
-            const pricePerGram = Math.max(1, Math.round(product.price / 500))
+            const pricePerGram = product.price / parseBaseWeightGrams(product.price_per_unit)
             return {
               ...product,
               grams: productGrams,

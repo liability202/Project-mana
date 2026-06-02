@@ -3,13 +3,17 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Heart } from 'lucide-react'
 import { useCart } from '@/lib/store'
-import { formatPrice } from '@/lib/utils'
+import { calcPriceForWeight, formatPrice, parseBaseWeightGrams } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 import type { Product } from '@/lib/supabase'
 
 export function ProductCard({ product }: { product: Product }) {
   const addItem = useCart(s => s.addItem)
   const firstVariant = product.variants?.[0]
+  const basePrice = firstVariant?.price || product.price
+  const baseWeight = parseBaseWeightGrams(product.price_per_unit)
+  const displayWeight = 500
+  const displayPrice = calcPriceForWeight(basePrice, product.price_per_unit, displayWeight)
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -19,8 +23,8 @@ export function ProductCard({ product }: { product: Product }) {
       product_image: product.images?.[0] || '',
       variant_id: firstVariant?.id,
       variant_name: firstVariant?.name,
-      weight_grams: 500,
-      price: firstVariant?.price || product.price,
+      weight_grams: displayWeight,
+      price: displayPrice,
       quantity: 1,
     })
     showToast(`✦ ${product.name} added to cart`)
@@ -86,8 +90,11 @@ export function ProductCard({ product }: { product: Product }) {
         )}
         <div className="mt-auto flex items-center justify-between gap-2 flex-wrap">
           <div>
-            <div className="font-serif text-[1.18rem] text-green leading-none">{formatPrice(product.price)}</div>
-            <div className="text-[.6rem] text-ink-4 mt-0.5">{product.price_per_unit}</div>
+            <div className="font-serif text-[1.18rem] text-green leading-none">{formatPrice(displayPrice)}</div>
+            <div className="text-[.6rem] text-ink-4 mt-0.5">for 500g</div>
+            {baseWeight !== displayWeight && (
+              <div className="text-[.56rem] text-ink-4 mt-0.5">{formatPrice(basePrice)} {product.price_per_unit}</div>
+            )}
           </div>
           <button
             onClick={handleAdd}

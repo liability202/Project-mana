@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { X, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatPrice } from '@/lib/utils'
+import { calcPriceForWeight, formatPrice } from '@/lib/utils'
 import type { Product } from '@/lib/supabase'
 
 const POPULAR = ['Mamra Almonds', 'Ashwagandha', 'Cashews', 'Saffron', 'Dates', 'Walnuts', 'Pistachios', 'Triphala']
@@ -131,7 +131,8 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
                         className="text-sm text-ink leading-tight mb-1 font-serif"
                         dangerouslySetInnerHTML={{ __html: highlight(product.name) }}
                       />
-                      <div className="font-serif text-base text-green">{formatPrice(product.price)}</div>
+                      <div className="font-serif text-base text-green">{formatPrice(calcPriceForWeight(product.price, product.price_per_unit, 500))}</div>
+                      <div className="text-[.55rem] text-ink-4">for 500g</div>
                     </div>
                   </Link>
                 ))}

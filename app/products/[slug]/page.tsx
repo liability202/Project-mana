@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useCart, useCoupon } from '@/lib/store'
-import { formatPrice, formatWeight } from '@/lib/utils'
+import { calcPriceForWeight, formatPrice, formatWeight } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 import { ReviewForm } from '@/components/product/ReviewForm'
 import { ReviewList } from '@/components/product/ReviewList'
@@ -147,7 +147,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
 
   const galleryImages = activeVar?.images?.length ? activeVar.images : product.images
   const basePrice = activeVar?.price || product.price
-  const livePrice = Math.round((basePrice / 500) * grams)
+  const livePrice = calcPriceForWeight(basePrice, product.price_per_unit, grams)
   const presetWeights = getPresetWeights(product.category)
   const presetIndex = Math.max(0, presetWeights.findIndex(weight => weight === grams))
   const sliderMax = customWeight ? (unit === 'kg' ? 5 : 1000) : presetWeights.length - 1
@@ -251,7 +251,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
                         {qt && <span className={`text-[.5rem] font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded-sm ${qt.cls}`}>{qt.label}</span>}
                       </div>
                       {v.description && <div className="text-[.65rem] text-ink-4">{v.description}</div>}
-                      <div className="font-serif text-base text-green mt-1">{formatPrice(v.price)}/500g</div>
+                      <div className="font-serif text-base text-green mt-1">{formatPrice(v.price)} {product.price_per_unit}</div>
                     </button>
                   )
                 })}

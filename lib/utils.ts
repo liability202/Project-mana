@@ -18,9 +18,25 @@ export function formatWeight(grams: number): string {
   return grams + 'g'
 }
 
+export function parseBaseWeightGrams(label?: string | null, fallbackGrams = 500): number {
+  const match = String(label || '').toLowerCase().match(/(\d+(?:\.\d+)?)\s*(kg|kgs|kilogram|kilograms|g|gm|gram|grams)\b/)
+  if (!match) return fallbackGrams
+
+  const value = Number(match[1])
+  if (!Number.isFinite(value) || value <= 0) return fallbackGrams
+
+  return match[2].startsWith('kg') || match[2].startsWith('kilo')
+    ? Math.round(value * 1000)
+    : Math.round(value)
+}
+
 // Calculate price for a given weight
 export function calcPrice(basePricePaise: number, baseWeightGrams: number, targetGrams: number): number {
   return Math.round((basePricePaise / baseWeightGrams) * targetGrams)
+}
+
+export function calcPriceForWeight(basePricePaise: number, pricePerUnit: string | null | undefined, targetGrams: number): number {
+  return calcPrice(basePricePaise, parseBaseWeightGrams(pricePerUnit), targetGrams)
 }
 
 // Free shipping threshold in paise
