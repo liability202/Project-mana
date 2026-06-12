@@ -370,10 +370,14 @@ export default function CheckoutPage() {
         mode: process.env.NEXT_PUBLIC_CASHFREE_ENV === 'production' ? 'production' : 'sandbox',
       })
 
-      await cashfree.checkout({
+      const checkoutResult = await cashfree.checkout({
         paymentSessionId,
         redirectTarget: '_modal',
       })
+
+      if (checkoutResult?.error) {
+        throw new Error(checkoutResult.error.message || checkoutResult.error.description || 'Payment gateway declined this transaction')
+      }
 
       const verificationRes = await fetch('/api/cashfree/verify-order', {
         method: 'POST',

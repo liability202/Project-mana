@@ -111,7 +111,7 @@ export default async function HomePage() {
           <div className="flex gap-10 sm:gap-16 pt-12 mt-12 border-t border-white/15 flex-wrap justify-center animate-fade-up w-full" style={{ animationDelay: '.65s', animationFillMode: 'both' }}>
             {[
               ['400+', 'Premium Products'], 
-              ['10K+', 'Happy Families'], 
+              ['2K+', 'Happy Families'], 
               ['100%', 'Pure & Natural']
             ].map(([n, l]) => (
               <div key={l} className="flex flex-col items-center gap-1.5">

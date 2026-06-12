@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto'
+
 const CASHFREE_API_VERSION = process.env.CASHFREE_API_VERSION || '2025-01-01'
 
 function getCashfreeBaseUrl() {
@@ -5,7 +7,7 @@ function getCashfreeBaseUrl() {
   return mode === 'production' ? 'https://api.cashfree.com/pg' : 'https://sandbox.cashfree.com/pg'
 }
 
-function getCashfreeHeaders() {
+function getCashfreeHeaders(requestId: string) {
   const clientId = process.env.CASHFREE_APP_ID
   const clientSecret = process.env.CASHFREE_SECRET_KEY
   const mode = (process.env.CASHFREE_ENV || 'sandbox').toLowerCase()
@@ -25,50 +27,70 @@ function getCashfreeHeaders() {
     'x-api-version': CASHFREE_API_VERSION,
     'x-client-id': clientId,
     'x-client-secret': clientSecret,
+    'x-request-id': requestId,
+    'x-idempotency-key': requestId,
   }
 }
 
+async function parseCashfreeResponse(response: Response, fallback: unknown) {
+  const text = await response.text().catch(() => '')
+  if (!text) return fallback
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { message: text }
+  }
+}
+
+function cashfreeError(data: any, status: number, requestId: string, fallback: string) {
+  const message = data?.message || data?.error_description || data?.error || fallback
+  return new Error(`${message} (Cashfree ${status}, request ${requestId})`)
+}
+
 export async function createCashfreeOrder(payload: Record<string, unknown>) {
+  const requestId = randomUUID()
   const response = await fetch(`${getCashfreeBaseUrl()}/orders`, {
     method: 'POST',
-    headers: getCashfreeHeaders(),
+    headers: getCashfreeHeaders(requestId),
     body: JSON.stringify(payload),
     cache: 'no-store',
   })
 
-  const data = await response.json().catch(() => ({}))
+  const data = await parseCashfreeResponse(response, {})
   if (!response.ok) {
-    throw new Error(data?.message || data?.error || `Cashfree create order failed (${response.status})`)
+    throw cashfreeError(data, response.status, requestId, 'Cashfree create order failed')
   }
 
   return data
 }
 
 export async function fetchCashfreeOrder(orderId: string) {
+  const requestId = randomUUID()
   const response = await fetch(`${getCashfreeBaseUrl()}/orders/${orderId}`, {
     method: 'GET',
-    headers: getCashfreeHeaders(),
+    headers: getCashfreeHeaders(requestId),
     cache: 'no-store',
   })
 
-  const data = await response.json().catch(() => ({}))
+  const data = await parseCashfreeResponse(response, {})
   if (!response.ok) {
-    throw new Error(data?.message || data?.error || `Cashfree fetch order failed (${response.status})`)
+    throw cashfreeError(data, response.status, requestId, 'Cashfree fetch order failed')
   }
 
   return data
 }
 
 export async function fetchCashfreePayments(orderId: string) {
+  const requestId = randomUUID()
   const response = await fetch(`${getCashfreeBaseUrl()}/orders/${orderId}/payments`, {
     method: 'GET',
-    headers: getCashfreeHeaders(),
+    headers: getCashfreeHeaders(requestId),
     cache: 'no-store',
   })
 
-  const data = await response.json().catch(() => [])
+  const data = await parseCashfreeResponse(response, [])
   if (!response.ok) {
-    throw new Error(`Cashfree fetch payments failed (${response.status})`)
+    throw cashfreeError(data, response.status, requestId, 'Cashfree fetch payments failed')
   }
 
   return Array.isArray(data) ? data : []
