@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ensureUserProfile, normalizePhone } from '@/lib/commerce'
-import { sendWhatsAppMessage } from '@/lib/whatsapp/sender'
+import { sendWhatsAppMessage, sendWhatsAppTemplate } from '@/lib/whatsapp/sender'
 
 const OTP_EXPIRY_MINUTES = 10
 const OTP_RESEND_SECONDS = 30
@@ -43,6 +43,25 @@ function generateOtp() {
 
 function getOtpMessage(code: string) {
   return `Your MANA checkout OTP is ${code}. It is valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share this code with anyone.`
+}
+
+async function sendWhatsAppOtp(phone: string, code: string) {
+  const to = `91${phone}`
+  const templateName = process.env.WHATSAPP_OTP_TEMPLATE_NAME
+  const templateLang = process.env.WHATSAPP_OTP_TEMPLATE_LANG || 'en_US'
+  const hasCopyCodeButton = process.env.WHATSAPP_OTP_TEMPLATE_COPY_BUTTON === 'true'
+
+  if (templateName) {
+    return sendWhatsAppTemplate(
+      to,
+      templateName,
+      templateLang,
+      [code],
+      hasCopyCodeButton ? code : undefined
+    )
+  }
+
+  return sendWhatsAppMessage(to, getOtpMessage(code))
 }
 
 async function readFallbackOtp(client: SupabaseClient, phone: string): Promise<OtpRecord | null> {
@@ -181,7 +200,7 @@ export async function deliverOtp(phone: string, code: string) {
 
   if (process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID) {
     try {
-      await sendWhatsAppMessage(`91${phone}`, getOtpMessage(code))
+      await sendWhatsAppOtp(phone, code)
       channels.push('whatsapp')
     } catch (error: any) {
       errors.push(error.message || 'WhatsApp delivery failed')

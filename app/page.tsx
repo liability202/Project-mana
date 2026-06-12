@@ -29,6 +29,17 @@ async function getFeaturedProducts(): Promise<Product[]> {
   return any4 || []
 }
 
+async function getKits(): Promise<Product[]> {
+  const { data } = await supabase
+    .from('products')
+    .select('*')
+    .eq('category', 'kits')
+    .eq('in_stock', true)
+    .order('created_at', { ascending: false })
+    .limit(4)
+  return data || []
+}
+
 const CATEGORIES = [
   { name: 'Dry Fruits', slug: 'dry-fruits', pill: 'Most Popular', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/ChatGPT%20Image%20Mar%2024,%202026,%2010_12_09%20PM.png', count: '48 varieties' },
   { name: 'Herbs', slug: 'herbs', pill: 'Ayurvedic', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/herbs%20category.png', count: '36 varieties' },
@@ -52,7 +63,10 @@ const MARQUEE_ITEMS = [
 ]
 
 export default async function HomePage() {
-  const featuredProducts = await getFeaturedProducts()
+  const [featuredProducts, kits] = await Promise.all([
+    getFeaturedProducts(),
+    getKits(),
+  ])
 
   return (
     <>
@@ -164,32 +178,47 @@ export default async function HomePage() {
           <div className="eyebrow justify-center">Pre-made Kits</div>
           <h2 className="section-title">Everything <em className="not-italic text-green">together,</em><br />perfectly curated</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {[
-            { name: 'Triphala Churna Kit', tag: 'Ayurvedic', price: 58000, save: '18%', img: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=600&q=80', desc: 'Digestive wellness · Complete set' },
-            { name: 'Ladoo Ingredients Kit', tag: "Editor's Pick", price: 74000, save: '22%', img: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&q=80', desc: 'Festival ready · Perfect ladoos' },
-            { name: 'Protein Power Kit', tag: 'High-Protein', price: 124000, save: '15%', img: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=600&q=80', desc: 'Seeds, berries & nuts' },
-            { name: 'Daily Wellness Kit', tag: 'Daily Wellness', price: 89000, save: '20%', img: 'https://images.unsplash.com/photo-1574226516831-e1dff420e562?w=600&q=80', desc: 'Balanced & complete' },
-          ].map(kit => (
-            <Link key={kit.name} href="/kits" className="card no-underline group flex flex-col">
-              <div className="aspect-[4/3] overflow-hidden">
-                <Image src={kit.img} alt={kit.name} width={600} height={450} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div className="p-4 flex flex-col flex-1">
-                <div className="text-[.56rem] tracking-wide uppercase bg-green-6 text-green-2 px-1.5 py-0.5 rounded-sm inline-block mb-2 font-medium w-fit">{kit.tag}</div>
-                <div className="font-serif text-[1.1rem] text-ink mb-1 leading-tight">{kit.name}</div>
-                <div className="text-[.74rem] text-ink-3 mb-3">{kit.desc}</div>
-                <div className="mt-auto flex items-center justify-between pt-3 border-t border-ivory-3">
-                  <div>
-                    <div className="font-serif text-[1.2rem] text-green leading-none">{formatPrice(kit.price)}</div>
-                    <div className="text-[.58rem] text-ink-4 mt-0.5">per 500g kit</div>
+        {kits.length === 0 ? (
+          <div className="text-center py-12 text-ink-3 bg-white/40 border border-ivory-3 rounded-2xl">
+            <p className="font-serif text-lg text-ink">No kits available at the moment.</p>
+            <p className="text-xs text-ink-4 mt-1">Please check back later or customize your order via WhatsApp!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {kits.map(kit => {
+              const firstVariant = kit.variants?.[0]
+              const price = firstVariant?.price || kit.price
+              const comparePrice = firstVariant?.compare_price || kit.compare_price
+              const savePct = comparePrice && comparePrice > price 
+                ? Math.round(((comparePrice - price) / comparePrice) * 100) 
+                : 0
+              const image = kit.images?.[0] || 'https://images.unsplash.com/photo-1574226516831-e1dff420e562?w=600&q=80'
+              const tag = kit.tags?.filter(t => t !== 'kit')[0] || 'Wellness Kit'
+              
+              return (
+                <Link key={kit.id} href="/kits" className="card no-underline group flex flex-col">
+                  <div className="aspect-[4/3] overflow-hidden relative">
+                    <Image src={image} alt={kit.name} fill sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
                   </div>
-                  <span className="text-[.58rem] bg-terra-4 text-terra border border-terra-3 px-2 py-0.5 rounded-sm font-medium">Save {kit.save}</span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+                  <div className="p-4 flex flex-col flex-1">
+                    <div className="text-[.56rem] tracking-wide uppercase bg-green-6 text-green-2 px-1.5 py-0.5 rounded-sm inline-block mb-2 font-medium w-fit">{tag}</div>
+                    <div className="font-serif text-[1.1rem] text-ink mb-1 leading-tight">{kit.name}</div>
+                    <div className="text-[.74rem] text-ink-3 mb-3 line-clamp-2">{kit.description}</div>
+                    <div className="mt-auto flex items-center justify-between pt-3 border-t border-ivory-3">
+                      <div>
+                        <div className="font-serif text-[1.2rem] text-green leading-none">{formatPrice(price)}</div>
+                        <div className="text-[.58rem] text-ink-4 mt-0.5">{kit.price_per_unit || 'per kit'}</div>
+                      </div>
+                      {savePct > 0 && (
+                        <span className="text-[.58rem] bg-terra-4 text-terra border border-terra-3 px-2 py-0.5 rounded-sm font-medium">Save {savePct}%</span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
         <div className="text-center">
           <Link href="/kits" className="btn-primary no-underline inline-flex items-center gap-2">
             <span>View All Kit →</span>

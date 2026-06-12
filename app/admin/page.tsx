@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { formatPrice } from '@/lib/utils'
 import type { Coupon, Order, Product, Review } from '@/lib/supabase'
 
-type AdminTab = 'orders' | 'products' | 'coupons' | 'customers' | 'reviews' | 'creators'
+type AdminTab = 'orders' | 'products' | 'kits' | 'coupons' | 'customers' | 'reviews' | 'creators'
 type OrderFilter = 'all' | 'pending' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled'
 type CustomerSnapshot = {
   balance: number
@@ -370,6 +370,7 @@ export default function AdminPage() {
         <div className="flex gap-3">
           <button onClick={() => setTab('orders')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'orders' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Orders</button>
           <button onClick={() => setTab('products')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'products' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Products</button>
+          <button onClick={() => setTab('kits')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'kits' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Kits</button>
           <button onClick={() => setTab('coupons')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'coupons' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Coupons</button>
           <button onClick={() => setTab('customers')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'customers' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Customers</button>
           <button onClick={() => setTab('reviews')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'reviews' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Reviews</button>
@@ -540,7 +541,6 @@ export default function AdminPage() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-serif text-xl text-ink">Products</h2>
               <div className="flex gap-2">
-                <a href="/admin/kit/new" className="btn-outline text-sm py-2 px-4 no-underline">+ Add Kit</a>
                 <a href="/admin/product/new" className="btn-primary text-sm py-2 px-4 no-underline">+ Add Product</a>
               </div>
             </div>
@@ -556,7 +556,7 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ivory-3">
-                  {products.map(product => (
+                  {products.filter(product => product.category !== 'kits').map(product => (
                     <tr key={product.id} className="hover:bg-ivory-2 transition-colors">
                       <td className="px-4 py-3">
                         <div className="font-medium text-ink">{product.name}</div>
@@ -574,6 +574,58 @@ export default function AdminPage() {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : tab === 'kits' ? (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-serif text-xl text-ink">Pre-made Kits</h2>
+              <div className="flex gap-2">
+                <a href="/admin/kit/new" className="btn-primary text-sm py-2 px-4 no-underline">+ Add Kit</a>
+              </div>
+            </div>
+            <div className="bg-white border border-ivory-3 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-ivory-2 border-b border-ivory-3">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Kit Name</th>
+                    <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Slug</th>
+                    <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Pricing</th>
+                    <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Stock Status</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ivory-3">
+                  {products.filter(product => product.category === 'kits').map(product => {
+                    const priceRange = product.variants && product.variants.length > 0
+                      ? `${formatPrice(Math.min(...product.variants.map((v: any) => v.price)))} - ${formatPrice(Math.max(...product.variants.map((v: any) => v.price)))}`
+                      : formatPrice(product.price)
+                    return (
+                      <tr key={product.id} className="hover:bg-ivory-2 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-ink">{product.name}</div>
+                          <div className="text-xs text-ink-4">{product.variants?.length || 0} ritual sizes</div>
+                        </td>
+                        <td className="px-4 py-3 text-ink-3 font-mono text-xs">{product.slug}</td>
+                        <td className="px-4 py-3 font-serif text-green">{priceRange}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs px-2 py-0.5 rounded border ${product.in_stock ? 'bg-green-6 text-green-2 border-green-5' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                            {product.in_stock ? 'In Stock' : 'Out of Stock'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <a href={`/admin/kit/${product.id}`} className="text-xs text-green-3 hover:text-green no-underline">Edit Kit</a>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {products.filter(product => product.category === 'kits').length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-sm text-ink-3">No kits created yet.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

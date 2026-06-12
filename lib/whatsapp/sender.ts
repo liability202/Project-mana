@@ -40,6 +40,46 @@ export async function sendWhatsAppMessage(to: string, text: string) {
   })
 }
 
+export async function sendWhatsAppTemplate(
+  to: string,
+  templateName: string,
+  languageCode: string,
+  bodyParameters: string[] = [],
+  buttonCode?: string
+) {
+  const components: any[] = []
+
+  if (bodyParameters.length > 0) {
+    components.push({
+      type: 'body',
+      parameters: bodyParameters.map((value) => ({
+        type: 'text',
+        text: value,
+      })),
+    })
+  }
+
+  if (buttonCode) {
+    components.push({
+      type: 'button',
+      sub_type: 'url',
+      index: '0',
+      parameters: [{ type: 'text', text: buttonCode }],
+    })
+  }
+
+  return postWhatsAppMessage({
+    messaging_product: 'whatsapp',
+    to,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: languageCode },
+      ...(components.length ? { components } : {}),
+    },
+  })
+}
+
 export async function sendWhatsAppList(
   to: string,
   buttonLabel: string,
