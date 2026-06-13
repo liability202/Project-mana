@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { calcPriceForWeight, formatPrice, parseBaseWeightGrams, slugify } from '@/lib/utils'
+import { ImageManager } from '@/components/admin/ImageManager'
 import type { Product } from '@/lib/supabase'
 
 type SelectedKitProduct = {
@@ -400,81 +401,7 @@ export default function NewAdminKitPage() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="text-xs text-ink-3 block mb-1.5">Kit Images</label>
-                  
-                  {/* Visual Thumbnails Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 mb-3">
-                    {imagesInput.split('\n').map(url => url.trim()).filter(Boolean).map((url, idx) => (
-                      <div key={idx} className="relative aspect-square rounded-xl border border-ivory-3 overflow-hidden bg-ivory-2 group">
-                        <img src={url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const list = imagesInput.split('\n').map(u => u.trim()).filter(Boolean)
-                            list.splice(idx, 1)
-                            setImagesInput(list.join('\n'))
-                          }}
-                          className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-terra/80 hover:bg-terra text-white text-xs flex items-center justify-center transition-colors shadow-sm cursor-pointer"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                    
-                    {/* Upload Trigger */}
-                    <label className="flex flex-col items-center justify-center aspect-square rounded-xl border border-dashed border-green-5/40 hover:border-green bg-white hover:bg-green-6/20 transition-all cursor-pointer text-center p-2">
-                      <span className="text-xl text-green mb-1">＋</span>
-                      <span className="text-[.7rem] text-ink-3">Upload Photo</span>
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const files = Array.from(e.target.files || [])
-                          if (!files.length) return
-                          const secret = localStorage.getItem('mana_admin') || ''
-                          const uploadedUrls: string[] = []
-                          
-                          for (const file of files) {
-                            const fd = new FormData()
-                            fd.append('file', file)
-                            try {
-                              const res = await fetch('/api/admin/upload', {
-                                method: 'POST',
-                                headers: { authorization: `Bearer ${secret}` },
-                                body: fd,
-                              })
-                              const data = await res.json()
-                              if (res.ok && data.url) {
-                                uploadedUrls.push(data.url)
-                              } else {
-                                alert(`Upload failed: ${data.error || 'Unknown error'}`)
-                              }
-                            } catch (err) {
-                              alert(`Upload failed for ${file.name}`)
-                            }
-                          }
-                          
-                          if (uploadedUrls.length) {
-                            const current = imagesInput.split('\n').map(u => u.trim()).filter(Boolean)
-                            setImagesInput([...current, ...uploadedUrls].join('\n'))
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-                  
-                  {/* Fallback Textarea for manually pasting/editing URLs */}
-                  <details className="mt-2">
-                    <summary className="text-[.7rem] text-ink-4 cursor-pointer hover:text-ink transition-colors">Edit Raw URLs</summary>
-                    <textarea
-                      value={imagesInput}
-                      onChange={e => setImagesInput(e.target.value)}
-                      className="input min-h-[90px] text-xs font-mono mt-1.5"
-                      placeholder={"One image URL per line\nhttps://...\nhttps://..."}
-                    />
-                  </details>
+                  <ImageManager label="Kit Images" value={imagesInput} onChange={setImagesInput} />
                 </div>
 
                 <div className="md:col-span-2">

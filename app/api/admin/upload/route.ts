@@ -14,28 +14,74 @@ export async function POST(req: Request) {
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
     }
+    if (!file.type.startsWith('image/')) {
+      return NextResponse.json({ error: 'Only image files can be uploaded' }, { status: 400 })
+    }
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
     // Generate safe unique filename
     const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const fileName = `${Date.now()}-${cleanName}`
+    const fileName = `admin-products/${Date.now()}-${cleanName}`
 
-    // Upload to supabase storage bucket 'product-images'
-    const { error } = await supabaseAdmin.storage
-      .from('product-images')
-      .upload(fileName, buffer, {
-        contentType: file.type,
-      })
+    const bucketCandidates = [
+      process.env.SUPABASE_PRODUCT_IMAGE_BUCKET,
+      'product-images',
+      'product image',
+    ].filter(Boolean) as string[]
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    let uploadedBucket = ''
+    let uploadError = ''
+
+    for (const bucket of bucketCandidates) {
+      const { error } = await supabaseAdmin.storage
+        .from(bucket)
+        .upload(fileName, buffer, {
+          contentType: file.type || 'application/octet-stream',
+          upsert: false,
+        })
+
+      if (!error) {
+        uploadedBucket = bucket
+        break
+      }
+
+      uploadError = error.message
     }
 
-    // Get public URL
+    if (!uploadedBucket) {
+      const fallbackBucket = process.env.SUPABASE_PRODUCT_IMAGE_BUCKET || 'product-images'
+      const { error: createError } = await supabaseAdmin.storage.createBucket(fallbackBucket, {
+        public: true,
+        fileSizeLimit: 1024 * 1024 * 10,
+        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
+      })
+
+      if (createError && !createError.message.toLowerCase().includes('already exists')) {
+        return NextResponse.json({
+          error: createError.message || uploadError || 'Upload failed. Could not create Supabase storage bucket.',
+        }, { status: 500 })
+      }
+
+      const { error } = await supabaseAdmin.storage
+        .from(fallbackBucket)
+        .upload(fileName, buffer, {
+          contentType: file.type || 'application/octet-stream',
+          upsert: false,
+        })
+
+      if (error) {
+        return NextResponse.json({
+          error: error.message || uploadError || 'Upload failed after creating Supabase storage bucket.',
+        }, { status: 500 })
+      }
+
+      uploadedBucket = fallbackBucket
+    }
+
     const { data } = supabaseAdmin.storage
-      .from('product-images')
+      .from(uploadedBucket)
       .getPublicUrl(fileName)
 
     return NextResponse.json({ url: data.publicUrl })
