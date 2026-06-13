@@ -40,6 +40,7 @@ export function ImageManager({ label, value, onChange }: ImageManagerProps) {
         : new File([originalFile], fileNameForClipboard(originalFile, index), { type: originalFile.type })
       const fd = new FormData()
       fd.append('file', file)
+      fd.append('admin_secret', secret)
 
       try {
         const res = await fetch('/api/admin/upload', {

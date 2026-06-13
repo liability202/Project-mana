@@ -2,18 +2,20 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: Request) {
-  // Admin only
-  const auth = req.headers.get('authorization')
-  const headerSecret = req.headers.get('x-admin-secret')
-  const token = (headerSecret || auth?.replace(/^Bearer\s+/i, '') || '').trim()
-  const adminSecret = (process.env.ADMIN_SECRET || '').trim()
-
-  if (!adminSecret || token !== adminSecret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   try {
     const formData = await req.formData()
+    const auth = req.headers.get('authorization')
+    const headerSecret = req.headers.get('x-admin-secret')
+    const formSecret = String(formData.get('admin_secret') || '')
+    const token = (headerSecret || auth?.replace(/^Bearer\s+/i, '') || formSecret).trim()
+    const adminSecret = (process.env.ADMIN_SECRET || '').trim()
+
+    if (!adminSecret || token !== adminSecret) {
+      return NextResponse.json({
+        error: 'Unauthorized. Please logout from admin, login again, and retry upload.',
+      }, { status: 401 })
+    }
+
     const file = formData.get('file') as File | null
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
