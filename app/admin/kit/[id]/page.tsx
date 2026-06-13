@@ -25,6 +25,7 @@ type KitSize = {
 }
 
 type WeightMatrix = Record<string, Record<string, string>>
+type FormOptions = { powder: boolean; whole: boolean }
 
 export default function EditAdminKitPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true)
@@ -36,6 +37,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
   const [tagsInput, setTagsInput] = useState('bestseller, kit')
   const [imagesInput, setImagesInput] = useState('')
   const [pricePerUnit, setPricePerUnit] = useState('per kit')
+  const [formOptions, setFormOptions] = useState<FormOptions>({ powder: true, whole: true })
   const [kitSizes, setKitSizes] = useState<KitSize[]>([
     { id: 'small', name: 'Essential', gramsEach: '100', priceRupees: '', comparePriceRupees: '', description: 'Starter size' },
     { id: 'medium', name: 'Signature', gramsEach: '200', priceRupees: '', comparePriceRupees: '', description: 'Recommended size' },
@@ -102,6 +104,14 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
 
         // Populate kitSizes and productWeights from variants
         if (product.variants && product.variants.length > 0) {
+          const savedFormOptions = product.variants.find((variant: any) => variant?.form_options)?.form_options
+          if (savedFormOptions) {
+            setFormOptions({
+              powder: savedFormOptions.powder !== false,
+              whole: savedFormOptions.whole !== false,
+            })
+          }
+
           const sizes = product.variants.map((v: any) => {
             const sizeId = v.id.replace('kit-', '')
             return {
@@ -185,6 +195,64 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
     setKitSizes(prev => prev.map(size => size.id === id ? { ...size, ...next } : size))
   }
 
+  const addKitSize = () => {
+    const medium = kitSizes[1] || kitSizes[0]
+    const baseGrams = Math.max(1, Number(medium?.gramsEach || '100'))
+    const nextGrams = String(baseGrams * 2)
+    const id = `size-${Date.now()}`
+    setKitSizes(prev => [...prev, {
+      id,
+      name: 'Custom Size',
+      gramsEach: nextGrams,
+      priceRupees: '',
+      comparePriceRupees: '',
+      description: `${nextGrams}g each`,
+    }])
+    setProductWeights(prev => {
+      const next = { ...prev }
+      selectedProducts.forEach(product => {
+        const reference = Number(getProductWeight(product.id, medium?.id || '', medium?.gramsEach || '100') || baseGrams)
+        next[product.id] = {
+          ...(next[product.id] || {}),
+          [id]: String(Math.max(1, Math.round(reference * (Number(nextGrams) / baseGrams)))),
+        }
+      })
+      return next
+    })
+  }
+
+  const removeKitSize = (id: string) => {
+    if (kitSizes.length <= 1) return
+    setKitSizes(prev => prev.filter(size => size.id !== id))
+    setProductWeights(prev => Object.fromEntries(
+      Object.entries(prev).map(([productId, weights]) => {
+        const nextWeights = { ...weights }
+        delete nextWeights[id]
+        return [productId, nextWeights]
+      })
+    ))
+  }
+
+  const scaleSizeWeights = (targetSize: KitSize) => {
+    const referenceSize = kitSizes[1]?.id === targetSize.id ? kitSizes[0] : (kitSizes[1] || kitSizes[0])
+    if (!referenceSize) return
+    const referenceDefault = Math.max(1, Number(referenceSize.gramsEach || '1'))
+    const targetDefault = Math.max(1, Number(targetSize.gramsEach || '1'))
+    const ratio = targetDefault / referenceDefault
+
+    setProductWeights(prev => {
+      const next = { ...prev }
+      selectedProducts.forEach(product => {
+        const referenceWeight = Math.max(1, Number(getProductWeight(product.id, referenceSize.id, referenceSize.gramsEach) || referenceDefault))
+        next[product.id] = {
+          ...(next[product.id] || {}),
+          [targetSize.id]: String(Math.max(1, Math.round(referenceWeight * ratio))),
+        }
+      })
+      return next
+    })
+  }
+
   const updateProductWeight = (productId: string, sizeId: string, grams: string) => {
     setProductWeights(prev => ({
       ...prev,
@@ -264,6 +332,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
           grams_each: gramsEach,
           price,
           compare_price: size.comparePriceRupees ? Math.round(Number(size.comparePriceRupees) * 100) : null,
+          form_options: formOptions,
           items: selectedProducts.map(product => {
             const productGrams = Math.max(0, Number(getProductWeight(product.id, size.id, size.gramsEach) || '0'))
             const pricePerGram = product.price / parseBaseWeightGrams(product.price_per_unit)
@@ -367,6 +436,31 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                     <input value={pricePerUnit} onChange={e => setPricePerUnit(e.target.value)} className="input" placeholder="per kit" />
                   </div>
 
+                  <div className="md:col-span-2 rounded-xl border border-ivory-3 bg-ivory-2 p-4">
+                    <label className="text-xs text-ink-3 block mb-3">Available Forms</label>
+                    <div className="flex flex-wrap gap-4">
+                      <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formOptions.powder}
+                          onChange={e => setFormOptions(prev => ({ ...prev, powder: e.target.checked || !prev.whole }))}
+                          className="h-4 w-4 accent-[var(--green)]"
+                        />
+                        Powder
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formOptions.whole}
+                          onChange={e => setFormOptions(prev => ({ ...prev, whole: e.target.checked || !prev.powder }))}
+                          className="h-4 w-4 accent-[var(--green)]"
+                        />
+                        Whole
+                      </label>
+                    </div>
+                    <p className="text-xs text-ink-4 mt-2">Both forms use the same kit price. Disable one when the kit should not offer it.</p>
+                  </div>
+
                   <div className="md:col-span-2">
                     <label className="text-xs text-ink-3 block mb-1.5">Description</label>
                     <textarea value={description} onChange={e => setDescription(e.target.value)} className="input min-h-[140px]" placeholder="A curated hair care kit with herbs chosen for stronger, healthier hair." />
@@ -463,6 +557,14 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                   <p className="text-sm text-ink-3 mt-1">Set default grams for each size. Exact per-product grams are controlled in the selected products matrix.</p>
                 </div>
 
+                <button
+                  type="button"
+                  onClick={addKitSize}
+                  className="btn-outline text-sm py-2 px-4 mb-4"
+                >
+                  Add Kit Size
+                </button>
+
                 <div className="space-y-4">
                   {kitSizes.map(size => {
                     const autoPrice = getSizeTotal(size.id, size.gramsEach)
@@ -520,6 +622,24 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                         </div>
                         <div className="mt-2 text-xs text-ink-4">
                           Auto estimate: {formatPrice(autoPrice)} using the product weights below. New products start at {size.gramsEach || 0}g for this size.
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => scaleSizeWeights(size)}
+                            className="rounded-md border border-green-4 bg-white px-3 py-1.5 text-xs text-green hover:bg-green-6"
+                          >
+                            Scale Weights Proportionally
+                          </button>
+                          {kitSizes.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeKitSize(size.id)}
+                              className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
+                            >
+                              Remove Size
+                            </button>
+                          )}
                         </div>
                       </div>
                     )
@@ -597,7 +717,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                           </button>
                         </div>
 
-                        <div className="mt-3 grid grid-cols-3 gap-2">
+                        <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(kitSizes.length, 4)}, minmax(0, 1fr))` }}>
                           {kitSizes.map(size => (
                             <div key={size.id}>
                               <label className="text-[.64rem] text-ink-4 block mb-1">{size.name}</label>

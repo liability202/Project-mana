@@ -94,8 +94,17 @@ export default function AdminPage() {
   })
   const [payoutMessage, setPayoutMessage] = useState('')
 
-  const login = () => {
-    if (password === process.env.NEXT_PUBLIC_ADMIN_HINT || password.length > 6) {
+  const login = async () => {
+    if (!password.trim()) {
+      alert('Enter admin password')
+      return
+    }
+
+    const res = await fetch('/api/products?include_all=1&limit=1', {
+      headers: { authorization: `Bearer ${password}` },
+    })
+
+    if (res.ok) {
       localStorage.setItem('mana_admin', password)
       setAuth(true)
       loadData(password)
@@ -129,8 +138,17 @@ export default function AdminPage() {
   useEffect(() => {
     const saved = localStorage.getItem('mana_admin')
     if (saved) {
-      setAuth(true)
-      loadData(saved)
+      void fetch('/api/products?include_all=1&limit=1', {
+        headers: { authorization: `Bearer ${saved}` },
+      }).then(res => {
+        if (!res.ok) {
+          localStorage.removeItem('mana_admin')
+          setAuth(false)
+          return
+        }
+        setAuth(true)
+        loadData(saved)
+      })
     }
   }, [])
 

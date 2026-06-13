@@ -25,6 +25,10 @@ type KitVariant = Omit<Variant, 'items'> & {
   items?: KitItem[]
   grams_each?: number
   size_desc?: string
+  form_options?: {
+    powder?: boolean
+    whole?: boolean
+  }
 }
 
 type KitProduct = Omit<Product, 'variants'> & {
@@ -186,6 +190,10 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
   const [tab, setTab] = useState<'benefits' | 'howto'>('benefits')
   const activeVariant = variants[sizeIdx] || variants[0]
   const activeItems = activeVariant?.items || []
+  const availableForms = {
+    powder: activeVariant?.form_options?.powder !== false,
+    whole: activeVariant?.form_options?.whole !== false,
+  }
   const [itemStates, setItemStates] = useState<ItemState[]>(() => activeItems.map(item => ({
     id: item.id,
     selected: true,
@@ -213,6 +221,16 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
     })
   }, [sizeIdx, variants])
 
+  useEffect(() => {
+    const nextForms = {
+      powder: activeVariant?.form_options?.powder !== false,
+      whole: activeVariant?.form_options?.whole !== false,
+    }
+    if (!nextForms[form]) {
+      setForm(nextForms.powder ? 'powder' : 'whole')
+    }
+  }, [activeVariant, form])
+
   const image = kit.images?.[0] || activeItems[0]?.image || ''
 
   const selectedItems = activeItems
@@ -224,8 +242,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
   ), 0)
   const dynamicRawTotal = selectedItems.reduce((sum, item) => sum + getBasePrice(item, item.grams), 0)
   const kitFactor = defaultRawTotal > 0 ? (activeVariant?.price || kit.price || defaultRawTotal) / defaultRawTotal : 1
-  const powderPrice = Math.max(0, Math.round(dynamicRawTotal * kitFactor))
-  const price = form === 'whole' ? Math.round(powderPrice * 0.85) : powderPrice
+  const price = Math.max(0, Math.round(dynamicRawTotal * kitFactor))
   const totalWeight = selectedItems.reduce((sum, item) => sum + item.grams, 0)
   const totalWeightLabel = totalWeight >= 1000
     ? `${(totalWeight / 1000).toFixed(totalWeight % 1000 === 0 ? 0 : 1)}kg`
@@ -354,26 +371,27 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
             </div>
           </div>
 
-          <div>
-            <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-2">Choose form</div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setForm('powder')}
-                className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'powder' ? 'border-green bg-green text-white' : 'border-green-4 bg-white text-green hover:bg-green-6'}`}
-              >
-                Powder
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm('whole')}
-                className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'whole' ? 'border-green bg-green text-white' : 'border-green-4 bg-white text-green hover:bg-green-6'}`}
-              >
-                Whole
-              </button>
+          {(availableForms.powder && availableForms.whole) && (
+            <div>
+              <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-2">Choose form</div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm('powder')}
+                  className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'powder' ? 'border-green bg-green text-white' : 'border-green-4 bg-white text-green hover:bg-green-6'}`}
+                >
+                  Powder
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm('whole')}
+                  className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'whole' ? 'border-green bg-green text-white' : 'border-green-4 bg-white text-green hover:bg-green-6'}`}
+                >
+                  Whole
+                </button>
+              </div>
             </div>
-            <div className="text-[.7rem] text-ink-4 mt-1">Whole form is calculated 15% lower than powder.</div>
-          </div>
+          )}
 
           {isCustomizing && (
               <div className="rounded-2xl border border-ivory-3 bg-ivory/70 p-4">
@@ -391,7 +409,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
                       const recommended = item.grams || activeVariant?.grams_each || 100
                       const minWeight = Math.max(25, Math.round(recommended / 2 / 25) * 25)
                       const maxWeight = Math.max(recommended + 50, recommended * 2)
-                      const linePrice = Math.round(getBasePrice(item, state.grams) * kitFactor * (form === 'whole' ? 0.85 : 1))
+                      const linePrice = Math.round(getBasePrice(item, state.grams) * kitFactor)
 
                       return (
                         <div key={item.id} className="rounded-xl border border-ivory-3 bg-white p-3">
@@ -450,13 +468,12 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
               {selectedItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between gap-3 text-[.78rem] text-ink-3">
                   <span>{item.name} ({item.grams}g)</span>
-                  <span>{formatPrice(Math.round(getBasePrice(item, item.grams) * kitFactor * (form === 'whole' ? 0.85 : 1)))}</span>
+                  <span>{formatPrice(Math.round(getBasePrice(item, item.grams) * kitFactor))}</span>
                 </div>
               ))}
             </div>
             <div className="flex items-baseline gap-2 mb-1">
               <div className="font-serif text-3xl text-green">{formatPrice(price)}</div>
-              {form === 'whole' && <div className="text-sm text-ink-4 line-through">{formatPrice(powderPrice)}</div>}
             </div>
             <div className="text-[.72rem] text-ink-3 mb-4">{totalWeightLabel} total - {form === 'powder' ? 'powder form' : 'whole form'}</div>
             <div className="flex gap-2.5 flex-wrap">
