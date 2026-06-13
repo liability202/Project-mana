@@ -4,7 +4,10 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function POST(req: Request) {
   // Admin only
   const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
+  const token = auth?.replace(/^Bearer\s+/i, '').trim()
+  const adminSecret = (process.env.ADMIN_SECRET || '').trim()
+
+  if (!adminSecret || token !== adminSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

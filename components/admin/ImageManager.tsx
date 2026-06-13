@@ -25,7 +25,7 @@ export function ImageManager({ label, value, onChange }: ImageManagerProps) {
   const uploadFiles = async (files: File[]) => {
     if (!files.length) return
 
-    const secret = localStorage.getItem('mana_admin') || ''
+    const secret = (localStorage.getItem('mana_admin') || '').trim()
     if (!secret) {
       alert('Admin login not found. Please login again.')
       return
@@ -50,6 +50,10 @@ export function ImageManager({ label, value, onChange }: ImageManagerProps) {
         const data = await res.json()
         if (res.ok && data.url) {
           uploadedUrls.push(data.url)
+        } else if (res.status === 401) {
+          localStorage.removeItem('mana_admin')
+          alert('Upload failed: admin session expired. Please go back to Admin, login again, then upload the image.')
+          return
         } else {
           alert(`Upload failed: ${data.error || 'Unknown error'}`)
         }
