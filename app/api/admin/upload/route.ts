@@ -4,7 +4,8 @@ import { supabaseAdmin } from '@/lib/supabase'
 export async function POST(req: Request) {
   // Admin only
   const auth = req.headers.get('authorization')
-  const token = auth?.replace(/^Bearer\s+/i, '').trim()
+  const headerSecret = req.headers.get('x-admin-secret')
+  const token = (headerSecret || auth?.replace(/^Bearer\s+/i, '') || '').trim()
   const adminSecret = (process.env.ADMIN_SECRET || '').trim()
 
   if (!adminSecret || token !== adminSecret) {

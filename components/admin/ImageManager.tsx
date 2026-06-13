@@ -44,7 +44,10 @@ export function ImageManager({ label, value, onChange }: ImageManagerProps) {
       try {
         const res = await fetch('/api/admin/upload', {
           method: 'POST',
-          headers: { authorization: `Bearer ${secret}` },
+          headers: {
+            authorization: `Bearer ${secret}`,
+            'x-admin-secret': secret,
+          },
           body: fd,
         })
         const data = await res.json()
