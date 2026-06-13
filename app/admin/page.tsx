@@ -108,7 +108,7 @@ export default function AdminPage() {
     setLoading(true)
     const [oRes, pRes, cRes, rRes, crRes, pyRes] = await Promise.all([
       fetch('/api/orders', { headers: { authorization: `Bearer ${secret}` } }),
-      fetch('/api/products'),
+      fetch(`/api/products?include_all=1&limit=500`, { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/coupons', { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/reviews?pending=1', { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/admin/creators', { headers: { authorization: `Bearer ${secret}` } }),
