@@ -243,7 +243,10 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
                   return (
                     <button
                       key={v.id}
-                      onClick={() => setActiveVar(v)}
+                      onClick={() => {
+                        setActiveVar(v)
+                        setActiveImg(0)
+                      }}
                       className={`border rounded-lg p-3 text-left cursor-pointer transition-all ${activeVar?.id === v.id ? 'border-green bg-green-6' : 'border-ivory-3 bg-white hover:border-green-4'}`}
                     >
                       <div className="flex items-center justify-between mb-0.5">

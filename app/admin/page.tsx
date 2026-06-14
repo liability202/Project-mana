@@ -100,7 +100,7 @@ export default function AdminPage() {
       return
     }
 
-    const res = await fetch('/api/products?include_all=1&limit=1', {
+    const res = await fetch('/api/orders?limit=1', {
       headers: { authorization: `Bearer ${password}` },
     })
 
@@ -138,7 +138,7 @@ export default function AdminPage() {
   useEffect(() => {
     const saved = localStorage.getItem('mana_admin')
     if (saved) {
-      void fetch('/api/products?include_all=1&limit=1', {
+      void fetch('/api/orders?limit=1', {
         headers: { authorization: `Bearer ${saved}` },
       }).then(res => {
         if (!res.ok) {

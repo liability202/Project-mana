@@ -10,7 +10,7 @@ type Category = 'dry-fruits' | 'herbs' | 'spices' | 'pansari' | 'kits'
 const CATEGORY_OPTIONS: Category[] = ['dry-fruits', 'herbs', 'spices', 'pansari', 'kits']
 
 const DEFAULT_VARIANTS = [
-  { id: 'v1', name: 'Standard', description: 'Default option', price: 0, quality_tag: 'popular' },
+  { id: 'v1', name: 'Standard', description: 'Default option', price: 0, quality_tag: 'popular', images: [] },
 ]
 
 export default function NewAdminProductPage() {
@@ -188,6 +188,7 @@ export default function NewAdminProductPage() {
               <div className="md:col-span-2">
                 <label className="text-xs text-ink-3 block mb-1.5">Variants JSON</label>
                 <textarea value={variantsInput} onChange={e => setVariantsInput(e.target.value)} className="input min-h-[220px] font-mono text-xs" />
+                <div className="text-xs text-ink-4 mt-2">Tip: add an `images` array inside any variant. When that variant is selected, its first image appears in the main product image holder.</div>
               </div>
             </div>
           </div>

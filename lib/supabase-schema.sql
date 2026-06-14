@@ -311,6 +311,8 @@ alter table user_profiles enable row level security;
 alter table reviews enable row level security;
 alter table wa_sessions enable row level security;
 alter table checkout_otps enable row level security;
+alter table referrals enable row level security;
+alter table kit_orders enable row level security;
 
 -- Anyone can read products
 create policy "products_public_read" on products for select using (true);
@@ -333,3 +335,5 @@ create policy "reviews_public_read_approved" on reviews for select using (approv
 create policy "reviews_public_insert" on reviews for insert with check (true);
 create policy "wa_sessions_service_role_all" on wa_sessions for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
 create policy "checkout_otps_service_role_all" on checkout_otps for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+create policy "referrals_service_role_all" on referrals for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+create policy "kit_orders_service_role_all" on kit_orders for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
