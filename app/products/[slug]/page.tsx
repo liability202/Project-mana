@@ -246,18 +246,21 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             )}
           </div>
           {galleryImages && galleryImages.length > 1 && (
-            <div className="flex gap-2.5">
+            <div className="flex gap-2.5 mb-3">
               {galleryImages.map((img, i) => (
                 <button
                   key={i}
                   onClick={() => setActiveImg(i)}
-                  className={`w-[68px] h-[68px] rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${activeImg === i ? 'border-green' : 'border-transparent hover:border-green-4'}`}
+                  className={`w-[68px] h-[68px] flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${activeImg === i ? 'border-green' : 'border-transparent hover:border-green-4'}`}
                 >
                   <Image src={img} alt="" width={68} height={68} className="object-cover w-full h-full" />
                 </button>
               ))}
             </div>
           )}
+          <div className="text-[.7rem] text-ink-4 text-center px-4 leading-tight opacity-80">
+            Image for reference only. Actual weight as per selected variant. Actual product might differ.
+          </div>
         </div>
 
         {/* Info */}
