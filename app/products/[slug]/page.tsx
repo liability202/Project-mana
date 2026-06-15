@@ -49,6 +49,9 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   const [canReview, setCanReview] = useState(false)
   const [reviewCheckLoading, setReviewCheckLoading] = useState(true)
 
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
+
   const addItem = useCart(s => s.addItem)
   const cartItems = useCart(s => s.items)
 
@@ -146,6 +149,27 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   if (!product) return <div className="section text-center text-ink-3">Product not found. <Link href="/products">Browse all products →</Link></div>
 
   const galleryImages = activeVar?.images?.length ? activeVar.images : product.images
+
+  const minSwipeDistance = 50
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+  const onTouchMove = (e: React.TouchEvent) => setTouchEnd(e.targetTouches[0].clientX)
+  const onTouchEndHandler = () => {
+    if (!touchStart || !touchEnd) return
+    const distance = touchStart - touchEnd
+    if (distance > minSwipeDistance) setActiveImg(prev => (galleryImages ? (prev + 1) % galleryImages.length : 0))
+    if (distance < -minSwipeDistance) setActiveImg(prev => (galleryImages ? (prev - 1 + galleryImages.length) % galleryImages.length : 0))
+  }
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setActiveImg(prev => (galleryImages ? (prev - 1 + galleryImages.length) % galleryImages.length : 0))
+  }
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setActiveImg(prev => (galleryImages ? (prev + 1) % galleryImages.length : 0))
+  }
   const basePrice = activeVar?.price || product.price
   const livePrice = calcPriceForWeight(basePrice, product.price_per_unit, grams)
   const presetWeights = getPresetWeights(product.category)
@@ -192,11 +216,33 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
       <div className="px-[5%] py-8 grid grid-cols-1 lg:grid-cols-2 gap-16 items-start max-w-[1400px] mx-auto">
         {/* Gallery */}
         <div className="lg:sticky lg:top-20">
-          <div className="rounded-xl overflow-hidden border border-ivory-3 bg-ivory-2 mb-3 shadow-soft">
+          <div 
+            className="group relative rounded-xl overflow-hidden border border-ivory-3 bg-ivory-2 mb-3 shadow-soft"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEndHandler}
+          >
             {galleryImages?.[activeImg] ? (
               <Image src={galleryImages[activeImg]} alt={product.name} width={700} height={700} className="object-cover w-full aspect-square" priority />
             ) : (
               <div className="w-full aspect-square bg-ivory-2 flex items-center justify-center text-ink-4">No image</div>
+            )}
+            
+            {galleryImages && galleryImages.length > 1 && (
+              <>
+                <button 
+                  onClick={prevImage}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-white/80 backdrop-blur rounded-full text-ink opacity-0 group-hover:opacity-100 transition-opacity border border-ivory-3 shadow-sm hover:bg-white cursor-pointer z-10"
+                >
+                  ‹
+                </button>
+                <button 
+                  onClick={nextImage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-white/80 backdrop-blur rounded-full text-ink opacity-0 group-hover:opacity-100 transition-opacity border border-ivory-3 shadow-sm hover:bg-white cursor-pointer z-10"
+                >
+                  ›
+                </button>
+              </>
             )}
           </div>
           {galleryImages && galleryImages.length > 1 && (
@@ -239,7 +285,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
               <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-3">Select Variety</div>
               <div className="grid grid-cols-2 gap-2">
                 {product.variants.map((v: Variant) => {
-                  const qt = v.quality_tag ? QUALITY_TAGS[v.quality_tag] : null
+                  const qt = v.quality_tag ? (QUALITY_TAGS[v.quality_tag] || { label: v.quality_tag, cls: 'bg-green-6 text-green-2 border border-green-5' }) : null
                   return (
                     <button
                       key={v.id}
