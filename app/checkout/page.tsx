@@ -7,7 +7,7 @@ import { showToast } from '@/components/ui/Toaster'
 
 declare global {
   interface Window {
-    Cashfree: any
+    Razorpay: any
   }
 }
 
@@ -330,10 +330,10 @@ export default function CheckoutPage() {
     setCouponState({ code: '', discountAmount: 0, valid: false })
   }
 
-  const loadCashfree = () => new Promise<boolean>(resolve => {
-    if (window.Cashfree) { resolve(true); return }
+  const loadRazorpay = () => new Promise<boolean>(resolve => {
+    if (window.Razorpay) { resolve(true); return }
     const script = document.createElement('script')
-    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js'
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
     script.onload = () => resolve(true)
     script.onerror = () => resolve(false)
     document.body.appendChild(script)
@@ -346,91 +346,115 @@ export default function CheckoutPage() {
 
     try {
       const gatewayOrderId = `mana_${Date.now()}`
-      const res = await fetch('/api/cashfree/create-order', {
+      const res = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: orderTotal,
-          orderId: gatewayOrderId,
-          customerId: verifiedUserId || normalizedPhone,
-          name: form.name,
-          email: form.email,
-          phone: normalizedPhone,
-          returnUrl: `${window.location.origin}/checkout?cf_order_id={order_id}`,
-          orderNote: `Mana order for ${form.name}`,
+          receipt: gatewayOrderId,
+          notes: {
+            name: form.name,
+            email: form.email,
+            phone: normalizedPhone,
+            customerId: verifiedUserId || normalizedPhone,
+          },
         }),
       })
-      const { orderId: cashfreeOrderId, paymentSessionId, error } = await res.json()
+      const { orderId: razorpayOrderId, amount: rpAmount, error } = await res.json()
       if (error) throw new Error(error)
 
-      const loaded = await loadCashfree()
+      const loaded = await loadRazorpay()
       if (!loaded) throw new Error('Failed to load payment gateway')
 
-      const cashfree = window.Cashfree({
-        mode: process.env.NEXT_PUBLIC_CASHFREE_ENV === 'production' ? 'production' : 'sandbox',
-      })
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: rpAmount,
+        currency: 'INR',
+        name: 'MANA',
+        description: 'Order Payment',
+        order_id: razorpayOrderId,
+        prefill: {
+          name: form.name,
+          email: form.email,
+          contact: normalizedPhone,
+        },
+        handler: async function (response: any) {
+          try {
+            const verificationRes = await fetch('/api/razorpay/verify-order', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            })
 
-      const checkoutResult = await cashfree.checkout({
-        paymentSessionId,
-        redirectTarget: '_modal',
-      })
+            const verification = await verificationRes.json()
+            if (!verificationRes.ok) throw new Error(verification?.error || 'Could not verify payment')
+            if (!verification.isPaid) throw new Error('Payment was not completed')
 
-      if (checkoutResult?.error) {
-        throw new Error(checkoutResult.error.message || checkoutResult.error.description || 'Payment gateway declined this transaction')
+            const saveRes = await fetch('/api/orders', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                customer_name: form.name,
+                customer_phone: normalizedPhone,
+                customer_email: form.email,
+                address: form.address,
+                city: form.city,
+                state: form.state,
+                pincode: form.pincode,
+                user_id: verifiedUserId,
+                items: cartItems.map(i => ({
+                  product_id: i.product_id,
+                  product_name: i.product_name,
+                  variant_name: i.variant_name,
+                  quantity: i.quantity,
+                  weight_grams: i.weight_grams,
+                  price: i.price,
+                })),
+                subtotal,
+                shipping,
+                coupon_code: couponState.code || null,
+                wallet_amount: walletApplied,
+                cod_charge: 0,
+                small_order_fee: smallOrderFee,
+                payment_id: verification.paymentId,
+                razorpay_order_id: verification.orderId,
+                payment_status: 'paid',
+                status: 'confirmed',
+                notes: `Razorpay order ${verification.orderId}`,
+              }),
+            })
+
+            const data = await saveRes.json()
+            if (!saveRes.ok) throw new Error(data?.error || 'Could not save order')
+
+            setOrderId(data.id)
+            clearCart()
+            clearCoupon()
+            setUseCashback(false)
+            setStep('success')
+          } catch (err: any) {
+            showToast('Order saving failed: ' + (err.message || 'Please contact support'))
+            setLoading(false)
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            setLoading(false)
+          }
+        }
       }
 
-      const verificationRes = await fetch('/api/cashfree/verify-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: cashfreeOrderId }),
+      const rzp1 = new window.Razorpay(options)
+      rzp1.on('payment.failed', function (response: any) {
+        showToast('Payment failed: ' + (response.error?.description || 'Please try again'))
+        setLoading(false)
       })
+      rzp1.open()
 
-      const verification = await verificationRes.json()
-      if (!verificationRes.ok) throw new Error(verification?.error || 'Could not verify payment')
-      if (!verification.isPaid) throw new Error('Payment was not completed')
-
-      const saveRes = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer_name: form.name,
-          customer_phone: normalizedPhone,
-          customer_email: form.email,
-          address: form.address,
-          city: form.city,
-          state: form.state,
-          pincode: form.pincode,
-          user_id: verifiedUserId,
-          items: cartItems.map(i => ({
-            product_id: i.product_id,
-            product_name: i.product_name,
-            variant_name: i.variant_name,
-            quantity: i.quantity,
-            weight_grams: i.weight_grams,
-            price: i.price,
-          })),
-          subtotal,
-          shipping,
-          coupon_code: couponState.code || null,
-          wallet_amount: walletApplied,
-          cod_charge: 0,
-          small_order_fee: smallOrderFee,
-          payment_id: verification.paymentId,
-          cashfree_order_id: verification.orderId,
-          payment_status: 'paid',
-          status: 'confirmed',
-          notes: `Cashfree order ${verification.orderId}`,
-        }),
-      })
-
-      const data = await saveRes.json()
-      if (!saveRes.ok) throw new Error(data?.error || 'Could not save order')
-
-      setOrderId(data.id)
-      clearCart()
-      clearCoupon()
-      setUseCashback(false)
-      setStep('success')
     } catch (err: any) {
       showToast('Payment failed: ' + (err.message || 'Please try again'))
       setLoading(false)
@@ -694,7 +718,7 @@ export default function CheckoutPage() {
               {paymentMethod === 'cod' && (
                 <p className="text-xs text-terra mt-2">₹49 COD charge will be added to your order.</p>
               )}
-              <p className="text-xs text-ink-4 mt-2">Secure payment powered by Cashfree</p>
+              <p className="text-xs text-ink-4 mt-2">Secure payment powered by Razorpay</p>
             </div>
           </div>
         </div>
@@ -782,7 +806,7 @@ export default function CheckoutPage() {
           )}
 
           <div className="flex items-center justify-center gap-2 mt-3 text-xs text-ink-4">
-            <span>🔒</span> Secured by Cashfree
+            <span>🔒</span> Secured by Razorpay
           </div>
         </div>
       </div>

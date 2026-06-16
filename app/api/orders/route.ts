@@ -167,7 +167,7 @@ export async function POST(req: Request) {
       cashback_earned: cashbackEarned,
       coupon_code: coupon?.code || null,
       payment_id: body.payment_id || null,
-      cashfree_order_id: body.cashfree_order_id || null,
+      razorpay_order_id: body.razorpay_order_id || null,
       payment_status: body.payment_status || 'pending',
       status: body.status || 'pending',
       notes: body.notes || null,
