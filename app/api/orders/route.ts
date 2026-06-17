@@ -58,6 +58,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
+    const { data: settingRow } = await supabaseAdmin
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'enable_cashback_earning')
+      .single()
+    const enableEarning = settingRow ? settingRow.value !== false : true
+
     const normalizedPhone = normalizePhone(body.customer_phone || '')
     if (!normalizedPhone) {
       return NextResponse.json({ error: 'Customer phone is required.' }, { status: 400 })
@@ -127,7 +134,7 @@ export async function POST(req: Request) {
     const codCharge = body.cod_charge || 0
     const smallOrderFee = body.small_order_fee || 0
     const finalAmount = Math.max(0, body.subtotal + shipping + codCharge + smallOrderFee - discountAmount - walletUsed)
-    const cashbackEarned = Math.round((finalAmount * 5) / 100)
+    const cashbackEarned = enableEarning ? Math.round((finalAmount * 5) / 100) : 0
     const orderRef = body.order_ref || `MANA${Date.now().toString().slice(-6)}`
 
     const refCookie = cookies().get('mana_ref')?.value
@@ -216,7 +223,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    if ((priorOrderCount || 0) === 0 && !profile.is_cashback_eligible) {
+    if ((priorOrderCount || 0) === 0 && !profile.is_cashback_eligible && enableEarning) {
       await supabaseAdmin.from('user_profiles').update({ is_cashback_eligible: true }).eq('phone', normalizedPhone)
     }
 

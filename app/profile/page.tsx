@@ -110,6 +110,11 @@ export default function ProfilePage() {
   const [walletBalance, setWalletBalance] = useState(0)
   const [orders, setOrders] = useState<any[]>([])
   const [dataLoading, setDataLoading] = useState(true)
+  const [siteSettings, setSiteSettings] = useState({ enable_cashback_earning: true, enable_cashback_spending: true })
+
+  useEffect(() => {
+    fetch('/api/settings').then(res => res.json()).then(data => setSiteSettings(data)).catch(() => {})
+  }, [])
 
   const clearCart = useCart(s => s.clearCart)
   const addItem = useCart(s => s.addItem)
@@ -373,6 +378,7 @@ export default function ProfilePage() {
                 {/* Left Column: Wallet & Quick Actions */}
                 <div className="space-y-6">
                   {/* Wallet Card */}
+                  {siteSettings.enable_cashback_spending && (
                   <div className="bg-green-6 border-2 border-green-5 rounded-2xl p-6 relative overflow-hidden shadow-sm">
                     <div className="absolute -right-6 -top-6 text-green-5 opacity-50">
                       <Wallet size={120} strokeWidth={1} />
@@ -383,10 +389,11 @@ export default function ProfilePage() {
                       </div>
                       <div className="font-serif text-4xl text-green mb-2">{formatPrice(walletBalance)}</div>
                       <p className="text-xs text-green-2 leading-relaxed max-w-[200px]">
-                        Available balance to use on your next purchase. Earn 5% cashback on every order!
+                        Available balance to use on your next purchase. {siteSettings.enable_cashback_earning ? 'Earn 5% cashback on every order!' : ''}
                       </p>
                     </div>
                   </div>
+                  )}
 
                   {/* Need Help Box */}
                   <div className="bg-white border border-ivory-3 rounded-2xl p-6 text-center shadow-sm relative overflow-hidden">

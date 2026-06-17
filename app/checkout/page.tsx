@@ -69,6 +69,11 @@ export default function CheckoutPage() {
   const [shippingCheck, setShippingCheck] = useState<ShippingCheck | null>(null)
   const [shippingCheckLoading, setShippingCheckLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online')
+  const [siteSettings, setSiteSettings] = useState({ enable_cashback_earning: true, enable_cashback_spending: true })
+
+  useEffect(() => {
+    fetch('/api/settings').then(res => res.json()).then(data => setSiteSettings(data)).catch(() => {})
+  }, [])
 
   const cartItems = hydrated ? items : []
   const subtotal = hydrated ? total() : 0
@@ -80,9 +85,9 @@ export default function CheckoutPage() {
   const discount = couponState.discountAmount
   const codCharge = paymentMethod === 'cod' ? COD_CHARGE : 0
   const smallOrderFee = subtotal < 50000 ? SMALL_ORDER_FEE : 0
-  const walletApplied = useCashback ? Math.min(walletBalance, Math.max(0, subtotal - discount)) : 0
+  const walletApplied = (useCashback && siteSettings.enable_cashback_spending) ? Math.min(walletBalance, Math.max(0, subtotal - discount)) : 0
   const orderTotal = Math.max(0, subtotal + shipping + codCharge + smallOrderFee - discount - walletApplied)
-  const cashbackPreview = Math.round((orderTotal * 5) / 100)
+  const cashbackPreview = siteSettings.enable_cashback_earning ? Math.round((orderTotal * 5) / 100) : 0
 
   const normalizedPhone = useMemo(() => form.phone.replace(/\D/g, ''), [form.phone])
   const isPhoneVerified = otpStatus === 'verified' && verifiedPhone === normalizedPhone
@@ -519,7 +524,7 @@ export default function CheckoutPage() {
           <h1 className="font-serif text-2xl font-light text-ink mb-2">Order Placed!</h1>
           <p className="text-sm text-ink-3 mb-1">Order ID: <strong className="text-ink">{orderId.slice(0, 8).toUpperCase()}</strong></p>
           <p className="text-sm text-ink-3 mb-2">We&apos;ll confirm on WhatsApp shortly.</p>
-          {cashbackPreview > 0 && <p className="text-sm text-green-3 mb-6">You will earn {formatPrice(cashbackPreview)} cashback to your wallet after delivery.</p>}
+          {siteSettings.enable_cashback_earning && cashbackPreview > 0 && <p className="text-sm text-green-3 mb-6">You will earn {formatPrice(cashbackPreview)} cashback to your wallet after delivery.</p>}
           <a
             href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=Hi! My order ID is ${orderId.slice(0, 8).toUpperCase()}. Please confirm.`}
             target="_blank"
@@ -662,6 +667,7 @@ export default function CheckoutPage() {
               )}
             </div>
 
+            {siteSettings.enable_cashback_spending && (
             <div>
               <h3 className="font-sans text-sm font-medium text-ink mb-3">Cashback Wallet</h3>
               <div className="rounded-xl border border-ivory-3 bg-ivory-2 p-4">
@@ -688,14 +694,18 @@ export default function CheckoutPage() {
                     {useCashback && walletApplied > 0 && (
                       <div className="text-sm text-green-3">Using {formatPrice(walletApplied)} from wallet.</div>
                     )}
-                    <div className="text-xs text-ink-4">
-                      You earn 5% cashback on every order.
-                      <br/>You will get {formatPrice(cashbackPreview)} credited to your wallet once this order is delivered.
-                    </div>
+                    {siteSettings.enable_cashback_earning && (
+                      <div className="text-xs text-ink-4">
+                        You earn 5% cashback on every order.
+                        <br/>You will get {formatPrice(cashbackPreview)} credited to your wallet once this order is delivered.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             </div>
+            )}
+
 
             <div>
               <h3 className="font-sans text-sm font-medium text-ink mb-3">Payment Method</h3>
@@ -784,9 +794,13 @@ export default function CheckoutPage() {
               <span>Total</span>
               <span className="font-serif text-xl text-green">{formatPrice(orderTotal)}</span>
             </div>
-            <div className="text-xs text-ink-4">
-              Cashback preview: {formatPrice(cashbackPreview)}
-            </div>
+            {siteSettings.enable_cashback_earning && cashbackPreview > 0 && (
+              <div className="flex items-center justify-between font-medium text-green mb-3 pt-3 border-t border-ivory-3">
+                <span className="text-sm text-green-3">
+                  Cashback preview: {formatPrice(cashbackPreview)}
+                </span>
+              </div>
+            )}
             {shippingCheck?.serviceable && (
               <div className="text-xs text-green-3">
                 Expected delivery: {shippingCheck.estimatedDeliveryDate

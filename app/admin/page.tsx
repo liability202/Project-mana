@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { formatPrice } from '@/lib/utils'
 import type { Coupon, Order, Product, Review } from '@/lib/supabase'
 
-type AdminTab = 'orders' | 'products' | 'kits' | 'coupons' | 'customers' | 'reviews' | 'creators'
+type AdminTab = 'orders' | 'products' | 'kits' | 'coupons' | 'customers' | 'reviews' | 'creators' | 'settings'
 type OrderFilter = 'all' | 'pending' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled'
 type CustomerSnapshot = {
   balance: number
@@ -93,6 +93,10 @@ export default function AdminPage() {
     tier: 'standard'
   })
   const [payoutMessage, setPayoutMessage] = useState('')
+  const [siteSettings, setSiteSettings] = useState({
+    enable_cashback_earning: true,
+    enable_cashback_spending: true,
+  })
 
   const login = async () => {
     if (!password.trim()) {
@@ -115,16 +119,17 @@ export default function AdminPage() {
 
   const loadData = async (secret: string) => {
     setLoading(true)
-    const [oRes, pRes, cRes, rRes, crRes, pyRes] = await Promise.all([
+    const [oRes, pRes, cRes, rRes, crRes, pyRes, sRes] = await Promise.all([
       fetch('/api/orders', { headers: { authorization: `Bearer ${secret}` } }),
       fetch(`/api/products?include_all=1&limit=500`, { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/coupons', { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/reviews?pending=1', { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/admin/creators', { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/admin/payouts', { headers: { authorization: `Bearer ${secret}` } }),
+      fetch('/api/settings'),
     ])
-    const [o, p, c, r, cr, py] = await Promise.all([
-      oRes.json(), pRes.json(), cRes.json(), rRes.json(), crRes.json(), pyRes.json()
+    const [o, p, c, r, cr, py, s] = await Promise.all([
+      oRes.json(), pRes.json(), cRes.json(), rRes.json(), crRes.json(), pyRes.json(), sRes.json()
     ])
     if (Array.isArray(o)) setOrders(o)
     if (Array.isArray(p)) setProducts(p)
@@ -132,6 +137,7 @@ export default function AdminPage() {
     if (Array.isArray(r)) setReviews(r)
     if (Array.isArray(cr)) setCreators(cr)
     if (Array.isArray(py)) setPayouts(py)
+    if (s && typeof s === 'object') setSiteSettings(prev => ({ ...prev, ...s }))
     setLoading(false)
   }
 
@@ -356,6 +362,15 @@ export default function AdminPage() {
     }
   }
 
+  const updateSetting = async (key: string, value: boolean) => {
+    const secret = localStorage.getItem('mana_admin') || ''
+    setSiteSettings(prev => ({ ...prev, [key]: value }))
+    await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ key, value }),
+    })
+  }
 
   if (!auth) {
     return (
@@ -393,6 +408,7 @@ export default function AdminPage() {
           <button onClick={() => setTab('customers')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'customers' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Customers</button>
           <button onClick={() => setTab('reviews')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'reviews' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Reviews</button>
           <button onClick={() => setTab('creators')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'creators' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Creators</button>
+          <button onClick={() => setTab('settings')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'settings' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Settings</button>
           <button onClick={() => { localStorage.removeItem('mana_admin'); setAuth(false) }} className="text-xs text-green-4 hover:text-ivory transition-colors">Logout</button>
         </div>
       </div>
@@ -976,6 +992,34 @@ export default function AdminPage() {
                 ))}
               </div>
             )}
+          </div>
+        ) : tab === 'settings' ? (
+          <div className="bg-white border border-ivory-3 rounded-xl p-6 shadow-soft max-w-2xl">
+            <h2 className="font-serif text-xl text-ink mb-6">Global Site Settings</h2>
+            
+            <div className="space-y-6">
+              <div className="flex items-start justify-between gap-4 p-4 rounded-lg bg-ivory-2 border border-ivory-3">
+                <div>
+                  <div className="font-medium text-ink">Enable Cashback Earning</div>
+                  <div className="text-sm text-ink-3 mt-1">If enabled, users will earn 5% cashback on new orders. If disabled, new cashback is not awarded and promotional text is hidden.</div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
+                  <input type="checkbox" className="sr-only peer" checked={siteSettings.enable_cashback_earning} onChange={e => updateSetting('enable_cashback_earning', e.target.checked)} />
+                  <div className="w-11 h-6 bg-ivory-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green"></div>
+                </label>
+              </div>
+
+              <div className="flex items-start justify-between gap-4 p-4 rounded-lg bg-ivory-2 border border-ivory-3">
+                <div>
+                  <div className="font-medium text-ink">Enable Wallet & Spending UI</div>
+                  <div className="text-sm text-ink-3 mt-1">If enabled, users can view their wallet and spend their existing cashback balance at checkout. If disabled, the entire wallet system is hidden from the user interface.</div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
+                  <input type="checkbox" className="sr-only peer" checked={siteSettings.enable_cashback_spending} onChange={e => updateSetting('enable_cashback_spending', e.target.checked)} />
+                  <div className="w-11 h-6 bg-ivory-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green"></div>
+                </label>
+              </div>
+            </div>
           </div>
         )}
       </div>
