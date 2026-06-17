@@ -231,10 +231,7 @@ export default function CheckoutPage() {
 
       setOtpStatus('code-sent')
       setOtpCode('')
-      const channelLabel = Array.isArray(data.channels) && data.channels.length > 0
-        ? data.channels.join(' + ')
-        : 'your phone'
-      const hint = data.dev_otp ? `Test OTP: ${data.dev_otp}` : `OTP sent via ${channelLabel}`
+      const hint = data.dev_otp ? `Test OTP: ${data.dev_otp}` : `OTP sent via WhatsApp`
       setOtpHint(hint)
       showToast(hint)
     } catch (err: any) {
@@ -552,7 +549,20 @@ export default function CheckoutPage() {
             </div>
             <div>
               <label className="text-xs text-ink-3 block mb-1.5">WhatsApp Number *</label>
-              <input name="phone" value={form.phone} onChange={handleChange} placeholder="+91 98765 43210" type="tel" className="input" />
+              <div className="flex">
+                <span className="inline-flex items-center px-3 border border-r-0 border-ivory-3 rounded-l-lg bg-ivory-2 text-ink-3 sm:text-sm font-medium">
+                  +91
+                </span>
+                <input 
+                  name="phone" 
+                  value={form.phone} 
+                  onChange={handleChange} 
+                  placeholder="9876543210" 
+                  type="tel" 
+                  maxLength={10}
+                  className="input rounded-l-none" 
+                />
+              </div>
               <div className="mt-2 rounded-lg border border-ivory-3 bg-ivory-2 p-3">
                 <div className="flex flex-col gap-2 sm:flex-row">
                   {otpStatus === 'verified' ? (
