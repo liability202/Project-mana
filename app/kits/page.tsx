@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useCart } from '@/lib/store'
@@ -29,6 +29,8 @@ type KitVariant = Omit<Variant, 'items'> & {
     powder?: boolean
     whole?: boolean
   }
+  benefits?: string[]
+  how_to_use?: string
 }
 
 type KitProduct = Omit<Product, 'variants'> & {
@@ -85,6 +87,7 @@ export default function KitsPage() {
   const [kits, setKits] = useState<KitProduct[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedKitId, setSelectedKitId] = useState<string | null>(null)
+  const detailRef = useRef<HTMLDivElement | null>(null)
   const selectedKit = kits.find(kit => kit.id === selectedKitId) || null
 
   useEffect(() => {
@@ -102,6 +105,13 @@ export default function KitsPage() {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!selectedKitId) return
+    window.setTimeout(() => {
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }, [selectedKitId])
 
   return (
     <>
@@ -127,24 +137,22 @@ export default function KitsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
             {kits.map(kit => (
-              <KitOverviewCard key={kit.id} kit={kit} onSelect={() => setSelectedKitId(kit.id)} />
+              <KitOverviewCard key={kit.id} kit={kit} selected={selectedKitId === kit.id} onSelect={() => setSelectedKitId(kit.id)} />
             ))}
           </div>
         )}
-      </div>
 
-      {selectedKit && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-ink/50 px-[4%] py-6 sm:py-10">
-          <div className="max-w-[1320px] mx-auto">
+        {selectedKit && (
+          <div ref={detailRef} className="scroll-mt-24">
             <KitBuilder kit={selectedKit} onClose={() => setSelectedKitId(null)} />
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </>
   )
 }
 
-function KitOverviewCard({ kit, onSelect }: { kit: KitProduct; onSelect: () => void }) {
+function KitOverviewCard({ kit, selected, onSelect }: { kit: KitProduct; selected: boolean; onSelect: () => void }) {
   const variants = normalizeVariants(kit)
   const firstVariant = variants[0]
   const items = firstVariant?.items || []
@@ -155,7 +163,7 @@ function KitOverviewCard({ kit, onSelect }: { kit: KitProduct; onSelect: () => v
     <button
       type="button"
       onClick={onSelect}
-      className="group text-left rounded-[24px] border border-ivory-3 bg-white p-3 shadow-soft transition-all hover:-translate-y-1 hover:border-green-4 hover:shadow-lg"
+      className={`group text-left rounded-[24px] border bg-white p-3 shadow-soft transition-all hover:-translate-y-1 hover:border-green-4 hover:shadow-lg ${selected ? 'border-green ring-2 ring-green-5' : 'border-ivory-3'}`}
     >
       <div className="relative overflow-hidden rounded-[20px] border border-ivory-3 bg-ivory2 aspect-[4/3]">
         {image ? (
@@ -174,7 +182,7 @@ function KitOverviewCard({ kit, onSelect }: { kit: KitProduct; onSelect: () => v
             <div className="font-serif text-2xl text-green mt-1">{formatPrice(firstVariant?.price || kit.price)}</div>
           </div>
           <span className="rounded-full bg-green px-4 py-2 text-xs font-medium text-white transition-colors group-hover:bg-terra">
-            Customize
+            {selected ? 'Selected' : 'View Kit'}
           </span>
         </div>
       </div>
@@ -260,8 +268,10 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
     )))
   }
 
-  const benefits = kit.tags?.filter(tag => !['kit', 'bestseller', 'premium'].includes(tag)) || []
-  const howToUse = activeVariant?.description || kit.description
+  const benefits = activeVariant?.benefits?.length
+    ? activeVariant.benefits
+    : (kit.tags?.filter(tag => !['kit', 'bestseller', 'premium'].includes(tag)) || [])
+  const howToUse = activeVariant?.how_to_use || activeVariant?.description || kit.description
   const sizeLabel = getSizeDisplayName(activeVariant?.name, sizeIdx)
 
   const handleAddToCart = () => {
@@ -287,10 +297,10 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
   const whatsappMessage = `Hi Mana! I want to buy the ${kit.name}.\n\nSize: ${sizeLabel}\nForm: ${form === 'powder' ? 'Powder' : 'Whole'}\nWeight: ${totalWeightLabel}\nPrice: ${formatPrice(price)}\n\nItems:\n${selectedItems.map(item => `- ${item.name}: ${item.grams}g`).join('\n')}`
 
   return (
-    <div className="bg-white border border-ivory-3 rounded-[28px] overflow-hidden shadow-soft">
-      <div className="flex items-center justify-between gap-3 border-b border-ivory-3 bg-ivory px-5 py-4 sm:px-7">
+    <div className="bg-white border border-ivory-3 rounded-[18px] sm:rounded-[24px] overflow-hidden shadow-soft">
+      <div className="flex items-center justify-between gap-3 border-b border-ivory-3 bg-ivory px-4 py-4 sm:px-7">
         <div>
-          <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4">Customize selected kit</div>
+          <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4">Kit details</div>
           <div className="font-serif text-xl text-ink mt-1">{kit.name}</div>
         </div>
         <button
@@ -298,7 +308,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
           onClick={onClose}
           className="rounded-full border border-ivory-3 bg-white px-4 py-2 text-sm text-ink transition-colors hover:border-terra hover:text-terra"
         >
-          Close
+          Back
         </button>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-[0.92fr_1.08fr]">

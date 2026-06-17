@@ -959,7 +959,7 @@ export default function AdminPage() {
               )}
             </div>
           </div>
-        ) : (
+        ) : tab === 'reviews' ? (
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-serif text-xl text-ink">Pending Reviews</h2>
@@ -1021,7 +1021,7 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {shipForm && (

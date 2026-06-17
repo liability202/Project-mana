@@ -33,6 +33,8 @@ export default function NewAdminKitPage() {
   const [slug, setSlug] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
   const [description, setDescription] = useState('')
+  const [benefitsInput, setBenefitsInput] = useState('')
+  const [howToUse, setHowToUse] = useState('')
   const [vendor, setVendor] = useState('Mana')
   const [tagsInput, setTagsInput] = useState('bestseller, kit')
   const [imagesInput, setImagesInput] = useState('')
@@ -228,6 +230,7 @@ export default function NewAdminKitPage() {
 
       const images = imagesInput.split('\n').map(url => url.trim()).filter(Boolean)
       const tags = tagsInput.split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean)
+      const benefits = benefitsInput.split('\n').map(item => item.trim()).filter(Boolean)
       const variants = kitSizes.map(size => {
         const gramsEach = Math.max(0, Number(size.gramsEach || '0'))
         const computedPrice = getSizeTotal(size.id, size.gramsEach)
@@ -243,6 +246,8 @@ export default function NewAdminKitPage() {
           price,
           compare_price: size.comparePriceRupees ? Math.round(Number(size.comparePriceRupees) * 100) : null,
           form_options: formOptions,
+          benefits,
+          how_to_use: howToUse.trim(),
           items: selectedProducts.map(product => {
             const productGrams = Math.max(0, Number(getProductWeight(product.id, size.id, size.gramsEach) || '0'))
             const pricePerGram = product.price / parseBaseWeightGrams(product.price_per_unit)
@@ -289,6 +294,8 @@ export default function NewAdminKitPage() {
       setSlug('')
       setSlugTouched(false)
       setDescription('')
+      setBenefitsInput('')
+      setHowToUse('')
       setVendor('Mana')
       setTagsInput('bestseller, kit')
       setImagesInput('')
@@ -398,6 +405,27 @@ export default function NewAdminKitPage() {
                 <div className="md:col-span-2">
                   <label className="text-xs text-ink-3 block mb-1.5">Description</label>
                   <textarea value={description} onChange={e => setDescription(e.target.value)} className="input min-h-[140px]" placeholder="A curated hair care kit with herbs chosen for stronger, healthier hair." />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs text-ink-3 block mb-1.5">Benefits</label>
+                  <textarea
+                    value={benefitsInput}
+                    onChange={e => setBenefitsInput(e.target.value)}
+                    className="input min-h-[120px]"
+                    placeholder={'Supports stronger hair\nHelps daily digestion\nFreshly packed ingredients'}
+                  />
+                  <p className="text-xs text-ink-4 mt-1.5">Add one benefit per line. These show in the kit page Benefits tab.</p>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs text-ink-3 block mb-1.5">How to Use</label>
+                  <textarea
+                    value={howToUse}
+                    onChange={e => setHowToUse(e.target.value)}
+                    className="input min-h-[120px]"
+                    placeholder="Take as recommended for this kit. Mention timing, quantity, and any preparation steps here."
+                  />
                 </div>
 
                 <div className="md:col-span-2">
