@@ -59,14 +59,14 @@ export async function sendWhatsAppTemplate(
     })
   }
 
-  if (buttonCode) {
-    components.push({
-      type: 'button',
-      sub_type: 'url',
-      index: '0',
-      parameters: [{ type: 'text', text: buttonCode }],
-    })
-  }
+ if (buttonCode) {
+  components.push({
+    type: 'button',
+    sub_type: 'copy_code',
+    index: '0',
+    parameters: [{ type: 'coupon_code', coupon_code: buttonCode }],
+  })
+}
 
   return postWhatsAppMessage({
     messaging_product: 'whatsapp',
