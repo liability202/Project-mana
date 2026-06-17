@@ -155,45 +155,6 @@ export async function clearOtpRecord(client: SupabaseClient, phone: string) {
   await clearFallbackOtp(client, normalized)
 }
 
-async function sendSmsOtp(phone: string, code: string) {
-  const authKey = process.env.MSG91_AUTH_KEY
-  
-  if (!authKey) {
-    return false
-  }
-
-  const res = await fetch("https://api.msg91.com/api/v2/sendsms", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      authkey: authKey,
-    },
-    body: JSON.stringify({
-      sender: "TESTIN", // temporary sender
-      route: "4", // transactional
-      country: "91",
-      sms: [
-        {
-          message: `Your MANA checkout OTP is ${code}`,
-          to: [phone],
-        },
-      ],
-    }),
-  })
-
-  if (!res.ok) {
-    const details = await res.text()
-    throw new Error(`SMS delivery failed: ${details}`)
-  }
-
-  const data = await res.json()
-  if (data.type === 'error') {
-    throw new Error(`MSG91 Error: ${data.message}`)
-  }
-
-  return true
-}
-
 export async function deliverOtp(phone: string, code: string) {
   const channels: string[] = []
   const errors: string[] = []
@@ -205,13 +166,6 @@ export async function deliverOtp(phone: string, code: string) {
     } catch (error: any) {
       errors.push(error.message || 'WhatsApp delivery failed')
     }
-  }
-
-  try {
-    const smsSent = await sendSmsOtp(phone, code)
-    if (smsSent) channels.push('sms')
-  } catch (error: any) {
-    errors.push(error.message || 'SMS delivery failed')
   }
 
   if (channels.length === 0 && (process.env.NODE_ENV !== 'production' || process.env.ENABLE_TEST_OTP === 'true' || phone.endsWith('9999999999'))) {
