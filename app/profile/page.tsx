@@ -151,7 +151,7 @@ export default function ProfilePage() {
 
       setStep('verify')
       setOtpCode('')
-      const hint = data.dev_otp ? `Test OTP: ${data.dev_otp}` : `OTP sent via WhatsApp`
+      const hint = `OTP sent via WhatsApp`
       setOtpHint(hint)
       showToast('OTP sent successfully')
     } catch (err: any) {

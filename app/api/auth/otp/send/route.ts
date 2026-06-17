@@ -17,7 +17,6 @@ export async function POST(req: Request) {
       success: true,
       channels: otp.channels,
       expires_in_minutes: otp.expiresInMinutes,
-      dev_otp: otp.devOtp,
     })
   } catch (err: any) {
     const message = err?.message || 'Could not send OTP.'

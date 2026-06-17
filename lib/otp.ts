@@ -168,17 +168,12 @@ export async function deliverOtp(phone: string, code: string) {
     }
   }
 
-  if (channels.length === 0 && (process.env.NODE_ENV !== 'production' || process.env.ENABLE_TEST_OTP === 'true' || phone.endsWith('9999999999'))) {
-    channels.push('dev')
-  }
-
   if (channels.length === 0) {
     throw new Error(errors[0] || 'No OTP delivery channel is configured.')
   }
 
   return {
     channels,
-    devOtp: channels.includes('dev') ? code : null,
   }
 }
 
@@ -208,7 +203,6 @@ export async function createAndSendOtp(client: SupabaseClient, phone: string) {
 
   return {
     channels: delivery.channels,
-    devOtp: delivery.devOtp,
     expiresInMinutes: OTP_EXPIRY_MINUTES,
   }
 }
@@ -230,20 +224,12 @@ export async function verifyOtpCode(
     throw new Error('Too many invalid attempts. Please request a new OTP.')
   }
 
-  const isTestOtp = params.otp === '111111' && (
-    process.env.NODE_ENV !== 'production' || 
-    process.env.ENABLE_TEST_OTP === 'true' ||
-    normalized.endsWith('9999999999')
-  )
-
-  if (!isTestOtp) {
-    if (hashOtp(normalized, params.otp) !== record.otp_hash) {
-      await saveOtpRecord(client, {
-        ...record,
-        attempts: (record.attempts || 0) + 1,
-      })
-      throw new Error('Invalid OTP. Please check and try again.')
-    }
+  if (hashOtp(normalized, params.otp) !== record.otp_hash) {
+    await saveOtpRecord(client, {
+      ...record,
+      attempts: (record.attempts || 0) + 1,
+    })
+    throw new Error('Invalid OTP. Please check and try again.')
   }
 
   await clearOtpRecord(client, normalized)

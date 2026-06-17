@@ -231,7 +231,7 @@ export default function CheckoutPage() {
 
       setOtpStatus('code-sent')
       setOtpCode('')
-      const hint = data.dev_otp ? `Test OTP: ${data.dev_otp}` : `OTP sent via WhatsApp`
+      const hint = `OTP sent via WhatsApp`
       setOtpHint(hint)
       showToast(hint)
     } catch (err: any) {
