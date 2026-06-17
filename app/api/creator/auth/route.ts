@@ -33,7 +33,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ 
         success: true, 
         channels: result.channels,
-        devOtp: result.devOtp 
       })
     }
 
