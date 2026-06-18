@@ -229,7 +229,9 @@ export default function NewAdminKitPage() {
       if (!selectedProducts.length) throw new Error('Select at least one product for this kit.')
 
       const images = imagesInput.split('\n').map(url => url.trim()).filter(Boolean)
-      const tags = tagsInput.split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean)
+      const baseTags = tagsInput.split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean)
+      const benefitsTags = benefitsInput.split('\n').map(tag => tag.trim()).filter(Boolean)
+      const tags = [...baseTags, ...benefitsTags]
       const benefits = benefitsInput.split('\n').map(item => item.trim()).filter(Boolean)
       const variants = kitSizes.map(size => {
         const gramsEach = Math.max(0, Number(size.gramsEach || '0'))
@@ -241,13 +243,13 @@ export default function NewAdminKitPage() {
           id: `kit-${size.id}`,
           name: size.name,
           description: size.description || `${gramsEach}g each`,
+          how_to_use: howToUse.trim() || undefined,
           size_desc: size.description || `${gramsEach}g each`,
           grams_each: gramsEach,
           price,
           compare_price: size.comparePriceRupees ? Math.round(Number(size.comparePriceRupees) * 100) : null,
           form_options: formOptions,
           benefits,
-          how_to_use: howToUse.trim(),
           items: selectedProducts.map(product => {
             const productGrams = Math.max(0, Number(getProductWeight(product.id, size.id, size.gramsEach) || '0'))
             const pricePerGram = product.price / parseBaseWeightGrams(product.price_per_unit)
@@ -408,15 +410,11 @@ export default function NewAdminKitPage() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="text-xs text-ink-3 block mb-1.5">Benefits</label>
-                  <textarea
-                    value={benefitsInput}
-                    onChange={e => setBenefitsInput(e.target.value)}
-                    className="input min-h-[120px]"
-                    placeholder={'Supports stronger hair\nHelps daily digestion\nFreshly packed ingredients'}
-                  />
+                  <label className="text-xs text-ink-3 block mb-1.5">Benefits (One per line)</label>
+                  <textarea value={benefitsInput} onChange={e => setBenefitsInput(e.target.value)} className="input min-h-[100px]" placeholder={'Supports stronger hair\nHelps daily digestion\nFreshly packed ingredients'} />
                   <p className="text-xs text-ink-4 mt-1.5">Add one benefit per line. These show in the kit page Benefits tab.</p>
                 </div>
+
 
                 <div className="md:col-span-2">
                   <label className="text-xs text-ink-3 block mb-1.5">How to Use</label>

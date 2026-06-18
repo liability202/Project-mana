@@ -100,7 +100,11 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
         setSlug(product.slug)
         setDescription(product.description || '')
         setVendor(product.vendor || 'Mana')
-        setTagsInput((product.tags || []).join(', '))
+        const baseTags = (product.tags || []).filter((tag: string) => ['kit', 'bestseller', 'premium'].includes(tag.toLowerCase()))
+        const benefitTags = (product.tags || []).filter((tag: string) => !['kit', 'bestseller', 'premium'].includes(tag.toLowerCase()))
+        
+        setTagsInput(baseTags.join(', '))
+        setBenefitsInput(benefitTags.join('\n'))
         setImagesInput((product.images || []).join('\n'))
         setPricePerUnit(product.price_per_unit || 'per kit')
         setInStock(Boolean(product.in_stock))
@@ -117,6 +121,10 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
               powder: savedFormOptions.powder !== false,
               whole: savedFormOptions.whole !== false,
             })
+          }
+
+          if (product.variants.length > 0) {
+            setHowToUse(product.variants[0].how_to_use || '')
           }
 
           const sizes = product.variants.map((v: any) => {
@@ -324,7 +332,9 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
       if (!selectedProducts.length) throw new Error('Select at least one product for this kit.')
 
       const images = imagesInput.split('\n').map(url => url.trim()).filter(Boolean)
-      const tags = tagsInput.split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean)
+      const baseTags = tagsInput.split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean)
+      const benefitsTags = benefitsInput.split('\n').map(tag => tag.trim()).filter(Boolean)
+      const tags = [...baseTags, ...benefitsTags]
       const benefits = benefitsInput.split('\n').map(item => item.trim()).filter(Boolean)
       const variants = kitSizes.map(size => {
         const gramsEach = Math.max(0, Number(size.gramsEach || '0'))
@@ -336,13 +346,13 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
           id: `kit-${size.id}`,
           name: size.name,
           description: size.description || `${gramsEach}g each`,
+          how_to_use: howToUse.trim() || undefined,
           size_desc: size.description || `${gramsEach}g each`,
           grams_each: gramsEach,
           price,
           compare_price: size.comparePriceRupees ? Math.round(Number(size.comparePriceRupees) * 100) : null,
           form_options: formOptions,
           benefits,
-          how_to_use: howToUse.trim(),
           items: selectedProducts.map(product => {
             const productGrams = Math.max(0, Number(getProductWeight(product.id, size.id, size.gramsEach) || '0'))
             const pricePerGram = product.price / parseBaseWeightGrams(product.price_per_unit)
@@ -477,13 +487,8 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="text-xs text-ink-3 block mb-1.5">Benefits</label>
-                    <textarea
-                      value={benefitsInput}
-                      onChange={e => setBenefitsInput(e.target.value)}
-                      className="input min-h-[120px]"
-                      placeholder={'Supports stronger hair\nHelps daily digestion\nFreshly packed ingredients'}
-                    />
+                    <label className="text-xs text-ink-3 block mb-1.5">Benefits (One per line)</label>
+                    <textarea value={benefitsInput} onChange={e => setBenefitsInput(e.target.value)} className="input min-h-[100px]" placeholder={'Supports stronger hair\nHelps daily digestion\nFreshly packed ingredients'} />
                     <p className="text-xs text-ink-4 mt-1.5">Add one benefit per line. These show in the kit page Benefits tab.</p>
                   </div>
 
@@ -495,7 +500,10 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                       className="input min-h-[120px]"
                       placeholder="Take as recommended for this kit. Mention timing, quantity, and any preparation steps here."
                     />
+                    <p className="text-xs text-ink-4 mt-1.5">Instructions show in the kit page How to Use tab.</p>
                   </div>
+
+
 
                   <div className="md:col-span-2">
                   <ImageManager label="Kit Images" value={imagesInput} onChange={setImagesInput} />
