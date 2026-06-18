@@ -72,7 +72,7 @@ export default function CheckoutPage() {
   const [siteSettings, setSiteSettings] = useState({ enable_cashback_earning: true, enable_cashback_spending: true })
 
   useEffect(() => {
-    fetch('/api/settings').then(res => res.json()).then(data => setSiteSettings(data)).catch(() => {})
+    fetch(`/api/settings?t=${Date.now()}`, { cache: 'no-store' }).then(res => res.json()).then(data => setSiteSettings(data)).catch(() => {})
   }, [])
 
   const cartItems = hydrated ? items : []

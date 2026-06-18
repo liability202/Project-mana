@@ -129,7 +129,7 @@ export default function AdminPage() {
       fetch('/api/reviews?pending=1', { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/admin/creators', { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/admin/payouts', { headers: { authorization: `Bearer ${secret}` } }),
-      fetch('/api/settings'),
+      fetch(`/api/settings?t=${Date.now()}`, { cache: 'no-store' }),
     ])
     const [o, p, c, r, cr, py, s] = await Promise.all([
       oRes.json(), pRes.json(), cRes.json(), rRes.json(), crRes.json(), pyRes.json(), sRes.json()
