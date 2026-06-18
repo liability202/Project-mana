@@ -7,26 +7,19 @@ const DEFAULTS: Record<string, boolean> = {
 }
 
 async function ensureTable() {
-  // Try to create the table via raw SQL if it doesn't exist
-  await supabaseAdmin.rpc('exec_sql', {
-    sql: `
-      create table if not exists site_settings (
-        key text primary key,
-        value boolean default true,
-        updated_at timestamptz default now()
-      );
-      alter table site_settings enable row level security;
-      do $$
-      begin
-        if not exists (select 1 from pg_policies where tablename = 'site_settings' and policyname = 'site_settings_public_read') then
-          create policy "site_settings_public_read" on site_settings for select using (true);
-        end if;
-        if not exists (select 1 from pg_policies where tablename = 'site_settings' and policyname = 'site_settings_service_role_all') then
-          create policy "site_settings_service_role_all" on site_settings for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
-        end if;
-      end $$;
-    `
-  }).catch(() => {})
+  try {
+    await supabaseAdmin.rpc('exec_sql', {
+      sql: `
+        create table if not exists site_settings (
+          key text primary key,
+          value boolean default true,
+          updated_at timestamptz default now()
+        );
+      `
+    })
+  } catch {
+    // ignore - table likely already exists
+  }
 }
 
 export async function GET() {
