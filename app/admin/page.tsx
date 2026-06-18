@@ -97,6 +97,9 @@ export default function AdminPage() {
     enable_cashback_earning: true,
     enable_cashback_spending: true,
   })
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsError, setSettingsError] = useState('')
+  const [settingsOk, setSettingsOk] = useState(false)
 
   const login = async () => {
     if (!password.trim()) {
@@ -364,12 +367,32 @@ export default function AdminPage() {
 
   const updateSetting = async (key: string, value: boolean) => {
     const secret = localStorage.getItem('mana_admin') || ''
-    setSiteSettings(prev => ({ ...prev, [key]: value }))
-    await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', authorization: `Bearer ${secret}` },
-      body: JSON.stringify({ key, value }),
-    })
+    const prev = siteSettings[key as keyof typeof siteSettings]
+    setSiteSettings(s => ({ ...s, [key]: value }))
+    setSettingsSaving(true)
+    setSettingsError('')
+    setSettingsOk(false)
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${secret}` },
+        body: JSON.stringify({ key, value }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        // Revert the optimistic update
+        setSiteSettings(s => ({ ...s, [key]: prev }))
+        setSettingsError(data?.error || 'Could not save setting. The site_settings table may not exist in Supabase — please run the SQL setup below.')
+      } else {
+        setSettingsOk(true)
+        setTimeout(() => setSettingsOk(false), 2000)
+      }
+    } catch {
+      setSiteSettings(s => ({ ...s, [key]: prev }))
+      setSettingsError('Network error. Could not save setting.')
+    } finally {
+      setSettingsSaving(false)
+    }
   }
 
   if (!auth) {
@@ -994,31 +1017,61 @@ export default function AdminPage() {
             )}
           </div>
         ) : tab === 'settings' ? (
-          <div className="bg-white border border-ivory-3 rounded-xl p-6 shadow-soft max-w-2xl">
-            <h2 className="font-serif text-xl text-ink mb-6">Global Site Settings</h2>
-            
-            <div className="space-y-6">
-              <div className="flex items-start justify-between gap-4 p-4 rounded-lg bg-ivory-2 border border-ivory-3">
-                <div>
-                  <div className="font-medium text-ink">Enable Cashback Earning</div>
-                  <div className="text-sm text-ink-3 mt-1">If enabled, users will earn 5% cashback on new orders. If disabled, new cashback is not awarded and promotional text is hidden.</div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-                  <input type="checkbox" className="sr-only peer" checked={siteSettings.enable_cashback_earning} onChange={e => updateSetting('enable_cashback_earning', e.target.checked)} />
-                  <div className="w-11 h-6 bg-ivory-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green"></div>
-                </label>
+          <div className="space-y-4 max-w-2xl">
+            <div className="bg-white border border-ivory-3 rounded-xl p-6 shadow-soft">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-serif text-xl text-ink">Global Site Settings</h2>
+                {settingsSaving && <span className="text-xs text-ink-4">Saving...</span>}
+                {settingsOk && <span className="text-xs text-green-3 font-medium">✓ Saved</span>}
               </div>
 
-              <div className="flex items-start justify-between gap-4 p-4 rounded-lg bg-ivory-2 border border-ivory-3">
-                <div>
-                  <div className="font-medium text-ink">Enable Wallet & Spending UI</div>
-                  <div className="text-sm text-ink-3 mt-1">If enabled, users can view their wallet and spend their existing cashback balance at checkout. If disabled, the entire wallet system is hidden from the user interface.</div>
+              {settingsError && (
+                <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <div className="font-medium mb-1">⚠ Save failed</div>
+                  <div>{settingsError}</div>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-                  <input type="checkbox" className="sr-only peer" checked={siteSettings.enable_cashback_spending} onChange={e => updateSetting('enable_cashback_spending', e.target.checked)} />
-                  <div className="w-11 h-6 bg-ivory-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green"></div>
-                </label>
+              )}
+
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-4 p-4 rounded-lg bg-ivory-2 border border-ivory-3">
+                  <div>
+                    <div className="font-medium text-ink">Enable Cashback Earning</div>
+                    <div className="text-sm text-ink-3 mt-1">Users earn 5% cashback on new orders. When OFF, no cashback is awarded and the promotional text is hidden on the website.</div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
+                    <input type="checkbox" className="sr-only peer" checked={siteSettings.enable_cashback_earning} disabled={settingsSaving} onChange={e => updateSetting('enable_cashback_earning', e.target.checked)} />
+                    <div className="w-11 h-6 bg-ivory-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green"></div>
+                  </label>
+                </div>
+
+                <div className="flex items-start justify-between gap-4 p-4 rounded-lg bg-ivory-2 border border-ivory-3">
+                  <div>
+                    <div className="font-medium text-ink">Enable Wallet & Spending UI</div>
+                    <div className="text-sm text-ink-3 mt-1">Users can see and spend their wallet balance at checkout. When OFF, the entire wallet section is hidden from customers.</div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
+                    <input type="checkbox" className="sr-only peer" checked={siteSettings.enable_cashback_spending} disabled={settingsSaving} onChange={e => updateSetting('enable_cashback_spending', e.target.checked)} />
+                    <div className="w-11 h-6 bg-ivory-3 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green"></div>
+                  </label>
+                </div>
               </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+              <div className="font-medium text-amber-800 mb-2">⚠ One-time database setup required</div>
+              <div className="text-sm text-amber-700 mb-3">If the toggles are not saving, you need to create the <code className="bg-amber-100 px-1 rounded">site_settings</code> table in Supabase. Go to your <strong>Supabase Dashboard → SQL Editor</strong> and run this once:</div>
+              <pre className="bg-white border border-amber-200 rounded-lg p-3 text-xs text-ink-3 overflow-auto whitespace-pre-wrap">{`create table if not exists site_settings (
+  key text primary key,
+  value boolean default true,
+  updated_at timestamptz default now()
+);
+alter table site_settings enable row level security;
+create policy "site_settings_public_read" on site_settings for select using (true);
+create policy "site_settings_service_role_all" on site_settings for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+insert into site_settings (key, value) values
+  ('enable_cashback_earning', true),
+  ('enable_cashback_spending', true)
+on conflict (key) do nothing;`}</pre>
             </div>
           </div>
         ) : null}
