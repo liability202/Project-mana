@@ -89,7 +89,7 @@ export default function KitSlugPage({ params }: { params: { slug: string } }) {
 
   useEffect(() => {
     let active = true
-    void fetch(`/api/products?slug=${params.slug}`)
+    void fetch(`/api/products?slug=${params.slug}&category=kits`)
       .then(res => res.json())
       .then((data: any) => {
         if (!active) return
