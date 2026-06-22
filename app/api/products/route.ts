@@ -50,3 +50,41 @@ export async function GET(req: Request) {
 
   return NextResponse.json(data)
 }
+
+export async function POST(req: Request) {
+  const auth = req.headers.get('authorization')
+  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const body = await req.json()
+    const { data, error } = await supabaseAdmin.from('products').insert(body).select().single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(data)
+  } catch (error) {
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Invalid product payload',
+    }, { status: 400 })
+  }
+}
+
+export async function PUT(req: Request) {
+  const auth = req.headers.get('authorization')
+  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const { id, ...updates } = await req.json()
+    if (!id) return NextResponse.json({ error: 'Product id is required' }, { status: 400 })
+
+    const { data, error } = await supabaseAdmin.from('products').update(updates).eq('id', id).select().single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(data)
+  } catch (error) {
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Invalid product payload',
+    }, { status: 400 })
+  }
+}

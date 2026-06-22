@@ -28,6 +28,16 @@ type KitSize = {
 type WeightMatrix = Record<string, Record<string, string>>
 type FormOptions = { powder: boolean; whole: boolean }
 
+async function readProductResponse(res: Response) {
+  const text = await res.text()
+  if (!text.trim()) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(`Product API returned ${res.status}: ${text.slice(0, 160)}`)
+  }
+}
+
 export default function EditAdminKitPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState('')
@@ -392,8 +402,8 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
         body: JSON.stringify(payload),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Failed to update kit.')
+      const data = await readProductResponse(res)
+      if (!res.ok) throw new Error(data?.error || `Failed to update kit (${res.status}).`)
 
       setSuccess('Kit updated successfully.')
     } catch (err) {
