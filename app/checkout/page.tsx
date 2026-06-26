@@ -75,6 +75,43 @@ export default function CheckoutPage() {
     fetch(`/api/settings?t=${Date.now()}`, { cache: 'no-store' }).then(res => res.json()).then(data => setSiteSettings(data)).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    let rememberedPhone = ''
+    try {
+      rememberedPhone = localStorage.getItem(ACCOUNT_PHONE_KEY) || document.cookie.split('; ').find((row) => row.startsWith(`${ACCOUNT_PHONE_KEY}=`))?.split('=')[1] || ''
+    } catch(e) {}
+
+    const normalized = rememberedPhone.replace(/\D/g, '').slice(-10)
+
+    if (normalized.length === 10) {
+      setForm(prev => ({ ...prev, phone: normalized }))
+      setVerifiedPhone(normalized)
+      setOtpStatus('verified')
+      
+      fetch(`/api/orders?phone=${normalized}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data) && data.length > 0) {
+            const latest = data[0]
+            setForm(prev => ({
+              ...prev,
+              phone: normalized,
+              name: prev.name || latest.customer_name || '',
+              email: prev.email || latest.customer_email || '',
+              address: prev.address || latest.address || '',
+              city: prev.city || latest.city || '',
+              state: prev.state || latest.state || '',
+              pincode: prev.pincode || latest.pincode || '',
+            }))
+            setCustomerType('returning')
+          } else {
+            setCustomerType('new')
+          }
+        })
+        .catch(() => {})
+    }
+  }, [])
+
   const cartItems = hydrated ? items : []
   const subtotal = hydrated ? total() : 0
   const totalWeightGrams = useMemo(

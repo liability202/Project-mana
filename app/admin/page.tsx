@@ -484,7 +484,7 @@ export default function AdminPage() {
                       <div className="text-xs text-ink-4 mb-0.5">#{order.order_ref || order.id.slice(0, 8).toUpperCase()}</div>
                       <div className="font-medium text-ink">{order.customer_name}</div>
                       <div className="text-sm text-ink-3">{order.customer_phone}</div>
-                      <div className="text-xs text-ink-4 mt-0.5">{order.city} - {order.pincode}</div>
+                      <div className="text-xs text-ink-4 mt-0.5 max-w-sm">{order.address}, {order.city}{order.state ? `, ${order.state}` : ''} - {order.pincode}</div>
                       {order.coupon_code && <div className="text-xs text-green-3 mt-1">Coupon: {order.coupon_code}</div>}
                     </div>
                     <div className="text-right">
