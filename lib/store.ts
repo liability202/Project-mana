@@ -27,6 +27,7 @@ export const useCart = create<CartStore>()(
           i => i.product_id === item.product_id && i.variant_id === item.variant_id
         )
         if (existing) {
+          if (existing.quantity >= 10) return
           set(state => ({
             items: state.items.map(i =>
               i.product_id === item.product_id && i.variant_id === item.variant_id
@@ -52,6 +53,7 @@ export const useCart = create<CartStore>()(
           get().removeItem(productId, variantId)
           return
         }
+        if (qty > 10) return
         set(state => ({
           items: state.items.map(i =>
             i.product_id === productId && i.variant_id === variantId

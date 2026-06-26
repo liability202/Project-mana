@@ -47,7 +47,7 @@ function rememberAccountPhone(phone: string) {
 }
 
 export default function CheckoutPage() {
-  const { items, total, clearCart, hydrated } = useCart()
+  const { items, total, clearCart, hydrated, updateQty, removeItem } = useCart()
   const [form, setForm] = useState<FormData>({ name: '', phone: '', email: '', address: '', city: '', state: '', pincode: '' })
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'details' | 'success'>('details')
@@ -148,6 +148,22 @@ export default function CheckoutPage() {
 
     let active = true
     setShippingCheckLoading(true)
+
+    if (!form.city || !form.state) {
+      fetch(`https://api.postalpincode.in/pincode/${pincode}`)
+        .then(res => res.json())
+        .then(data => {
+          if (active && data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+             setForm(prev => ({
+               ...prev,
+               city: prev.city || data[0].PostOffice[0].District,
+               state: prev.state || data[0].PostOffice[0].State
+             }))
+          }
+        })
+        .catch(() => {})
+    }
+
     void fetch(`/api/shipping/serviceability?pincode=${pincode}&grams=${totalWeightGrams}&cod=1`)
       .then(res => res.json())
       .then(data => {
@@ -320,7 +336,7 @@ export default function CheckoutPage() {
 
   const applyCoupon = async () => {
     if (!isPhoneVerified) {
-      showToast('Verify your phone first to unlock influencer or loyalty discounts')
+      showToast('Verify your phone number to use Discount Codes')
       return
     }
     await applyCouponCode(couponInput)
@@ -648,8 +664,8 @@ export default function CheckoutPage() {
                 <>
                   <p className="text-xs text-ink-4 mb-2">
                     {isPhoneVerified
-                      ? 'First order hai? Apna influencer code enter karke 10% discount le sakte ho.'
-                      : 'Code abhi enter kar sakte ho. Apply karne ke liye phone verification zaroori rahega.'}
+                      ? 'Enter your discount or influencer code to apply your savings.'
+                      : 'You can enter a discount code now. Phone verification is required to apply it.'}
                   </p>
                   <div className="flex gap-2">
                     <input value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} className="input" placeholder="Enter influencer code" />
@@ -746,18 +762,37 @@ export default function CheckoutPage() {
         <div className="bg-white border border-ivory-3 rounded-xl p-5 shadow-soft lg:sticky lg:top-20">
           <h2 className="font-serif text-lg font-normal text-ink mb-4">Order Summary</h2>
 
-          <div className="flex flex-col gap-3 mb-4 max-h-56 overflow-y-auto">
+          <div className="flex flex-col gap-3 mb-4 max-h-[300px] overflow-y-auto pr-2">
             {cartItems.map((item, i) => (
-              <div key={i} className="flex gap-3">
-                <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-ivory-2">
-                  {item.product_image && <Image src={item.product_image} alt={item.product_name} width={56} height={56} className="object-cover w-full h-full" />}
+              <div key={`${item.product_id}-${item.variant_id}-${i}`} className="flex gap-3">
+                <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-ivory-2">
+                  {item.product_image && <Image src={item.product_image} alt={item.product_name} width={64} height={64} className="object-cover w-full h-full" />}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm text-ink leading-tight">{item.product_name}</div>
-                  {item.variant_name && <div className="text-xs text-ink-4">{item.variant_name}</div>}
-                  <div className="text-xs text-ink-4">{item.weight_grams >= 1000 ? (item.weight_grams / 1000).toFixed(1) + 'kg' : item.weight_grams + 'g'} × {item.quantity}</div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <div className="text-sm font-medium text-ink leading-tight">{item.product_name}</div>
+                  {item.variant_name && <div className="text-xs text-ink-4 mt-0.5">{item.variant_name}</div>}
+                  
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={() => updateQty(item.product_id, item.variant_id, item.quantity - 1)}
+                      className="w-6 h-6 rounded border border-ivory-4 bg-transparent text-green text-base flex items-center justify-center cursor-pointer hover:bg-green-6 transition-colors"
+                    >−</button>
+                    <span className="text-sm font-medium text-ink min-w-[20px] text-center">
+                      {item.quantity}
+                    </span>
+                    <button
+                      onClick={() => updateQty(item.product_id, item.variant_id, item.quantity + 1)}
+                      className="w-6 h-6 rounded border border-ivory-4 bg-transparent text-green text-base flex items-center justify-center cursor-pointer hover:bg-green-6 transition-colors"
+                    >+</button>
+                    <button
+                      onClick={() => removeItem(item.product_id, item.variant_id)}
+                      className="text-xs text-ink-4 underline bg-transparent border-none cursor-pointer hover:text-terra transition-colors ml-2"
+                    >Remove</button>
+                  </div>
                 </div>
-                <div className="text-sm font-serif text-green">{formatPrice(item.price * item.quantity)}</div>
+                <div className="text-sm font-serif text-green flex flex-col justify-end items-end pb-1">
+                  {formatPrice(item.price * item.quantity)}
+                </div>
               </div>
             ))}
           </div>

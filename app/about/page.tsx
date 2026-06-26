@@ -13,7 +13,7 @@ export default function AboutPage() {
             We started because we <em className="not-italic text-green-4">couldn't find</em> what we were looking for.
           </h1>
           <p className="text-[1.05rem] leading-[1.9]" style={{ color: 'rgba(194,224,206,0.72)' }}>
-            As a family that has been in the dry fruits and spices trade for decades in Ghaziabad, we knew exactly what premium meant — and what was missing from everything being sold online.
+            As a family that has been in the dry fruits and spices trade for decades in Delhi-ncr, we knew exactly what premium meant and what was missing from everything being sold online.
           </p>
         </div>
       </div>
@@ -25,13 +25,13 @@ export default function AboutPage() {
             <div className="eyebrow">Who We Are</div>
             <h2 className="section-title mb-5">MK and Sons — <em className="not-italic text-green">generations</em> of expertise</h2>
             <p className="text-[.96rem] text-ink-3 leading-[1.9] mb-4">
-              MK and Sons is a family-run dry fruits, herbs and spices business based in Ghaziabad. We have spent decades building relationships directly with farmers, orchards and growers across Kashmir, Kerala, Madhya Pradesh and beyond.
+              MK and Sons is a family run dry fruits, herbs and spices business based in Delhi-ncr. We have spent decades building relationships directly with farmers, orchards and growers across Kashmir, Kerala, Madhya Pradesh and beyond.
             </p>
             <p className="text-[.96rem] text-ink-3 leading-[1.9]">
-              Mana is our online face — bringing the same handpicked quality we have always offered our local customers to every family across India. No middlemen. No compromise. Just nature's finest, straight to your door.
+              Mana is our online face bringing the same handpicked quality we have always offered our local customers to every family across India. No middlemen. No compromise. Just nature's finest, straight to your door.
             </p>
             <div className="flex gap-10 mt-8 pt-7 border-t border-ivory-3 flex-wrap">
-              {[['20+','Years in trade'], ['200+','Products'], ['48K+','Families served']].map(([n,l]) => (
+              {[['20+','Years in trade'], ['200+','Products'], ['2K+','Families served']].map(([n,l]) => (
                 <div key={l}>
                   <div className="font-serif text-3xl text-green leading-none">{n}</div>
                   <div className="text-[.65rem] tracking-[.12em] uppercase text-ink-3 mt-1.5">{l}</div>
@@ -74,7 +74,7 @@ export default function AboutPage() {
               Ground and packed <em className="not-italic text-green-4">after your order.</em> Not before.
             </h3>
             <p className="text-[.92rem] leading-[1.85] mb-5" style={{ color: 'rgba(194,224,206,0.72)' }}>
-              For all powders, churnas and ground spices — we do not pre-grind in bulk and store. Your order triggers the grinding. The difference in aroma, colour and potency is immediate and unmistakable.
+              For all powders, churnas and ground spices, we do not pre-grind in bulk and store. Your order triggers the grinding. The difference in aroma, colour and potency is immediate and unmistakable.
             </p>
             <div className="flex flex-col gap-3">
               {['Ashwagandha powder — ground after order','Triphala churna — blended to order','Ground spices — never pre-ground in bulk','All powders sealed immediately after grinding'].map(item => (

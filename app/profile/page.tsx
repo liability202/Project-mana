@@ -302,13 +302,15 @@ export default function ProfilePage() {
               <div className="space-y-4">
                 <div>
                   <label className="text-xs font-medium text-ink-3 uppercase tracking-wider block mb-2">WhatsApp Number</label>
-                  <div className="flex gap-2">
-                    <span className="flex items-center justify-center px-4 bg-ivory-2 border border-ivory-3 rounded-lg text-ink-3 font-medium">+91</span>
+                  <div className="flex">
+                    <span className="inline-flex items-center px-4 border border-r-0 border-ivory-3 rounded-l-lg bg-ivory-2 text-ink-3 font-medium">
+                      +91
+                    </span>
                     <input 
                       type="tel" 
                       value={phone}
                       onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                      className="flex-1 px-4 py-3 border border-ivory-3 rounded-lg text-ink font-medium focus:border-green-3 outline-none" 
+                      className="flex-1 min-w-0 px-4 py-3 border border-ivory-3 rounded-r-lg text-ink font-medium focus:border-green-3 outline-none" 
                       placeholder="98765 43210" 
                       maxLength={10} 
                     />
