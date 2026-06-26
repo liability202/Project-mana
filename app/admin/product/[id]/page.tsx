@@ -114,6 +114,25 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
     }
   }
 
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this product? This action cannot be undone.')) return
+    setSubmitting(true)
+    setError('')
+    try {
+      const secret = localStorage.getItem('mana_admin') || ''
+      const res = await fetch(`/api/products?id=${params.id}`, {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${secret}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Failed to delete product.')
+      window.location.href = '/admin'
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      setSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-ivory">
       <div className="bg-green px-6 py-4 flex items-center justify-between">
@@ -192,17 +211,21 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
             <div className="space-y-6">
               <div className="bg-white border border-ivory-3 rounded-2xl p-6">
                 <h2 className="font-serif text-xl text-ink mb-4">Status</h2>
-                <label className="flex items-center gap-3 text-sm text-ink cursor-pointer">
-                  <input type="checkbox" checked={inStock} onChange={e => setInStock(e.target.checked)} className="h-4 w-4 accent-[var(--green)]" />
-                  Mark product as in stock
-                </label>
+                <label className="text-xs text-ink-3 block mb-1.5">Inventory Status</label>
+                <select value={inStock ? 'true' : 'false'} onChange={e => setInStock(e.target.value === 'true')} className="input">
+                  <option value="true">In Stock</option>
+                  <option value="false">Out of Stock</option>
+                </select>
               </div>
               <div className="bg-white border border-ivory-3 rounded-2xl p-6">
                 <h2 className="font-serif text-xl text-ink mb-4">Save</h2>
                 {error && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
                 {success && <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">{success}</div>}
-                <button type="submit" disabled={submitting} className="btn-primary w-full justify-center">
+                <button type="submit" disabled={submitting} className="btn-primary w-full justify-center mb-3">
                   {submitting ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button type="button" disabled={submitting} onClick={handleDelete} className="w-full text-center text-sm text-terra hover:text-terra-2 py-2">
+                  Delete Product
                 </button>
               </div>
             </div>

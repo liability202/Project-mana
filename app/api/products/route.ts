@@ -88,3 +88,24 @@ export async function PUT(req: Request) {
     }, { status: 400 })
   }
 }
+
+export async function DELETE(req: Request) {
+  const auth = req.headers.get('authorization')
+  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'Product id is required' }, { status: 400 })
+
+    const { error } = await supabaseAdmin.from('products').delete().eq('id', id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Invalid delete payload',
+    }, { status: 400 })
+  }
+}
