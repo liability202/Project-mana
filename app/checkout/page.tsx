@@ -539,15 +539,13 @@ export default function CheckoutPage() {
           <div className="w-16 h-16 rounded-full bg-green-6 border-2 border-green-4 flex items-center justify-center text-2xl text-green mx-auto mb-4">✓</div>
           <h1 className="font-serif text-2xl font-light text-ink mb-2">Order Placed!</h1>
           <p className="text-sm text-ink-3 mb-1">Order ID: <strong className="text-ink">{orderId.slice(0, 8).toUpperCase()}</strong></p>
-          <p className="text-sm text-ink-3 mb-2">We&apos;ll confirm on WhatsApp shortly.</p>
+          <p className="text-sm text-ink-3 mb-2">Thank you for shopping with us.</p>
           {siteSettings.enable_cashback_earning && cashbackPreview > 0 && <p className="text-sm text-green-3 mb-6">You will earn {formatPrice(cashbackPreview)} cashback to your wallet after delivery.</p>}
           <a
-            href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=Hi! My order ID is ${orderId.slice(0, 8).toUpperCase()}. Please confirm.`}
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/profile"
             className="btn-primary no-underline inline-flex mb-3"
           >
-            <span>Confirm on WhatsApp</span>
+            <span>View Order Status</span>
           </a>
           <br />
           <a href="/" className="btn-outline no-underline inline-flex mt-2">Back to Home</a>
@@ -771,6 +769,11 @@ export default function CheckoutPage() {
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                   <div className="text-sm font-medium text-ink leading-tight">{item.product_name}</div>
                   {item.variant_name && <div className="text-xs text-ink-4 mt-0.5">{item.variant_name}</div>}
+                  {item.weight_grams > 0 && (
+                    <div className="text-xs text-ink-4 mt-0.5">
+                      {item.weight_grams >= 1000 ? (item.weight_grams / 1000).toFixed(1) + 'kg' : item.weight_grams + 'g'}
+                    </div>
+                  )}
                   
                   <div className="flex items-center gap-2 mt-2">
                     <button
