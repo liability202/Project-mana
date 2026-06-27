@@ -259,6 +259,14 @@ export default function CheckoutPage() {
     }
   }
 
+  const loyaltyAppliedRef = useRef(false)
+  useEffect(() => {
+    if (customerType === 'returning' && otpStatus === 'verified' && subtotal > 0 && !loyaltyAppliedRef.current && !couponState.code) {
+      loyaltyAppliedRef.current = true
+      applyCouponCode('LOYAL12').catch(() => {})
+    }
+  }, [customerType, otpStatus, subtotal, couponState.code])
+
   const fetchCustomerType = async () => {
     const res = await fetch(`/api/orders?phone=${normalizedPhone}`)
     const data = await res.json()
@@ -690,31 +698,25 @@ export default function CheckoutPage() {
           <div className="mt-6 pt-5 border-t border-ivory-3 space-y-5">
             <div>
               <h3 className="font-sans text-sm font-medium text-ink mb-3">Discounts</h3>
-              {customerType === 'returning' && isPhoneVerified ? (
-                <div className="rounded-lg border border-green-5 bg-green-6 px-4 py-3 text-sm text-green-2">
-                  <div className="font-medium text-green">LOYAL12 auto-filled for your repeat order.</div>
-                  <div className="mt-1 text-green-2">You save {formatPrice(couponState.discountAmount)} automatically on this checkout.</div>
-                </div>
-              ) : (
-                <>
-                  <p className="text-xs text-ink-4 mb-2">
-                    {isPhoneVerified
-                      ? 'Enter your discount or influencer code to apply your savings.'
-                      : 'You can enter a discount code now. Phone verification is required to apply it.'}
-                  </p>
-                  <div className="flex gap-2">
-                    <input value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} className="input" placeholder="Enter influencer code" />
-                    <button type="button" onClick={applyCoupon} disabled={couponLoading} className="btn-primary justify-center px-5">
-                      <span>{couponLoading ? 'Checking...' : 'Apply'}</span>
-                    </button>
+              <p className="text-xs text-ink-4 mb-2">
+                {isPhoneVerified
+                  ? (customerType === 'returning' ? 'Welcome back! Your LOYAL12 discount is auto-applied if eligible, but you can use another code.' : 'Enter your discount or influencer code to apply your savings.')
+                  : 'You can enter a discount code now. Phone verification is required to apply it.'}
+              </p>
+              <div className="flex gap-2">
+                <input value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} className="input" placeholder="Enter influencer code" />
+                <button type="button" onClick={applyCoupon} disabled={couponLoading} className="btn-primary justify-center px-5">
+                  <span>{couponLoading ? 'Checking...' : 'Apply'}</span>
+                </button>
+              </div>
+              {couponState.valid && (
+                <div className="mt-2 flex items-center justify-between rounded-lg border border-green-5 bg-green-6 px-3 py-2 text-sm text-green-2">
+                  <div>
+                    <span className="font-medium">{couponState.code} applied.</span>
+                    <span className="ml-1">You saved {formatPrice(couponState.discountAmount)}.</span>
                   </div>
-                  {couponState.valid && (
-                    <div className="mt-2 flex items-center justify-between rounded-lg border border-green-5 bg-green-6 px-3 py-2 text-sm text-green-2">
-                      <span>{couponState.code} applied. You saved {formatPrice(couponState.discountAmount)}.</span>
-                      <button type="button" onClick={clearCoupon} className="text-xs underline bg-transparent border-none cursor-pointer">Remove</button>
-                    </div>
-                  )}
-                </>
+                  <button type="button" onClick={clearCoupon} className="text-xs underline bg-transparent border-none cursor-pointer text-green-3 hover:text-green">Remove</button>
+                </div>
               )}
             </div>
 
