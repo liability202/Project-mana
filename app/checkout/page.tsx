@@ -787,7 +787,7 @@ export default function CheckoutPage() {
                 </button>
               </div>
               {paymentMethod === 'cod' && (
-                <p className="text-xs text-terra mt-2">₹49 COD charge will be added to your order.</p>
+                <p className="text-xs text-terra mt-2">₹29 COD charge will be added to your order.</p>
               )}
               <p className="text-xs text-ink-4 mt-2">Secure payment powered by Razorpay</p>
             </div>
