@@ -14,7 +14,7 @@ const STATUS_STEPS = [
   { key: 'pending', label: 'Placed' },
   { key: 'confirmed', label: 'Confirmed' },
   { key: 'packed', label: 'Packed' },
-  { key: 'shipped', label: 'Shipped' },
+  { key: 'shipped', label: 'Shipping' },
   { key: 'delivered', label: 'Delivered' },
 ]
 
