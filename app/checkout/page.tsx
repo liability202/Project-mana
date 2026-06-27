@@ -38,7 +38,7 @@ type ShippingCheck = {
 }
 
 const ACCOUNT_PHONE_KEY = 'mana_account_phone'
-const COD_CHARGE = 4900 // ₹49 in paise
+const COD_CHARGE = 2900 // ₹29 in paise
 const SMALL_ORDER_FEE = 1900 // ₹19 in paise – charged on orders below ₹500
 
 function rememberAccountPhone(phone: string) {
@@ -118,7 +118,7 @@ export default function CheckoutPage() {
     () => cartItems.reduce((sum, item) => sum + Number(item.weight_grams || 0) * Number(item.quantity || 1), 0) || 500,
     [cartItems]
   )
-  const shipping = shippingCost(subtotal)
+  const shipping = shippingCost(subtotal, form.city)
   const discount = couponState.discountAmount
   const codCharge = paymentMethod === 'cod' ? COD_CHARGE : 0
   const smallOrderFee = subtotal < 50000 ? SMALL_ORDER_FEE : 0
