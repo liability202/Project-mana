@@ -191,15 +191,46 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
     }
   }, [params.id])
 
+  const selectableItems = useMemo(() => {
+    const items: SelectedKitProduct[] = []
+    catalog.forEach(product => {
+      // Add the main product
+      items.push({
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        price: product.price,
+        price_per_unit: product.price_per_unit,
+        category: product.category,
+        image: product.images?.[0] || '',
+      })
+      // Add its variants if any
+      if (Array.isArray(product.variants) && product.variants.length > 0) {
+        product.variants.forEach(variant => {
+          items.push({
+            id: `${product.id}::${variant.id}`,
+            name: `${product.name} - ${variant.name}`,
+            slug: product.slug,
+            price: variant.price || product.price,
+            price_per_unit: product.price_per_unit,
+            category: product.category,
+            image: variant.images?.[0] || product.images?.[0] || '',
+          })
+        })
+      }
+    })
+    return items
+  }, [catalog])
+
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return catalog
-    return catalog.filter(product =>
-      product.name.toLowerCase().includes(query) ||
-      product.slug.toLowerCase().includes(query) ||
-      product.category.toLowerCase().includes(query)
+    if (!query) return selectableItems
+    return selectableItems.filter(item =>
+      item.name.toLowerCase().includes(query) ||
+      item.slug.toLowerCase().includes(query) ||
+      item.category.toLowerCase().includes(query)
     )
-  }, [catalog, search])
+  }, [selectableItems, search])
 
   const getProductWeight = (productId: string, sizeId: string, fallbackGrams: string) => {
     return productWeights[productId]?.[sizeId] || fallbackGrams
@@ -288,7 +319,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
     }))
   }
 
-  const toggleProduct = (product: Product) => {
+  const toggleProduct = (product: SelectedKitProduct) => {
     setSelectedProducts(prev => {
       const exists = prev.some(item => item.id === product.id)
       if (exists) {
@@ -312,7 +343,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
           price: product.price,
           price_per_unit: product.price_per_unit,
           category: product.category,
-          image: product.images?.[0],
+          image: product.image,
         },
       ]
     })
