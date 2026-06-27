@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import Image from 'next/image'
 import { useCart } from '@/lib/store'
 import { formatPrice, shippingCost, FREE_SHIPPING_THRESHOLD } from '@/lib/utils'
