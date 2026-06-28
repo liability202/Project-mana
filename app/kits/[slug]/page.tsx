@@ -22,6 +22,9 @@ type KitItem = {
 }
 
 type KitVariant = Omit<Variant, 'items'> & {
+  tier_id?: string
+  tier_name?: string
+  tier_images?: string[]
   items?: KitItem[]
   grams_each?: number
   size_desc?: string
@@ -115,7 +118,8 @@ export default function KitSlugPage({ params }: { params: { slug: string } }) {
         <div className="eyebrow" style={{ color: 'var(--green4)' }}>Curated Kit</div>
         <h1 className="font-serif text-[clamp(2rem,4vw,3.2rem)] text-ivory font-light">
           {kit.name}
-        </h1>      </div>
+        </h1>
+      </div>
       <div className="max-w-[1000px] mx-auto px-[5%]">
         <KitBuilder kit={kit} onClose={() => {}} />
       </div>
@@ -125,11 +129,26 @@ export default function KitSlugPage({ params }: { params: { slug: string } }) {
 
 function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) {
   const variants = useMemo(() => normalizeVariants(kit), [kit])
+  
+  const tiers = useMemo(() => {
+    const groups = new Map<string, KitVariant[]>()
+    variants.forEach(v => {
+      const tierId = v.tier_id || 'default'
+      if (!groups.has(tierId)) groups.set(tierId, [])
+      groups.get(tierId)!.push(v)
+    })
+    return Array.from(groups.values())
+  }, [variants])
+
+  const [activeTierIdx, setActiveTierIdx] = useState(0)
+  const activeTierVariants = tiers[activeTierIdx] || []
+
   const [sizeIdx, setSizeIdx] = useState(0)
   const [isCustomizing, setIsCustomizing] = useState(false)
   const [form, setForm] = useState<Form>('powder')
   const [tab, setTab] = useState<'benefits' | 'howto'>('benefits')
-  const activeVariant = variants[sizeIdx] || variants[0]
+  
+  const activeVariant = activeTierVariants[sizeIdx] || activeTierVariants[0]
   const activeItems = activeVariant?.items || []
   const availableForms = {
     powder: activeVariant?.form_options?.powder !== false,
@@ -144,7 +163,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
   const addItem = useCart(s => s.addItem)
 
   useEffect(() => {
-    const nextVariant = variants[sizeIdx] || variants[0]
+    const nextVariant = activeTierVariants[sizeIdx] || activeTierVariants[0]
     const nextItems = nextVariant?.items || []
     setItemStates(prev => {
       const previousById = new Map(prev.map(item => [item.id, item]))
@@ -160,7 +179,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
         }
       })
     })
-  }, [sizeIdx, variants])
+  }, [sizeIdx, activeTierVariants])
 
   useEffect(() => {
     const nextForms = {
@@ -172,7 +191,8 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
     }
   }, [activeVariant, form])
 
-  const image = kit.images?.[0] || activeItems[0]?.image || ''
+  const tierImages = activeVariant?.tier_images || []
+  const image = tierImages[0] || kit.images?.[0] || activeItems[0]?.image || ''
 
   const selectedItems = activeItems
     .map((item, index) => ({ ...item, ...(itemStates[index] || { id: item.id, selected: true, grams: item.grams || 100, ratio: 1 }) }))
@@ -213,12 +233,14 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
       return
     }
 
+    const tierNamePart = activeVariant?.tier_name ? `${activeVariant.tier_name} - ` : ''
+    
     addItem({
       product_id: kit.id,
       product_name: kit.name,
       product_image: image,
       variant_id: `${activeVariant?.id || 'kit'}-${form}-${selectedItems.map(item => `${item.id}:${item.grams}`).join('|')}`,
-      variant_name: `${sizeLabel} - ${form === 'powder' ? 'Powder' : 'Whole'} - ${selectedItems.map(item => `${item.name} ${item.grams}g`).join(', ')}`,
+      variant_name: `${tierNamePart}${sizeLabel} - ${form === 'powder' ? 'Powder' : 'Whole'} - ${selectedItems.map(item => `${item.name} ${item.grams}g`).join(', ')}`,
       weight_grams: totalWeight,
       price,
       quantity: 1,
@@ -227,7 +249,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
     window.dispatchEvent(new CustomEvent('mana:open-cart'))
   }
 
-  const whatsappMessage = `Hi Mana! I want to buy the ${kit.name}.\n\nSize: ${sizeLabel}\nForm: ${form === 'powder' ? 'Powder' : 'Whole'}\nWeight: ${totalWeightLabel}\nPrice: ${formatPrice(price)}\n\nItems:\n${selectedItems.map(item => `- ${item.name}: ${item.grams}g`).join('\n')}`
+  const whatsappMessage = `Hi Mana! I want to buy the ${kit.name}.\n\nVersion: ${activeVariant?.tier_name || 'Standard'}\nSize: ${sizeLabel}\nForm: ${form === 'powder' ? 'Powder' : 'Whole'}\nWeight: ${totalWeightLabel}\nPrice: ${formatPrice(price)}\n\nItems:\n${selectedItems.map(item => `- ${item.name}: ${item.grams}g`).join('\n')}`
 
   return (
     <div className="bg-white border border-ivory-3 rounded-[18px] sm:rounded-[24px] overflow-hidden shadow-soft">
@@ -266,10 +288,39 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
             {kit.vendor && <div className="text-sm text-ink-4 mt-2">{kit.vendor}</div>}
           </div>
 
+          {tiers.length > 1 && (
+            <div>
+              <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-2">Select Kit Version</div>
+              <div className="flex flex-wrap gap-2">
+                {tiers.map((tierVariants, index) => {
+                  const tierName = tierVariants[0]?.tier_name || `Version ${index + 1}`
+                  const isActive = activeTierIdx === index
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => {
+                        setActiveTierIdx(index)
+                        setSizeIdx(0) // reset size when tier changes
+                      }}
+                      className={`rounded-xl border px-5 py-3 text-sm font-medium transition-all ${
+                        isActive 
+                          ? 'border-green bg-green-6 text-green shadow-soft' 
+                          : 'border-ivory-3 bg-white hover:border-green-4 text-ink-2'
+                      }`}
+                    >
+                      {tierName}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           <div>
             <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-2">Select size</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {variants.map((variant, index) => (
+              {activeTierVariants.map((variant, index) => (
                 <button
                   key={variant.id || variant.name}
                   type="button"

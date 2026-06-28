@@ -28,6 +28,15 @@ type KitSize = {
 type WeightMatrix = Record<string, Record<string, string>>
 type FormOptions = { powder: boolean; whole: boolean }
 
+type KitTier = {
+  id: string
+  name: string
+  imagesInput: string
+  sizes: KitSize[]
+  selectedProducts: SelectedKitProduct[]
+  productWeights: WeightMatrix
+}
+
 async function readProductResponse(res: Response) {
   const text = await res.text()
   if (!text.trim()) return null
@@ -36,6 +45,14 @@ async function readProductResponse(res: Response) {
   } catch {
     throw new Error(`Product API returned ${res.status}: ${text.slice(0, 160)}`)
   }
+}
+
+function createDefaultSizes(): KitSize[] {
+  return [
+    { id: 'small', name: 'Essential', gramsEach: '100', priceRupees: '', comparePriceRupees: '', description: 'Starter size' },
+    { id: 'medium', name: 'Signature', gramsEach: '200', priceRupees: '', comparePriceRupees: '', description: 'Recommended size' },
+    { id: 'large', name: 'Reserve', gramsEach: '500', priceRupees: '', comparePriceRupees: '', description: 'Best value size' },
+  ]
 }
 
 export default function EditAdminKitPage({ params }: { params: { id: string } }) {
@@ -51,16 +68,26 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
   const [imagesInput, setImagesInput] = useState('')
   const [pricePerUnit, setPricePerUnit] = useState('per kit')
   const [formOptions, setFormOptions] = useState<FormOptions>({ powder: true, whole: true })
-  const [kitSizes, setKitSizes] = useState<KitSize[]>([
-    { id: 'small', name: 'Essential', gramsEach: '100', priceRupees: '', comparePriceRupees: '', description: 'Starter size' },
-    { id: 'medium', name: 'Signature', gramsEach: '200', priceRupees: '', comparePriceRupees: '', description: 'Recommended size' },
-    { id: 'large', name: 'Reserve', gramsEach: '500', priceRupees: '', comparePriceRupees: '', description: 'Best value size' },
-  ])
   const [inStock, setInStock] = useState(true)
   const [catalog, setCatalog] = useState<Product[]>([])
   const [search, setSearch] = useState('')
-  const [selectedProducts, setSelectedProducts] = useState<SelectedKitProduct[]>([])
-  const [productWeights, setProductWeights] = useState<WeightMatrix>({})
+  
+  const [tiers, setTiers] = useState<KitTier[]>([{
+    id: `tier-${Date.now()}`,
+    name: '',
+    imagesInput: '',
+    sizes: createDefaultSizes(),
+    selectedProducts: [],
+    productWeights: {}
+  }])
+  const [activeTierId, setActiveTierId] = useState<string>('')
+
+  const activeTierIndex = useMemo(() => {
+    const idx = tiers.findIndex(t => t.id === activeTierId)
+    return idx >= 0 ? idx : 0
+  }, [tiers, activeTierId])
+  const activeTier = tiers[activeTierIndex]
+
   const [submitting, setSubmitting] = useState(false)
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [error, setError] = useState('')
@@ -118,12 +145,13 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
         setImagesInput((product.images || []).join('\n'))
         setPricePerUnit(product.price_per_unit || 'per kit')
         setInStock(Boolean(product.in_stock))
+        
         const savedBenefits = (product.variants || []).find((variant: any) => Array.isArray(variant?.benefits))?.benefits || []
         const savedHowToUse = (product.variants || []).find((variant: any) => typeof variant?.how_to_use === 'string')?.how_to_use || ''
         setBenefitsInput(savedBenefits.join('\n'))
         setHowToUse(savedHowToUse)
 
-        // Populate kitSizes and productWeights from variants
+        // Populate tiers from variants
         if (product.variants && product.variants.length > 0) {
           const savedFormOptions = product.variants.find((variant: any) => variant?.form_options)?.form_options
           if (savedFormOptions) {
@@ -133,32 +161,41 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
             })
           }
 
-          if (product.variants.length > 0) {
-            setHowToUse(product.variants[0].how_to_use || '')
-          }
-
-          const sizes = product.variants.map((v: any) => {
-            const sizeId = v.id.replace('kit-', '')
-            return {
+          const tiersMap = new Map<string, KitTier>()
+          
+          product.variants.forEach((v: any) => {
+            const tierId = v.tier_id || 'default'
+            
+            if (!tiersMap.has(tierId)) {
+              tiersMap.set(tierId, {
+                id: tierId,
+                name: v.tier_name || '',
+                imagesInput: Array.isArray(v.tier_images) ? v.tier_images.join('\n') : '',
+                sizes: [],
+                selectedProducts: [],
+                productWeights: {}
+              })
+            }
+            
+            const tier = tiersMap.get(tierId)!
+            
+            // Extract size
+            const sizeId = v.id.split('-').pop() || 'unknown'
+            tier.sizes.push({
               id: sizeId,
               name: v.name,
               gramsEach: String(v.grams_each || ''),
               priceRupees: String((v.price || 0) / 100),
               comparePriceRupees: v.compare_price ? String(v.compare_price / 100) : '',
               description: v.description || '',
-            }
-          })
-          setKitSizes(sizes)
-
-          // Extract selected products from variants
-          const uniqueProds: Record<string, SelectedKitProduct> = {}
-          const weights: WeightMatrix = {}
-          product.variants.forEach((v: any) => {
-            const sizeId = v.id.replace('kit-', '')
+            })
+            
+            // Extract selected products and weights
             if (v.items && Array.isArray(v.items)) {
               v.items.forEach((item: any) => {
-                if (!uniqueProds[item.id]) {
-                  uniqueProds[item.id] = {
+                const existingProduct = tier.selectedProducts.find(p => p.id === item.id)
+                if (!existingProduct) {
+                  tier.selectedProducts.push({
                     id: item.id,
                     name: item.name,
                     slug: item.slug || '',
@@ -166,17 +203,22 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                     price_per_unit: item.price_per_unit || 'per 500g',
                     category: item.category || '',
                     image: item.image || '',
-                  }
+                  })
                 }
-                if (!weights[item.id]) {
-                  weights[item.id] = {}
+                
+                if (!tier.productWeights[item.id]) {
+                  tier.productWeights[item.id] = {}
                 }
-                weights[item.id][sizeId] = String(item.grams || '')
+                tier.productWeights[item.id][sizeId] = String(item.grams || '')
               })
             }
           })
-          setSelectedProducts(Object.values(uniqueProds))
-          setProductWeights(weights)
+          
+          const loadedTiers = Array.from(tiersMap.values())
+          if (loadedTiers.length > 0) {
+            setTiers(loadedTiers)
+            setActiveTierId(loadedTiers[0].id)
+          }
         }
         setLoading(false)
       })
@@ -194,7 +236,6 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
   const selectableItems = useMemo(() => {
     const items: SelectedKitProduct[] = []
     catalog.forEach(product => {
-      // Add the main product
       items.push({
         id: product.id,
         name: product.name,
@@ -204,7 +245,6 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
         category: product.category,
         image: product.images?.[0] || '',
       })
-      // Add its variants if any
       if (Array.isArray(product.variants) && product.variants.length > 0) {
         product.variants.forEach(variant => {
           items.push({
@@ -232,130 +272,178 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
     )
   }, [selectableItems, search])
 
+  const updateActiveTier = (updater: (tier: KitTier) => KitTier) => {
+    setTiers(prev => prev.map((t, i) => i === activeTierIndex ? updater(t) : t))
+  }
+
   const getProductWeight = (productId: string, sizeId: string, fallbackGrams: string) => {
-    return productWeights[productId]?.[sizeId] || fallbackGrams
+    return activeTier?.productWeights[productId]?.[sizeId] || fallbackGrams
   }
 
   const getSizeTotal = (sizeId: string, fallbackGrams: string) => {
-    return selectedProducts.reduce((sum, product) => {
+    if (!activeTier) return 0
+    return activeTier.selectedProducts.reduce((sum, product) => {
       const grams = Math.max(0, Number(getProductWeight(product.id, sizeId, fallbackGrams) || '0'))
       return sum + calcPriceForWeight(product.price, product.price_per_unit, grams)
     }, 0)
   }
 
-  const estimatedMediumTotal = getSizeTotal(kitSizes[1]?.id || 'medium', kitSizes[1]?.gramsEach || '200')
+  const estimatedMediumTotal = activeTier ? getSizeTotal(activeTier.sizes[1]?.id || 'medium', activeTier.sizes[1]?.gramsEach || '200') : 0
   const estimatedTotal = estimatedMediumTotal
-  const priceRupees = kitSizes[1]?.priceRupees || ''
+  const priceRupees = activeTier?.sizes[1]?.priceRupees || ''
 
   const updateKitSize = (id: string, next: Partial<KitSize>) => {
-    setKitSizes(prev => prev.map(size => size.id === id ? { ...size, ...next } : size))
+    updateActiveTier(tier => ({
+      ...tier,
+      sizes: tier.sizes.map(size => size.id === id ? { ...size, ...next } : size)
+    }))
   }
 
   const addKitSize = () => {
-    const medium = kitSizes[1] || kitSizes[0]
+    if (!activeTier) return
+    const medium = activeTier.sizes[1] || activeTier.sizes[0]
     const baseGrams = Math.max(1, Number(medium?.gramsEach || '100'))
     const nextGrams = String(baseGrams * 2)
     const id = `size-${Date.now()}`
-    setKitSizes(prev => [...prev, {
-      id,
-      name: 'Custom Size',
-      gramsEach: nextGrams,
-      priceRupees: '',
-      comparePriceRupees: '',
-      description: `${nextGrams}g each`,
-    }])
-    setProductWeights(prev => {
-      const next = { ...prev }
-      selectedProducts.forEach(product => {
+    
+    updateActiveTier(tier => {
+      const nextSizes = [...tier.sizes, {
+        id,
+        name: 'Custom Size',
+        gramsEach: nextGrams,
+        priceRupees: '',
+        comparePriceRupees: '',
+        description: `${nextGrams}g each`,
+      }]
+      
+      const nextWeights = { ...tier.productWeights }
+      tier.selectedProducts.forEach(product => {
         const reference = Number(getProductWeight(product.id, medium?.id || '', medium?.gramsEach || '100') || baseGrams)
-        next[product.id] = {
-          ...(next[product.id] || {}),
+        nextWeights[product.id] = {
+          ...(nextWeights[product.id] || {}),
           [id]: String(Math.max(1, Math.round(reference * (Number(nextGrams) / baseGrams)))),
         }
       })
-      return next
+      
+      return { ...tier, sizes: nextSizes, productWeights: nextWeights }
     })
   }
 
   const removeKitSize = (id: string) => {
-    if (kitSizes.length <= 1) return
-    setKitSizes(prev => prev.filter(size => size.id !== id))
-    setProductWeights(prev => Object.fromEntries(
-      Object.entries(prev).map(([productId, weights]) => {
-        const nextWeights = { ...weights }
-        delete nextWeights[id]
-        return [productId, nextWeights]
-      })
-    ))
+    if (!activeTier || activeTier.sizes.length <= 1) return
+    updateActiveTier(tier => {
+      const nextSizes = tier.sizes.filter(size => size.id !== id)
+      const nextWeights = Object.fromEntries(
+        Object.entries(tier.productWeights).map(([productId, weights]) => {
+          const w = { ...weights }
+          delete w[id]
+          return [productId, w]
+        })
+      )
+      return { ...tier, sizes: nextSizes, productWeights: nextWeights }
+    })
   }
 
   const scaleSizeWeights = (targetSize: KitSize) => {
-    const referenceSize = kitSizes[1]?.id === targetSize.id ? kitSizes[0] : (kitSizes[1] || kitSizes[0])
+    if (!activeTier) return
+    const referenceSize = activeTier.sizes[1]?.id === targetSize.id ? activeTier.sizes[0] : (activeTier.sizes[1] || activeTier.sizes[0])
     if (!referenceSize) return
     const referenceDefault = Math.max(1, Number(referenceSize.gramsEach || '1'))
     const targetDefault = Math.max(1, Number(targetSize.gramsEach || '1'))
     const ratio = targetDefault / referenceDefault
 
-    setProductWeights(prev => {
-      const next = { ...prev }
-      selectedProducts.forEach(product => {
+    updateActiveTier(tier => {
+      const nextWeights = { ...tier.productWeights }
+      tier.selectedProducts.forEach(product => {
         const referenceWeight = Math.max(1, Number(getProductWeight(product.id, referenceSize.id, referenceSize.gramsEach) || referenceDefault))
-        next[product.id] = {
-          ...(next[product.id] || {}),
+        nextWeights[product.id] = {
+          ...(nextWeights[product.id] || {}),
           [targetSize.id]: String(Math.max(1, Math.round(referenceWeight * ratio))),
         }
       })
-      return next
+      return { ...tier, productWeights: nextWeights }
     })
   }
 
   const updateProductWeight = (productId: string, sizeId: string, grams: string) => {
-    setProductWeights(prev => ({
-      ...prev,
-      [productId]: {
-        ...(prev[productId] || {}),
-        [sizeId]: grams.replace(/[^\d]/g, ''),
-      },
+    updateActiveTier(tier => ({
+      ...tier,
+      productWeights: {
+        ...tier.productWeights,
+        [productId]: {
+          ...(tier.productWeights[productId] || {}),
+          [sizeId]: grams.replace(/[^\d]/g, ''),
+        },
+      }
     }))
   }
 
   const toggleProduct = (product: SelectedKitProduct) => {
-    setSelectedProducts(prev => {
-      const exists = prev.some(item => item.id === product.id)
+    updateActiveTier(tier => {
+      const exists = tier.selectedProducts.some(item => item.id === product.id)
       if (exists) {
-        setProductWeights(current => {
-          const next = { ...current }
-          delete next[product.id]
-          return next
-        })
-        return prev.filter(item => item.id !== product.id)
+        const nextWeights = { ...tier.productWeights }
+        delete nextWeights[product.id]
+        return {
+          ...tier,
+          selectedProducts: tier.selectedProducts.filter(item => item.id !== product.id),
+          productWeights: nextWeights
+        }
       }
-      setProductWeights(current => ({
-        ...current,
-        [product.id]: Object.fromEntries(kitSizes.map(size => [size.id, size.gramsEach])),
-      }))
-      return [
-        ...prev,
-        {
-          id: product.id,
-          name: product.name,
-          slug: product.slug,
-          price: product.price,
-          price_per_unit: product.price_per_unit,
-          category: product.category,
-          image: product.image,
-        },
-      ]
+      
+      const nextWeights = { ...tier.productWeights }
+      nextWeights[product.id] = Object.fromEntries(tier.sizes.map(size => [size.id, size.gramsEach]))
+      
+      return {
+        ...tier,
+        selectedProducts: [
+          ...tier.selectedProducts,
+          {
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            price: product.price,
+            price_per_unit: product.price_per_unit,
+            category: product.category,
+            image: product.image,
+          }
+        ],
+        productWeights: nextWeights
+      }
     })
   }
 
   const removeSelectedProduct = (productId: string) => {
-    setSelectedProducts(prev => prev.filter(item => item.id !== productId))
-    setProductWeights(prev => {
-      const next = { ...prev }
-      delete next[productId]
-      return next
+    updateActiveTier(tier => {
+      const nextWeights = { ...tier.productWeights }
+      delete nextWeights[productId]
+      return {
+        ...tier,
+        selectedProducts: tier.selectedProducts.filter(item => item.id !== productId),
+        productWeights: nextWeights
+      }
     })
+  }
+
+  const addTier = () => {
+    const newTier: KitTier = {
+      id: `tier-${Date.now()}`,
+      name: 'New Kit Version',
+      imagesInput: '',
+      sizes: createDefaultSizes(),
+      selectedProducts: [],
+      productWeights: {}
+    }
+    setTiers(prev => [...prev, newTier])
+    setActiveTierId(newTier.id)
+  }
+
+  const removeTier = (id: string) => {
+    if (tiers.length <= 1) return
+    setTiers(prev => prev.filter(t => t.id !== id))
+    if (activeTierId === id) {
+      setActiveTierId(tiers[0].id)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -370,42 +458,59 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
       if (!name.trim()) throw new Error('Kit name is required.')
       if (!effectiveSlug.trim()) throw new Error('Kit slug is required.')
       if (!description.trim()) throw new Error('Description is required.')
-      if (!selectedProducts.length) throw new Error('Select at least one product for this kit.')
+      
+      if (tiers.some(t => t.selectedProducts.length === 0)) {
+        throw new Error('Please select at least one product for each kit version.')
+      }
 
       const images = imagesInput.split('\n').map(url => url.trim()).filter(Boolean)
       const baseTags = tagsInput.split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean)
       const benefitsTags = benefitsInput.split('\n').map(tag => tag.trim()).filter(Boolean)
       const tags = [...baseTags, ...benefitsTags]
       const benefits = benefitsInput.split('\n').map(item => item.trim()).filter(Boolean)
-      const variants = kitSizes.map(size => {
-        const gramsEach = Math.max(0, Number(size.gramsEach || '0'))
-        const computedPrice = getSizeTotal(size.id, size.gramsEach)
-        const manualPrice = Math.round(Number(size.priceRupees || '0') * 100)
-        const price = manualPrice > 0 ? manualPrice : computedPrice
+      
+      const variants = tiers.flatMap(tier => {
+        const tierImages = tier.imagesInput.split('\n').map(url => url.trim()).filter(Boolean)
+        
+        return tier.sizes.map(size => {
+          const gramsEach = Math.max(0, Number(size.gramsEach || '0'))
+          // Calculate auto price based on this specific tier's products and weights
+          const computedPrice = tier.selectedProducts.reduce((sum, product) => {
+            const grams = Math.max(0, Number(tier.productWeights[product.id]?.[size.id] || size.gramsEach || '0'))
+            return sum + calcPriceForWeight(product.price, product.price_per_unit, grams)
+          }, 0)
+          
+          const manualPrice = Math.round(Number(size.priceRupees || '0') * 100)
+          const price = manualPrice > 0 ? manualPrice : computedPrice
 
-        return {
-          id: `kit-${size.id}`,
-          name: size.name,
-          description: size.description || `${gramsEach}g each`,
-          how_to_use: howToUse.trim() || undefined,
-          size_desc: size.description || `${gramsEach}g each`,
-          grams_each: gramsEach,
-          price,
-          compare_price: size.comparePriceRupees ? Math.round(Number(size.comparePriceRupees) * 100) : null,
-          form_options: formOptions,
-          benefits,
-          items: selectedProducts.map(product => {
-            const productGrams = Math.max(0, Number(getProductWeight(product.id, size.id, size.gramsEach) || '0'))
-            const pricePerGram = product.price / parseBaseWeightGrams(product.price_per_unit)
-            return {
-              ...product,
-              grams: productGrams,
-              base_price: Math.round(pricePerGram * productGrams),
-              price_per_gram: pricePerGram,
-            }
-          }),
-        }
+          return {
+            id: `kit-${tier.id}-${size.id}`,
+            tier_id: tier.id,
+            tier_name: tier.name.trim() || undefined,
+            tier_images: tierImages.length > 0 ? tierImages : undefined,
+            name: size.name,
+            description: size.description || `${gramsEach}g each`,
+            how_to_use: howToUse.trim() || undefined,
+            size_desc: size.description || `${gramsEach}g each`,
+            grams_each: gramsEach,
+            price,
+            compare_price: size.comparePriceRupees ? Math.round(Number(size.comparePriceRupees) * 100) : null,
+            form_options: formOptions,
+            benefits,
+            items: tier.selectedProducts.map(product => {
+              const productGrams = Math.max(0, Number(tier.productWeights[product.id]?.[size.id] || size.gramsEach || '0'))
+              const pricePerGram = product.price / parseBaseWeightGrams(product.price_per_unit)
+              return {
+                ...product,
+                grams: productGrams,
+                base_price: Math.round(pricePerGram * productGrams),
+                price_per_gram: pricePerGram,
+              }
+            }),
+          }
+        })
       })
+      
       const defaultVariant = variants[1] || variants[0]
 
       const payload = {
@@ -463,6 +568,12 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
     }
   }
 
+  useEffect(() => {
+    if (!activeTierId && tiers.length > 0) {
+      setActiveTierId(tiers[0].id)
+    }
+  }, [tiers, activeTierId])
+
   return (
     <div className="min-h-screen bg-ivory">
       <div className="bg-green px-6 py-4 flex items-center justify-between">
@@ -482,7 +593,12 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
           <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-[1.05fr_.95fr] gap-6">
             <div className="space-y-6">
               <div className="bg-white border border-ivory-3 rounded-2xl p-6">
-                <h1 className="font-serif text-2xl text-ink mb-5">Edit Kit</h1>
+                <div className="flex items-center justify-between mb-5">
+                  <h1 className="font-serif text-2xl text-ink">Edit Kit</h1>
+                  <button type="button" onClick={handleDelete} className="text-sm text-red-600 hover:text-red-800">
+                    Delete Kit
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
@@ -560,14 +676,11 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                       className="input min-h-[120px]"
                       placeholder="Take as recommended for this kit. Mention timing, quantity, and any preparation steps here."
                     />
-                    <p className="text-xs text-ink-4 mt-1.5">Instructions show in the kit page How to Use tab.</p>
                   </div>
 
-
-
                   <div className="md:col-span-2">
-                  <ImageManager label="Kit Images" value={imagesInput} onChange={setImagesInput} />
-                </div>
+                    <ImageManager label="Main Kit Images (Fallback)" value={imagesInput} onChange={setImagesInput} />
+                  </div>
 
                   <div className="md:col-span-2">
                     <label className="text-xs text-ink-3 block mb-1.5">Tags</label>
@@ -575,10 +688,76 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                   </div>
                 </div>
               </div>
+              
+              <div className="bg-white border border-ivory-3 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="font-serif text-xl text-ink">Kit Versions / Tiers</h2>
+                    <p className="text-sm text-ink-3 mt-1">Add optional tiers (e.g. Luxury Kit) with their own sizes and products.</p>
+                  </div>
+                  <button type="button" onClick={addTier} className="btn-outline text-sm py-2 px-4">
+                    + Add Kit Version
+                  </button>
+                </div>
+                
+                <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                  {tiers.map((tier, index) => (
+                    <button
+                      key={tier.id}
+                      type="button"
+                      onClick={() => setActiveTierId(tier.id)}
+                      className={`px-4 py-2 rounded-xl text-sm whitespace-nowrap transition-colors ${
+                        activeTierId === tier.id 
+                          ? 'bg-ink text-white' 
+                          : 'bg-ivory border border-ivory-3 text-ink-2 hover:bg-ivory-2'
+                      }`}
+                    >
+                      {tier.name || (index === 0 ? 'Standard Version' : `Version ${index + 1}`)}
+                    </button>
+                  ))}
+                </div>
+                
+                {activeTier && (
+                  <div className="border border-ivory-3 rounded-xl p-5 bg-ivory/30">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-serif text-lg text-ink">Editing: {activeTier.name || 'Standard Version'}</h3>
+                      {tiers.length > 1 && (
+                        <button 
+                          type="button" 
+                          onClick={() => removeTier(activeTier.id)}
+                          className="text-xs text-red-600 hover:text-red-800"
+                        >
+                          Remove Version
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-5">
+                      <div>
+                        <label className="text-xs text-ink-3 block mb-1.5">Version Name</label>
+                        <input 
+                          value={activeTier.name} 
+                          onChange={e => updateActiveTier(t => ({ ...t, name: e.target.value }))} 
+                          className="input bg-white" 
+                          placeholder="e.g., Luxury Kit, Premium Version (leave empty for Standard)" 
+                        />
+                      </div>
+                      
+                      <div>
+                        <ImageManager 
+                          label="Version-Specific Images (Optional overrides)" 
+                          value={activeTier.imagesInput} 
+                          onChange={val => updateActiveTier(t => ({ ...t, imagesInput: val }))} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="bg-white border border-ivory-3 rounded-2xl p-6">
                 <div className="mb-4">
-                  <h2 className="font-serif text-xl text-ink">Size & Weight Options</h2>
+                  <h2 className="font-serif text-xl text-ink">Size & Weight Options for this Version</h2>
                   <p className="text-sm text-ink-3 mt-1">Set default grams for each size. Exact per-product grams are controlled in the selected products matrix.</p>
                 </div>
 
@@ -591,7 +770,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                 </button>
 
                 <div className="space-y-4">
-                  {kitSizes.map(size => {
+                  {activeTier?.sizes.map(size => {
                     const autoPrice = getSizeTotal(size.id, size.gramsEach)
                     return (
                       <div key={size.id} className="rounded-2xl border border-ivory-3 bg-ivory-1 p-4">
@@ -656,7 +835,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                           >
                             Scale Weights Proportionally
                           </button>
-                          {kitSizes.length > 1 && (
+                          {activeTier.sizes.length > 1 && (
                             <button
                               type="button"
                               onClick={() => removeKitSize(size.id)}
@@ -674,8 +853,8 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
 
               <div className="bg-white border border-ivory-3 rounded-2xl p-6">
                 <div className="flex items-center justify-between gap-3 mb-4">
-                  <h2 className="font-serif text-xl text-ink">Select Products</h2>
-                  <div className="text-sm text-ink-3">{selectedProducts.length} selected</div>
+                  <h2 className="font-serif text-xl text-ink">Select Products for this Version</h2>
+                  <div className="text-sm text-ink-3">{activeTier?.selectedProducts.length || 0} selected</div>
                 </div>
 
                 <input
@@ -692,7 +871,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                     <div className="p-4 text-sm text-ink-3">No products found.</div>
                   ) : (
                     filteredProducts.map(product => {
-                      const checked = selectedProducts.some(item => item.id === product.id)
+                      const checked = activeTier?.selectedProducts.some(item => item.id === product.id)
                       return (
                         <label key={product.id} className="flex items-start gap-3 p-4 cursor-pointer hover:bg-ivory-2 transition-colors">
                           <input
@@ -720,30 +899,30 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
 
             <div className="space-y-6">
               <div className="bg-white border border-ivory-3 rounded-2xl p-6">
-                <h2 className="font-serif text-xl text-ink mb-1">Selected Products</h2>
+                <h2 className="font-serif text-xl text-ink mb-1">Selected Products Matrix</h2>
                 <p className="text-sm text-ink-3 mb-4">Set exact grams for each product in each kit size.</p>
-                {selectedProducts.length === 0 ? (
+                {!activeTier || activeTier.selectedProducts.length === 0 ? (
                   <div className="text-sm text-ink-3">No products selected yet.</div>
                 ) : (
                   <div className="space-y-3">
-                    {selectedProducts.map(product => (
+                    {activeTier.selectedProducts.map(product => (
                       <div key={product.id} className="rounded-xl border border-ivory-3 p-3">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="font-medium text-ink">{product.name}</div>
-                            <div className="text-xs text-ink-4">{product.category} · {product.slug}</div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeSelectedProduct(product.id)}
-                            className="text-xs text-terra hover:text-terra-2"
-                          >
-                            Remove
-                          </button>
+                        <div className="min-w-0">
+                          <div className="font-medium text-ink">{product.name}</div>
+                          <div className="text-xs text-ink-4">{product.category} · {product.slug}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeSelectedProduct(product.id)}
+                          className="text-xs text-terra hover:text-terra-2"
+                        >
+                          Remove
+                        </button>
                         </div>
 
-                        <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(kitSizes.length, 4)}, minmax(0, 1fr))` }}>
-                          {kitSizes.map(size => (
+                        <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(activeTier.sizes.length, 4)}, minmax(0, 1fr))` }}>
+                          {activeTier.sizes.map(size => (
                             <div key={size.id}>
                               <label className="text-[.64rem] text-ink-4 block mb-1">{size.name}</label>
                               <div className="relative">
@@ -770,10 +949,11 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                 <div className="space-y-2 text-sm text-ink-3">
                   <div><span className="text-ink font-medium">Name:</span> {name || 'Kit name'}</div>
                   <div><span className="text-ink font-medium">Slug:</span> {effectiveSlug || 'kit-slug'}</div>
-                  <div><span className="text-ink font-medium">Selected Products:</span> {selectedProducts.length}</div>
+                  <div><span className="text-ink font-medium">Active Version:</span> {activeTier?.name || 'Standard Version'}</div>
+                  <div><span className="text-ink font-medium">Selected Products in Version:</span> {activeTier?.selectedProducts.length || 0}</div>
                   <div><span className="text-ink font-medium">Medium Auto Estimate:</span> {formatPrice(estimatedMediumTotal)}</div>
                   <div className="space-y-1 pt-1">
-                    {kitSizes.map(size => {
+                    {activeTier?.sizes.map(size => {
                       const autoPrice = getSizeTotal(size.id, size.gramsEach)
                       return (
                         <div key={size.id}>
@@ -782,6 +962,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                       )
                     })}
                   </div>
+                  <div className="hidden"><span className="text-ink font-medium">Selling Price:</span> {priceRupees ? `₹${priceRupees}` : formatPrice(estimatedTotal)}</div>
                 </div>
               </div>
 
@@ -798,11 +979,8 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                 <h2 className="font-serif text-xl text-ink mb-4">Save Changes</h2>
                 {error && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
                 {success && <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">{success}</div>}
-                <button type="submit" disabled={submitting} className="btn-primary w-full justify-center mb-3">
-                  {submitting ? 'Saving...' : 'Save Kit'}
-                </button>
-                <button type="button" disabled={submitting} onClick={handleDelete} className="w-full text-center text-sm text-terra hover:text-terra-2 py-2">
-                  Delete Kit
+                <button type="submit" disabled={submitting} className="btn-primary w-full justify-center">
+                  {submitting ? 'Saving Changes...' : 'Save Changes'}
                 </button>
               </div>
             </div>
