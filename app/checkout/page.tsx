@@ -416,7 +416,6 @@ export default function CheckoutPage() {
   }
 
   const clearCoupon = () => {
-    if (loyaltyAutoApplied) return
     setCouponInput('')
     setCouponState({ code: '', discountAmount: 0, valid: false })
   }
