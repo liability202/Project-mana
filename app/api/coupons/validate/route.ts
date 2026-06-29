@@ -62,9 +62,6 @@ export async function POST(req: Request) {
     const coupon = await getCouponByCode(supabaseAdmin, normalizedCode)
     if (!coupon) return NextResponse.json({ error: 'Invalid or inactive coupon code.' }, { status: 404 })
 
-    if (phone && orderCount > 0 && coupon.influencer_name) {
-      return NextResponse.json({ error: 'Influencer codes are only valid on your first order.' }, { status: 400 })
-    }
 
     const ruleError = validateCouponRules(subtotal, coupon)
     if (ruleError) return NextResponse.json({ error: ruleError }, { status: 400 })
