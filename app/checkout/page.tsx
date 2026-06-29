@@ -383,7 +383,8 @@ export default function CheckoutPage() {
       if (nextCustomerType === 'returning') {
         await applyCouponCode('LOYAL12')
       } else {
-        setCouponInput('')
+        const refCookie = document.cookie.split('; ').find((row) => row.startsWith('mana_ref='))?.split('=')[1]
+        setCouponInput(refCookie || '')
         setCouponState({ code: '', discountAmount: 0, valid: false })
       }
 

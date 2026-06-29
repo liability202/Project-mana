@@ -147,6 +147,14 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
   const [isCustomizing, setIsCustomizing] = useState(false)
   const [form, setForm] = useState<Form>('powder')
   const [tab, setTab] = useState<'benefits' | 'howto'>('benefits')
+  const [refCode, setRefCode] = useState('')
+
+  useEffect(() => {
+    try {
+      const code = document.cookie.split('; ').find(row => row.startsWith('mana_ref='))?.split('=')[1]
+      if (code) setRefCode(code)
+    } catch (e) {}
+  }, [])
   
   const activeVariant = activeTierVariants[sizeIdx] || activeTierVariants[0]
   const activeItems = activeVariant?.items || []
@@ -455,6 +463,13 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
                   )}
                 </div>
               </div>
+          )}
+
+          {refCode && (
+            <div className="bg-white border-2 border-dashed border-green-4 rounded-lg p-4 text-center shadow-sm">
+              <div className="text-sm font-bold text-green tracking-wide">🏷 Your discount code: {refCode}</div>
+              <div className="text-xs text-ink-3 mt-1.5 font-medium">Verify your number at checkout to auto-apply this code!</div>
+            </div>
           )}
 
           <div className="rounded-2xl border border-green-5 bg-green-6/60 p-4">

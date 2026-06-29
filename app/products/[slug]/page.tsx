@@ -48,6 +48,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   const [deliveryLoading, setDeliveryLoading] = useState(false)
   const [canReview, setCanReview] = useState(false)
   const [reviewCheckLoading, setReviewCheckLoading] = useState(true)
+  const [refCode, setRefCode] = useState('')
 
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
@@ -66,6 +67,12 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
         }
         setLoading(false)
       })
+
+    // Load referral code from cookie
+    try {
+      const code = document.cookie.split('; ').find(row => row.startsWith('mana_ref='))?.split('=')[1]
+      if (code) setRefCode(code)
+    } catch (e) {}
   }, [params.slug])
 
   useEffect(() => {
@@ -430,10 +437,17 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
           </div>
 
           {/* Coupon Note */}
-          <div className="bg-white border-2 border-dashed border-green-4 rounded-lg p-4 mb-5 text-center shadow-sm">
-            <div className="text-sm font-bold text-green tracking-wide">🏷 Got a discount code?</div>
-            <div className="text-xs text-ink-3 mt-1.5 font-medium">You can apply your coupon code securely at checkout.</div>
-          </div>
+          {refCode ? (
+            <div className="bg-white border-2 border-dashed border-green-4 rounded-lg p-4 mb-5 text-center shadow-sm">
+              <div className="text-sm font-bold text-green tracking-wide">🏷 Your discount code: {refCode}</div>
+              <div className="text-xs text-ink-3 mt-1.5 font-medium">Verify your number at checkout to auto-apply this code!</div>
+            </div>
+          ) : (
+            <div className="bg-white border-2 border-dashed border-green-4 rounded-lg p-4 mb-5 text-center shadow-sm">
+              <div className="text-sm font-bold text-green tracking-wide">🏷 Got a discount code?</div>
+              <div className="text-xs text-ink-3 mt-1.5 font-medium">You can apply your coupon code securely at checkout.</div>
+            </div>
+          )}
 
           <div className="bg-white border border-ivory-3 rounded-xl p-4 mb-5">
             <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-3">Check Estimated Delivery Date</div>
