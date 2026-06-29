@@ -49,6 +49,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   const [canReview, setCanReview] = useState(false)
   const [reviewCheckLoading, setReviewCheckLoading] = useState(true)
   const [refCode, setRefCode] = useState('')
+  const [refPct, setRefPct] = useState(10)
 
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
@@ -70,8 +71,11 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
 
     // Load referral code from cookie
     try {
-      const code = document.cookie.split('; ').find(row => row.startsWith('mana_ref='))?.split('=')[1]
+      const cookies = document.cookie.split('; ')
+      const code = cookies.find(row => row.startsWith('mana_ref='))?.split('=')[1]
+      const pct = cookies.find(row => row.startsWith('mana_ref_pct='))?.split('=')[1]
       if (code) setRefCode(code)
+      if (pct) setRefPct(Number(pct) || 10)
     } catch (e) {}
   }, [params.slug])
 
@@ -439,8 +443,10 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
           {/* Coupon Note */}
           {refCode ? (
             <div className="bg-white border-2 border-dashed border-green-4 rounded-lg p-4 mb-5 text-center shadow-sm">
-              <div className="text-sm font-bold text-green tracking-wide">🏷 Your discount code: {refCode}</div>
-              <div className="text-xs text-ink-3 mt-1.5 font-medium">Verify your number at checkout to auto-apply this code!</div>
+              <div className="text-sm font-bold text-green tracking-wide">
+                Get it as low as {formatPrice(Math.round(livePrice * (1 - refPct / 100)))}
+              </div>
+              <div className="text-xs text-ink-3 mt-1.5 font-medium">Your discount code <strong>{refCode}</strong> will be securely applied at checkout!</div>
             </div>
           ) : (
             <div className="bg-white border-2 border-dashed border-green-4 rounded-lg p-4 mb-5 text-center shadow-sm">

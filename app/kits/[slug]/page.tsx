@@ -148,11 +148,15 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
   const [form, setForm] = useState<Form>('powder')
   const [tab, setTab] = useState<'benefits' | 'howto'>('benefits')
   const [refCode, setRefCode] = useState('')
+  const [refPct, setRefPct] = useState(10)
 
   useEffect(() => {
     try {
-      const code = document.cookie.split('; ').find(row => row.startsWith('mana_ref='))?.split('=')[1]
+      const cookies = document.cookie.split('; ')
+      const code = cookies.find(row => row.startsWith('mana_ref='))?.split('=')[1]
+      const pct = cookies.find(row => row.startsWith('mana_ref_pct='))?.split('=')[1]
       if (code) setRefCode(code)
+      if (pct) setRefPct(Number(pct) || 10)
     } catch (e) {}
   }, [])
   
@@ -467,8 +471,10 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
 
           {refCode && (
             <div className="bg-white border-2 border-dashed border-green-4 rounded-lg p-4 text-center shadow-sm">
-              <div className="text-sm font-bold text-green tracking-wide">🏷 Your discount code: {refCode}</div>
-              <div className="text-xs text-ink-3 mt-1.5 font-medium">Verify your number at checkout to auto-apply this code!</div>
+              <div className="text-sm font-bold text-green tracking-wide">
+                Get it as low as {formatPrice(Math.round(price * (1 - refPct / 100)))}
+              </div>
+              <div className="text-xs text-ink-3 mt-1.5 font-medium">Your discount code <strong>{refCode}</strong> will be securely applied at checkout!</div>
             </div>
           )}
 

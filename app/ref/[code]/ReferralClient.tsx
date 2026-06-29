@@ -23,6 +23,7 @@ export default function ReferralClient({ creator }: { creator: any }) {
       if (active) {
         // Save referral cookie
         document.cookie = `mana_ref=${creator.code}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`
+        document.cookie = `mana_ref_pct=${creator.discount_pct || 10}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`
         // Redirect to home page
         router.push('/')
       }
