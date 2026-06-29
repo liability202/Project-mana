@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    const [statsRes, monthlyRes, chartRes, creatorRes, visitsRes] = await Promise.all([
+    const [statsRes, monthlyRes, chartRes, creatorRes] = await Promise.all([
       // Total sessions/orders stats
       supabaseAdmin
         .from('commissions')
