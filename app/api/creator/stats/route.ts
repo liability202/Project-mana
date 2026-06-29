@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    const [statsRes, monthlyRes, chartRes, creatorRes] = await Promise.all([
+    const [statsRes, monthlyRes, chartRes, creatorRes, visitsRes] = await Promise.all([
       // Total sessions/orders stats
       supabaseAdmin
         .from('commissions')
@@ -39,10 +39,21 @@ export async function GET(req: Request) {
       // Creator profile totals
       supabaseAdmin
         .from('creators')
-        .select('total_earned, total_paid')
+        .select('total_earned, total_paid, code')
         .eq('id', creatorId)
         .maybeSingle()
     ])
+
+    // Fetch visits sequentially to rely on creator code, or do it by code if available
+    const creatorCode = creatorRes.data?.code
+    let totalVisits = 0
+    if (creatorCode) {
+      const { count } = await supabaseAdmin
+        .from('referral_visits')
+        .select('*', { count: 'exact', head: true })
+        .eq('creator_code', creatorCode)
+      totalVisits = count || 0
+    }
 
     const allCommissions = statsRes.data || []
     const totalOrders = allCommissions.filter(c => c.status !== 'cancelled').length
@@ -86,6 +97,7 @@ export async function GET(req: Request) {
       thisMonthEarnings,
       pendingPayout,
       totalEarnedLifetime,
+      totalVisits,
       chartData
     })
   } catch (err: any) {

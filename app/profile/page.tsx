@@ -288,8 +288,8 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-[70vh] bg-ivory pt-12 pb-24">
-      <div className="max-w-4xl mx-auto px-[5%]">
+    <div className="min-h-[70vh] bg-ivory pt-12 pb-24 overflow-x-hidden">
+      <div className="max-w-4xl mx-auto px-4 sm:px-[5%]">
         
         {step !== 'dashboard' && (
           <div className="max-w-md mx-auto bg-white border border-ivory-3 rounded-2xl p-8 shadow-soft">
@@ -375,7 +375,7 @@ export default function ProfilePage() {
                 <div className="w-8 h-8 border-4 border-ivory-3 border-t-green rounded-full animate-spin" />
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-8 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
                 
                 {/* Left Column: Wallet & Quick Actions */}
                 <div className="space-y-6">

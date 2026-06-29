@@ -114,8 +114,9 @@ export function CartDrawer() {
                         {item.quantity}
                       </span>
                       <button
-                        onClick={() => updateQty(item.product_id, item.variant_id, item.quantity + 1)}
-                        className="w-6 h-6 rounded border border-ivory-4 bg-transparent text-green text-base flex items-center justify-center cursor-pointer hover:bg-green-6 transition-colors"
+                        onClick={() => updateQty(item.product_id, item.variant_id, Math.min(10, item.quantity + 1))}
+                        disabled={item.quantity >= 10}
+                        className="w-8 h-8 rounded-full border border-ivory-4 bg-transparent text-green text-lg flex items-center justify-center cursor-pointer hover:bg-green-6 transition-colors disabled:opacity-50"
                       >+</button>
                       <button
                         onClick={() => removeItem(item.product_id, item.variant_id)}

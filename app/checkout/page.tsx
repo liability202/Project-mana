@@ -81,6 +81,13 @@ export default function CheckoutPage() {
       rememberedPhone = localStorage.getItem(ACCOUNT_PHONE_KEY) || document.cookie.split('; ').find((row) => row.startsWith(`${ACCOUNT_PHONE_KEY}=`))?.split('=')[1] || ''
     } catch(e) {}
 
+    try {
+      const refCookie = document.cookie.split('; ').find((row) => row.startsWith('mana_ref='))?.split('=')[1]
+      if (refCookie && !couponState.valid) {
+        setCouponInput(refCookie)
+      }
+    } catch(e) {}
+
     const normalized = rememberedPhone.replace(/\D/g, '').slice(-10)
 
     if (normalized.length === 10) {
@@ -111,6 +118,26 @@ export default function CheckoutPage() {
         .catch(() => {})
     }
   }, [])
+
+  useEffect(() => {
+    if (form.pincode.length === 6) {
+      fetch(`https://api.postalpincode.in/pincode/${form.pincode}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data[0]?.Status === 'Success') {
+            const postOffice = data[0].PostOffice[0]
+            if (postOffice) {
+              setForm(prev => ({
+                ...prev,
+                city: prev.city || postOffice.District || postOffice.Region || '',
+                state: prev.state || postOffice.State || ''
+              }))
+            }
+          }
+        })
+        .catch(() => {})
+    }
+  }, [form.pincode])
 
   const cartItems = hydrated ? items : []
   const subtotal = hydrated ? total() : 0
@@ -703,13 +730,14 @@ export default function CheckoutPage() {
                   ? (customerType === 'returning' ? 'Welcome back! Your LOYAL12 discount is auto-applied if eligible, but you can use another code.' : 'Enter your discount or influencer code to apply your savings.')
                   : 'You can enter a discount code now. Phone verification is required to apply it.'}
               </p>
-              <div className="flex gap-2">
-                <input value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} className="input" placeholder="Enter influencer code" />
-                <button type="button" onClick={applyCoupon} disabled={couponLoading} className="btn-primary justify-center px-5">
-                  <span>{couponLoading ? 'Checking...' : 'Apply'}</span>
-                </button>
-              </div>
-              {couponState.valid && (
+              {!couponState.valid ? (
+                <div className="flex gap-2">
+                  <input value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} className="input" placeholder="Enter influencer code" />
+                  <button type="button" onClick={applyCoupon} disabled={couponLoading} className="btn-primary justify-center px-5">
+                    <span>{couponLoading ? 'Checking...' : 'Apply'}</span>
+                  </button>
+                </div>
+              ) : (
                 <div className="mt-2 flex items-center justify-between rounded-lg border border-green-5 bg-green-6 px-3 py-2 text-sm text-green-2">
                   <div>
                     <span className="font-medium">{couponState.code} applied.</span>
@@ -810,7 +838,7 @@ export default function CheckoutPage() {
                   {item.variant_name && <div className="text-xs text-ink-4 mt-0.5">{item.variant_name}</div>}
                   {item.weight_grams > 0 && (
                     <div className="text-xs text-ink-4 mt-0.5">
-                      {item.weight_grams >= 1000 ? (item.weight_grams / 1000).toFixed(1) + 'kg' : item.weight_grams + 'g'}
+                      {(item.weight_grams * item.quantity) >= 1000 ? ((item.weight_grams * item.quantity) / 1000).toFixed(1) + 'kg total' : (item.weight_grams * item.quantity) + 'g total'}
                     </div>
                   )}
                   
@@ -823,8 +851,9 @@ export default function CheckoutPage() {
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => updateQty(item.product_id, item.variant_id, item.quantity + 1)}
-                      className="w-6 h-6 rounded border border-ivory-4 bg-transparent text-green text-base flex items-center justify-center cursor-pointer hover:bg-green-6 transition-colors"
+                      onClick={() => updateQty(item.product_id, item.variant_id, Math.min(10, item.quantity + 1))}
+                      disabled={item.quantity >= 10}
+                      className="w-6 h-6 rounded border border-ivory-4 bg-transparent text-green text-base flex items-center justify-center cursor-pointer hover:bg-green-6 transition-colors disabled:opacity-50"
                     >+</button>
                     <button
                       onClick={() => removeItem(item.product_id, item.variant_id)}

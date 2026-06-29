@@ -12,7 +12,7 @@ export default function CreatorCodePage() {
     }
   }, [])
 
-  const trackingLink = `https://mana.in/?ref=${creator?.code}`
+  const trackingLink = `https://manadryfruits.com/ref/${creator?.code}`
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -55,7 +55,7 @@ export default function CreatorCodePage() {
             <h2 className="text-[.7rem] font-bold text-ink-4 uppercase tracking-[.3em] mb-4">Your Referral Code</h2>
             <div className="bg-ivory-2 border-2 border-dashed border-green-5 rounded-2xl px-12 py-7 mb-8">
                 <div className="font-serif text-4xl text-green mb-1.5 tracking-tight font-light">{creator?.code}</div>
-                <div className="text-[.62rem] text-green-3 font-bold uppercase tracking-[.25em]">10% Off for your audience</div>
+                <div className="text-[.62rem] text-green-3 font-bold uppercase tracking-[.25em]">Exclusive discount for your audience</div>
             </div>
             <button 
                 onClick={() => copyToClipboard(creator?.code)}
@@ -81,7 +81,7 @@ export default function CreatorCodePage() {
                 <Copy size={16} className="text-terra" /> Copy Unique Link
             </button>
             <p className="text-[.7rem] text-ink-4 mt-8 leading-relaxed max-w-[240px]">
-                When people click this link, we'll automatically track their orders even if they forget to enter your code.
+                When people visit your unique link and verify their number, the discount is automatically unlocked for them — no code needed.
             </p>
         </div>
       </div>

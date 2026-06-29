@@ -8,7 +8,8 @@ import {
   TrendingUp, 
   Copy, 
   ExternalLink, 
-  MessageCircle 
+  MessageCircle,
+  Users
 } from 'lucide-react'
 import { 
   BarChart, 
@@ -85,7 +86,7 @@ export default function CreatorDashboard() {
              <Copy size={15} className="text-green-3" /> {creator?.code}
            </button>
            <a 
-              href={`https://wa.me/?text=Check%20out%20Mana%20for%20premium%20dry%20fruits%20%26%20herbs.%20Use%20code%20${creator?.code}%20for%2010%25%20off!%20Shop%20at%20https://mana.in/?ref=${creator?.code}`}
+              href={`https://wa.me/?text=Check%20out%20Mana%20for%20premium%20dry%20fruits%20%26%20herbs.%20Get%20your%20exclusive%20discount%20here%3A%20https%3A%2F%2Fmanadryfruits.com%2Fref%2F${creator?.code}`}
               target="_blank"
               rel="noopener noreferrer"
               className="bg-green text-ivory px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 no-underline hover:bg-green-2 transition-transform active:scale-95 shadow-soft"
@@ -96,7 +97,13 @@ export default function CreatorDashboard() {
       </header>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <StatCard 
+          label="Link Visits" 
+          value={stats.totalVisits ?? 0} 
+          icon={<Users size={18} />} 
+          subtitle="People who verified via your link"
+        />
         <StatCard 
           label="Total Orders" 
           value={stats.totalOrders} 
@@ -104,10 +111,10 @@ export default function CreatorDashboard() {
           subtitle="Orders placed using your code"
         />
         <StatCard 
-          label="Earnings this month" 
+          label="This Month" 
           value={formatPrice(stats.thisMonthEarnings)} 
           icon={<TrendingUp size={18} />} 
-          subtitle="Current month performance" 
+          subtitle="Current month earnings" 
         />
         <StatCard 
           label="Pending Payout" 
@@ -182,7 +189,7 @@ export default function CreatorDashboard() {
                 Creators who place their unique referral link in their Instagram Bio see **3x higher conversion** than those who only share the text code.
               </p>
               <button 
-                 onClick={() => copyToClipboard(`https://mana.in/?ref=${creator?.code}`)}
+                 onClick={() => copyToClipboard(`https://manadryfruits.com/ref/${creator?.code}`)}
                  className="mt-auto bg-ivory text-green border-none px-6 py-3 rounded-xl text-[.68rem] font-bold uppercase tracking-[.15em] cursor-pointer hover:bg-white transition-all transform active:scale-95 shadow-soft"
               >
                 Copy My Tracking Link
