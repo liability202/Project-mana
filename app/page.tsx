@@ -43,17 +43,17 @@ async function getKits(): Promise<Product[]> {
 const CATEGORIES = [
   { name: 'Dry Fruits', slug: 'dry-fruits', pill: 'Most Popular', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/ChatGPT%20Image%20Mar%2024,%202026,%2010_12_09%20PM.png', count: '48 varieties' },
   { name: 'Herbs', slug: 'herbs', pill: 'Ayurvedic', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/herbs%20category.png', count: '36 varieties' },
-  { name: 'Spices', slug: 'spices', pill: 'Single Origin', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/Spices%20category.png', count: '54 varieties' },
+  { name: 'Spices', slug: 'spices', pill: 'Single Origin', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/spices%20category.png', count: '54 varieties' },
   { name: 'Pansari', slug: 'pansari', pill: 'Traditional', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/Pansari%20category.png', count: '62 varieties' },
 ]
 
 const TESTIMONIALS = [
   { stars: 5, text: 'The Mamra almonds are unlike anything I have bought before. Premium packaging keeps them fresh for weeks.', name: 'Sunita Rao', city: 'Mumbai' },
   { stars: 5, text: 'Video appointment felt like a real store visit. Expert showed every herb live before I ordered.', name: 'Vikram Patel', city: 'Ahmedabad' },
-  { stars: 5, text: 'The Triphala kit is my holy grail. Consistent quality every single month.', name: 'Deepa Krishnan', city: 'Chennai' },
+  { stars: 5, text: 'The Triphala kit is my holy grail. Consistent quality every single month.', name: 'Deepa Krishnan', city: 'Delhi' },
   { stars: 5, text: 'Beautiful packaging, excellent quality. Ordered 3 times already!', name: 'Aryan Gupta', city: 'Delhi' },
   { stars: 5, text: 'Saffron quality is outstanding. You can tell it is real the moment you open the pack.', name: 'Priya Mehta', city: 'Bangalore' },
-  { stars: 5, text: 'The chat & buy service is so convenient. Ordered my monthly herbs in under 5 minutes.', name: 'Rahul Shah', city: 'Pune' },
+
 ]
 
 const MARQUEE_ITEMS = [
@@ -286,6 +286,33 @@ export default async function HomePage() {
             <Link href="/products" className="btn-primary no-underline inline-flex">
               <span>Browse All →</span>
             </Link>
+      {/* ── TESTIMONIALS ── */}
+      <section className="section bg-ivory-2 overflow-hidden fade-in">
+        <div className="text-center mb-10">
+          <div className="eyebrow justify-center">Testimonials</div>
+          <h2 className="section-title">Loved by <em className="not-italic text-green">thousands</em></h2>
+        </div>
+        <div className="overflow-hidden">
+          <div className="flex gap-4 w-max" style={{ animation: 'scroll-left 28s linear infinite' }}>
+            {[...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
+              <div key={i} className="w-[290px] flex-shrink-0 bg-white border border-ivory-3 rounded-xl p-5 shadow-soft">
+                <div className="text-terra text-[.78rem] mb-2.5">{'★'.repeat(t.stars)}</div>
+                <p className="text-[.8rem] text-ink-3 leading-[1.7] mb-3.5 italic">"{t.text}"</p>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-green-6 border border-green-5 flex items-center justify-center text-[.7rem] font-medium text-green flex-shrink-0">
+                    {t.name[0]}
+                  </div>
+                  <div>
+                    <div className="text-[.74rem] text-ink font-medium">{t.name}</div>
+                    <div className="text-[.6rem] text-ink-4">{t.city} · Verified</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
           </div>
         )}
       </section>
@@ -353,33 +380,6 @@ export default async function HomePage() {
             >
               <span>Start Chat & Buy →</span>
             </a>
-          </div>
-        </div>
-      </section>
-
-      {/* ── TESTIMONIALS ── */}
-      <section className="section bg-ivory-2 overflow-hidden fade-in">
-        <div className="text-center mb-10">
-          <div className="eyebrow justify-center">Testimonials</div>
-          <h2 className="section-title">Loved by <em className="not-italic text-green">thousands</em></h2>
-        </div>
-        <div className="overflow-hidden">
-          <div className="flex gap-4 w-max" style={{ animation: 'scroll-left 28s linear infinite' }}>
-            {[...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
-              <div key={i} className="w-[290px] flex-shrink-0 bg-white border border-ivory-3 rounded-xl p-5 shadow-soft">
-                <div className="text-terra text-[.78rem] mb-2.5">{'★'.repeat(t.stars)}</div>
-                <p className="text-[.8rem] text-ink-3 leading-[1.7] mb-3.5 italic">"{t.text}"</p>
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-green-6 border border-green-5 flex items-center justify-center text-[.7rem] font-medium text-green flex-shrink-0">
-                    {t.name[0]}
-                  </div>
-                  <div>
-                    <div className="text-[.74rem] text-ink font-medium">{t.name}</div>
-                    <div className="text-[.6rem] text-ink-4">{t.city} · Verified</div>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
