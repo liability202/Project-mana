@@ -9,6 +9,7 @@ import { showToast } from '@/components/ui/Toaster'
 import { ReviewForm } from '@/components/product/ReviewForm'
 import { ReviewList } from '@/components/product/ReviewList'
 import { ProductRecommendations } from '@/components/product/ProductRecommendations'
+import { BuyNowPopup } from '@/components/product/BuyNowPopup'
 import type { Product, Variant } from '@/lib/supabase'
 
 const ACCOUNT_PHONE_KEY = 'mana_account_phone'
@@ -50,6 +51,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   const [reviewCheckLoading, setReviewCheckLoading] = useState(true)
   const [refCode, setRefCode] = useState('')
   const [refPct, setRefPct] = useState(10)
+  const [isBuyNowOpen, setIsBuyNowOpen] = useState(false)
 
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
@@ -502,12 +504,12 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             )}
             <button
               onClick={() => {
-                const msg = `Hi Mana! I want to buy: ${product.name}${activeVar ? ` (${activeVar.name})` : ''} — ${formatWeight(grams)} for ${formatPrice(livePrice)}. Please confirm.`
-                window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank')
+                handleAddToCart()
+                setIsBuyNowOpen(true)
               }}
               className="btn-outline flex-1 justify-center"
             >
-              Buy via WhatsApp
+              Buy Now
             </button>
           </div>
 
@@ -534,6 +536,13 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
       <ProductRecommendations 
         currentSlug={product.slug} 
         category={product.category} 
+      />
+
+      <BuyNowPopup 
+        isOpen={isBuyNowOpen} 
+        onClose={() => setIsBuyNowOpen(false)} 
+        category={product.category} 
+        currentSlug={product.slug} 
       />
 
       <div className="px-[5%] pb-14 max-w-[1400px] mx-auto mt-8">

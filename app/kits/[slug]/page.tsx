@@ -5,7 +5,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useCart } from '@/lib/store'
 import { formatPrice } from '@/lib/utils'
+import { formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
+import { BuyNowPopup } from '@/components/product/BuyNowPopup'
 import type { Product, Variant } from '@/lib/supabase'
 
 type KitItem = {
@@ -144,11 +146,15 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
   const activeTierVariants = tiers[activeTierIdx] || []
 
   const [sizeIdx, setSizeIdx] = useState(0)
-  const [isCustomizing, setIsCustomizing] = useState(false)
-  const [form, setForm] = useState<Form>('powder')
-  const [tab, setTab] = useState<'benefits' | 'howto'>('benefits')
+  const [activeVariant, setActiveVariant] = useState<KitVariant | null>(null)
+  const [form, setForm] = useState<Form>('whole')
+  const [items, setItems] = useState<ItemState[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isBuyNowOpen, setIsBuyNowOpen] = useState(false)
   const [refCode, setRefCode] = useState('')
   const [refPct, setRefPct] = useState(10)
+  const [isCustomizing, setIsCustomizing] = useState(false)
+  const [tab, setTab] = useState<'benefits' | 'howto'>('benefits')
 
   useEffect(() => {
     try {
@@ -160,16 +166,16 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
     } catch (e) {}
   }, [])
   
-  const activeVariant = activeTierVariants[sizeIdx] || activeTierVariants[0]
-  const activeItems = activeVariant?.items || []
+  const activeVar = activeTierVariants[sizeIdx] || activeTierVariants[0]
+  const activeItems = activeVar?.items || []
   const availableForms = {
-    powder: activeVariant?.form_options?.powder !== false,
-    whole: activeVariant?.form_options?.whole !== false,
+    powder: activeVar?.form_options?.powder !== false,
+    whole: activeVar?.form_options?.whole !== false,
   }
   const [itemStates, setItemStates] = useState<ItemState[]>(() => activeItems.map(item => ({
     id: item.id,
     selected: true,
-    grams: item.grams || activeVariant?.grams_each || 100,
+    grams: item.grams || activeVar?.grams_each || 100,
     ratio: 1,
   })))
   const addItem = useCart(s => s.addItem)
@@ -195,15 +201,15 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
 
   useEffect(() => {
     const nextForms = {
-      powder: activeVariant?.form_options?.powder !== false,
-      whole: activeVariant?.form_options?.whole !== false,
+      powder: activeVar?.form_options?.powder !== false,
+      whole: activeVar?.form_options?.whole !== false,
     }
     if (!nextForms[form]) {
       setForm(nextForms.powder ? 'powder' : 'whole')
     }
-  }, [activeVariant, form])
+  }, [activeVar, form])
 
-  const tierImages = activeVariant?.tier_images || []
+  const tierImages = activeVar?.tier_images || []
   const image = tierImages[0] || kit.images?.[0] || activeItems[0]?.image || ''
 
   const selectedItems = activeItems
@@ -211,10 +217,10 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
     .filter(item => item.selected && item.grams > 0)
 
   const defaultRawTotal = activeItems.reduce((sum, item) => (
-    sum + getBasePrice(item, item.grams || activeVariant?.grams_each || 100)
+    sum + getBasePrice(item, item.grams || activeVar?.grams_each || 100)
   ), 0)
   const dynamicRawTotal = selectedItems.reduce((sum, item) => sum + getBasePrice(item, item.grams), 0)
-  const kitFactor = defaultRawTotal > 0 ? (activeVariant?.price || kit.price || defaultRawTotal) / defaultRawTotal : 1
+  const kitFactor = defaultRawTotal > 0 ? (activeVar?.price || kit.price || defaultRawTotal) / defaultRawTotal : 1
   const price = Math.max(0, Math.round(dynamicRawTotal * kitFactor))
   const totalWeight = selectedItems.reduce((sum, item) => sum + item.grams, 0)
   const totalWeightLabel = totalWeight >= 1000
@@ -233,11 +239,11 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
     )))
   }
 
-  const benefits = activeVariant?.benefits?.length
-    ? activeVariant.benefits
+  const benefits = activeVar?.benefits?.length
+    ? activeVar.benefits
     : (kit.tags?.filter(tag => !['kit', 'bestseller', 'premium'].includes(tag)) || [])
-  const howToUse = activeVariant?.how_to_use || activeVariant?.description || kit.description
-  const sizeLabel = getSizeDisplayName(activeVariant?.name, sizeIdx)
+  const howToUse = activeVar?.how_to_use || activeVar?.description || kit.description
+  const sizeLabel = getSizeDisplayName(activeVar?.name, sizeIdx)
 
   const handleAddToCart = () => {
     if (!selectedItems.length) {
@@ -245,13 +251,13 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
       return
     }
 
-    const tierNamePart = activeVariant?.tier_name ? `${activeVariant.tier_name} - ` : ''
+    const tierNamePart = activeVar?.tier_name ? `${activeVar.tier_name} - ` : ''
     
     addItem({
       product_id: kit.id,
       product_name: kit.name,
       product_image: image,
-      variant_id: `${activeVariant?.id || 'kit'}-${form}-${selectedItems.map(item => `${item.id}:${item.grams}`).join('|')}`,
+      variant_id: `${activeVar?.id || 'kit'}-${form}-${selectedItems.map(item => `${item.id}:${item.grams}`).join('|')}`,
       variant_name: `${tierNamePart}${sizeLabel} - ${form === 'powder' ? 'Powder' : 'Whole'} - ${selectedItems.map(item => `${item.name} ${item.grams}g`).join(', ')}`,
       weight_grams: totalWeight,
       price,
@@ -260,8 +266,6 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
     showToast(`${kit.name} added`)
     window.dispatchEvent(new CustomEvent('mana:open-cart'))
   }
-
-  const whatsappMessage = `Hi Mana! I want to buy the ${kit.name}.\n\nVersion: ${activeVariant?.tier_name || 'Standard'}\nSize: ${sizeLabel}\nForm: ${form === 'powder' ? 'Powder' : 'Whole'}\nWeight: ${totalWeightLabel}\nPrice: ${formatPrice(price)}\n\nItems:\n${selectedItems.map(item => `- ${item.name}: ${item.grams}g`).join('\n')}`
 
   return (
     <div className="bg-white border border-ivory-3 rounded-[18px] sm:rounded-[24px] overflow-hidden shadow-soft">
@@ -345,7 +349,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
                 </button>
               ))}
             </div>
-            {activeVariant?.size_desc && <div className="text-[.72rem] text-ink-3 mt-2">{activeVariant.size_desc}</div>}
+            {activeVar?.size_desc && <div className="text-[.72rem] text-ink-3 mt-2">{activeVar.size_desc}</div>}
           </div>
 
           <div className="rounded-2xl border border-ivory-3 bg-ivory/70 p-4">
@@ -412,7 +416,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
                   ) : (
                     activeItems.map((item, index) => {
                       const state = itemStates[index] || { id: item.id, selected: true, grams: item.grams || 100, ratio: 1 }
-                      const recommended = item.grams || activeVariant?.grams_each || 100
+                      const recommended = item.grams || activeVar?.grams_each || 100
                       const minWeight = Math.max(25, Math.round(recommended / 2 / 25) * 25)
                       const maxWeight = Math.max(recommended + 50, recommended * 2)
                       const linePrice = Math.round(getBasePrice(item, state.grams) * kitFactor)
@@ -492,17 +496,18 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
             </div>
             <div className="text-[.72rem] text-ink-3 mb-4">{totalWeightLabel} total - {form === 'powder' ? 'powder form' : 'whole form'}</div>
             <div className="flex gap-2.5 flex-wrap">
-              <button onClick={handleAddToCart} disabled={!selectedItems.length} className="btn-primary flex-1 justify-center min-w-[140px] disabled:opacity-50">
+              <button onClick={handleAddToCart} className="btn-primary flex-1 justify-center min-w-[140px]">
                 <span>Add to Cart</span>
               </button>
-              <a
-                href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMessage)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-outline flex-1 justify-center min-w-[140px] no-underline"
+              <button
+                onClick={() => {
+                  handleAddToCart()
+                  setIsBuyNowOpen(true)
+                }}
+                className="btn-outline flex-1 justify-center min-w-[140px]"
               >
-                WhatsApp
-              </a>
+                Buy Now
+              </button>
             </div>
           </div>
 
