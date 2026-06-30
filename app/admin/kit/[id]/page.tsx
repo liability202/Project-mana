@@ -87,6 +87,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
     return idx >= 0 ? idx : 0
   }, [tiers, activeTierId])
   const activeTier = tiers[activeTierIndex]
+  const activeTierSizes = activeTier?.sizes || []
 
   const [submitting, setSubmitting] = useState(false)
   const [loadingProducts, setLoadingProducts] = useState(true)
@@ -164,7 +165,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
           const tiersMap = new Map<string, KitTier>()
           
           product.variants.forEach((v: any) => {
-            const tierId = v.tier_id || 'default'
+            const tierId = typeof v.tier_id === 'string' && v.tier_id.trim() ? v.tier_id : 'default'
             
             if (!tiersMap.has(tierId)) {
               tiersMap.set(tierId, {
@@ -180,7 +181,8 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
             const tier = tiersMap.get(tierId)!
             
             // Extract size
-            const sizeId = v.id.split('-').pop() || 'unknown'
+            const rawVariantId = typeof v.id === 'string' ? v.id : ''
+            const sizeId = rawVariantId.split('-').pop() || slugify(v.name || 'size') || `size-${tier.sizes.length + 1}`
             tier.sizes.push({
               id: sizeId,
               name: v.name,
@@ -214,7 +216,12 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
             }
           })
           
-          const loadedTiers = Array.from(tiersMap.values())
+          const loadedTiers = Array.from(tiersMap.values()).map(tier => ({
+            ...tier,
+            sizes: tier.sizes?.length ? tier.sizes : createDefaultSizes(),
+            selectedProducts: tier.selectedProducts || [],
+            productWeights: tier.productWeights || {},
+          }))
           if (loadedTiers.length > 0) {
             setTiers(loadedTiers)
             setActiveTierId(loadedTiers[0].id)
@@ -292,26 +299,27 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
     }, 0)
   }
 
-  const estimatedMediumTotal = activeTier ? getSizeTotal(activeTier.sizes[1]?.id || 'medium', activeTier.sizes[1]?.gramsEach || '200') : 0
+  const estimatedMediumTotal = activeTier ? getSizeTotal(activeTierSizes[1]?.id || 'medium', activeTierSizes[1]?.gramsEach || '200') : 0
   const estimatedTotal = estimatedMediumTotal
-  const priceRupees = activeTier?.sizes[1]?.priceRupees || ''
+  const priceRupees = activeTierSizes[1]?.priceRupees || ''
 
   const updateKitSize = (id: string, next: Partial<KitSize>) => {
     updateActiveTier(tier => ({
       ...tier,
-      sizes: tier.sizes.map(size => size.id === id ? { ...size, ...next } : size)
+      sizes: (tier.sizes?.length ? tier.sizes : createDefaultSizes()).map(size => size.id === id ? { ...size, ...next } : size)
     }))
   }
 
   const addKitSize = () => {
     if (!activeTier) return
-    const medium = activeTier.sizes[1] || activeTier.sizes[0]
+    const medium = activeTierSizes[1] || activeTierSizes[0]
     const baseGrams = Math.max(1, Number(medium?.gramsEach || '100'))
     const nextGrams = String(baseGrams * 2)
     const id = `size-${Date.now()}`
     
     updateActiveTier(tier => {
-      const nextSizes = [...tier.sizes, {
+      const tierSizes = tier.sizes?.length ? tier.sizes : createDefaultSizes()
+      const nextSizes = [...tierSizes, {
         id,
         name: 'Custom Size',
         gramsEach: nextGrams,
@@ -334,9 +342,9 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
   }
 
   const removeKitSize = (id: string) => {
-    if (!activeTier || activeTier.sizes.length <= 1) return
+    if (!activeTier || activeTierSizes.length <= 1) return
     updateActiveTier(tier => {
-      const nextSizes = tier.sizes.filter(size => size.id !== id)
+      const nextSizes = (tier.sizes?.length ? tier.sizes : createDefaultSizes()).filter(size => size.id !== id)
       const nextWeights = Object.fromEntries(
         Object.entries(tier.productWeights).map(([productId, weights]) => {
           const w = { ...weights }
@@ -350,7 +358,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
 
   const scaleSizeWeights = (targetSize: KitSize) => {
     if (!activeTier) return
-    const referenceSize = activeTier.sizes[1]?.id === targetSize.id ? activeTier.sizes[0] : (activeTier.sizes[1] || activeTier.sizes[0])
+    const referenceSize = activeTierSizes[1]?.id === targetSize.id ? activeTierSizes[0] : (activeTierSizes[1] || activeTierSizes[0])
     if (!referenceSize) return
     const referenceDefault = Math.max(1, Number(referenceSize.gramsEach || '1'))
     const targetDefault = Math.max(1, Number(targetSize.gramsEach || '1'))
@@ -396,7 +404,8 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
       }
       
       const nextWeights = { ...tier.productWeights }
-      nextWeights[product.id] = Object.fromEntries(tier.sizes.map(size => [size.id, size.gramsEach]))
+      const tierSizes = tier.sizes?.length ? tier.sizes : createDefaultSizes()
+      nextWeights[product.id] = Object.fromEntries(tierSizes.map(size => [size.id, size.gramsEach]))
       
       return {
         ...tier,
@@ -475,11 +484,13 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
       const benefitsTags = benefitsInput.split('\n').map(tag => tag.trim()).filter(Boolean)
       const tags = [...baseTags, ...benefitsTags]
       const benefits = benefitsInput.split('\n').map(item => item.trim()).filter(Boolean)
+      const usesKitVersions = tiers.length > 1
       
       const variants = tiers.flatMap(tier => {
         const tierImages = tier.imagesInput.split('\n').map(url => url.trim()).filter(Boolean)
         
-        return tier.sizes.map(size => {
+        const tierSizes = tier.sizes?.length ? tier.sizes : createDefaultSizes()
+        return tierSizes.map(size => {
           const gramsEach = Math.max(0, Number(size.gramsEach || '0'))
           // Calculate auto price based on this specific tier's products and weights
           const computedPrice = tier.selectedProducts.reduce((sum, product) => {
@@ -492,9 +503,9 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
 
           return {
             id: `kit-${tier.id}-${size.id}`,
-            tier_id: tier.id,
-            tier_name: tier.name.trim() || undefined,
-            tier_images: tierImages.length > 0 ? tierImages : undefined,
+            tier_id: usesKitVersions ? tier.id : undefined,
+            tier_name: usesKitVersions ? (tier.name.trim() || undefined) : undefined,
+            tier_images: usesKitVersions && tierImages.length > 0 ? tierImages : undefined,
             name: size.name,
             description: size.description || `${gramsEach}g each`,
             how_to_use: howToUse.trim() || undefined,
@@ -777,7 +788,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                 </button>
 
                 <div className="space-y-4">
-                  {activeTier?.sizes.map(size => {
+                  {activeTierSizes.map(size => {
                     const autoPrice = getSizeTotal(size.id, size.gramsEach)
                     return (
                       <div key={size.id} className="rounded-2xl border border-ivory-3 bg-ivory-1 p-4">
@@ -842,7 +853,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                           >
                             Scale Weights Proportionally
                           </button>
-                          {activeTier.sizes.length > 1 && (
+                          {activeTierSizes.length > 1 && (
                             <button
                               type="button"
                               onClick={() => removeKitSize(size.id)}
@@ -928,8 +939,8 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                         </button>
                         </div>
 
-                        <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(activeTier.sizes.length, 4)}, minmax(0, 1fr))` }}>
-                          {activeTier.sizes.map(size => (
+                        <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(activeTierSizes.length, 4)}, minmax(0, 1fr))` }}>
+                          {activeTierSizes.map(size => (
                             <div key={size.id}>
                               <label className="text-[.64rem] text-ink-4 block mb-1">{size.name}</label>
                               <div className="relative">
@@ -960,7 +971,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                   <div><span className="text-ink font-medium">Selected Products in Version:</span> {activeTier?.selectedProducts.length || 0}</div>
                   <div><span className="text-ink font-medium">Medium Auto Estimate:</span> {formatPrice(estimatedMediumTotal)}</div>
                   <div className="space-y-1 pt-1">
-                    {activeTier?.sizes.map(size => {
+                    {activeTierSizes.map(size => {
                       const autoPrice = getSizeTotal(size.id, size.gramsEach)
                       return (
                         <div key={size.id}>
