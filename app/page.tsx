@@ -81,7 +81,7 @@ export default async function HomePage() {
             animation: kenburns 30s ease-in-out infinite alternate;
           }
         `}} />
-        
+
         {/* Cinematic Background */}
         <div className="absolute inset-0 z-0 bg-ink">
           <Image
@@ -103,16 +103,16 @@ export default async function HomePage() {
             Pure · Natural · Handpicked
             <span className="w-8 h-px bg-ivory/60 block" />
           </div>
-          
+
           <h1 className="font-serif text-[clamp(2.8rem,7vw,6rem)] font-light text-white leading-[1.05] tracking-tight mb-6 animate-fade-up" style={{ animationDelay: '.2s', animationFillMode: 'both' }}>
             The <em className="not-italic text-green-4">Essence</em><br />
             of Nature.
           </h1>
-          
+
           <p className="text-[1.05rem] md:text-[1.2rem] leading-[1.8] text-ivory-3 max-w-[580px] mx-auto mb-10 animate-fade-up font-light" style={{ animationDelay: '.35s', animationFillMode: 'both' }}>
             Premium dry fruits, Ayurvedic herbs, hand-picked spices and pansari staples — sourced directly from the finest origins across World.
           </p>
-          
+
           <div className="flex gap-5 flex-col sm:flex-row justify-center w-full sm:w-auto animate-fade-up px-4 sm:px-0" style={{ animationDelay: '.5s', animationFillMode: 'both' }}>
             <Link href="/products" className="btn-primary no-underline px-10 py-4 text-[.95rem] shadow-xl shadow-green/20 hover:shadow-green/40 hover:-translate-y-1 transition-all bg-green hover:bg-green-4 text-white border-none w-full sm:w-auto flex items-center justify-center">
               <span>view collection</span>
@@ -121,11 +121,11 @@ export default async function HomePage() {
               Explore Our Kits
             </Link>
           </div>
-          
+
           <div className="flex gap-10 sm:gap-16 pt-12 mt-12 border-t border-white/15 flex-wrap justify-center animate-fade-up w-full" style={{ animationDelay: '.65s', animationFillMode: 'both' }}>
             {[
-              ['400+', 'Premium Products'], 
-              ['2K+', 'Happy Families'], 
+              ['400+', 'Premium Products'],
+              ['2K+', 'Happy Families'],
               ['100%', 'Pure & Natural']
             ].map(([n, l]) => (
               <div key={l} className="flex flex-col items-center gap-1.5">
@@ -189,12 +189,12 @@ export default async function HomePage() {
               const firstVariant = kit.variants?.[0]
               const price = firstVariant?.price || kit.price
               const comparePrice = firstVariant?.compare_price || kit.compare_price
-              const savePct = comparePrice && comparePrice > price 
-                ? Math.round(((comparePrice - price) / comparePrice) * 100) 
+              const savePct = comparePrice && comparePrice > price
+                ? Math.round(((comparePrice - price) / comparePrice) * 100)
                 : 0
               const image = kit.images?.[0] || 'https://images.unsplash.com/photo-1574226516831-e1dff420e562?w=600&q=80'
               const tag = kit.tags?.filter(t => t !== 'kit')[0] || 'Wellness Kit'
-              
+
               return (
                 <Link key={kit.id} href="/kits" className="card no-underline group flex flex-col">
                   <div className="aspect-[4/3] overflow-hidden relative">
@@ -286,6 +286,10 @@ export default async function HomePage() {
             <Link href="/products" className="btn-primary no-underline inline-flex">
               <span>Browse All →</span>
             </Link>
+          </div>
+        )}
+      </section>
+
       {/* ── TESTIMONIALS ── */}
       <section className="section bg-ivory-2 overflow-hidden fade-in">
         <div className="text-center mb-10">
@@ -311,10 +315,6 @@ export default async function HomePage() {
             ))}
           </div>
         </div>
-      </section>
-
-          </div>
-        )}
       </section>
 
       {/* ── CHAT & BUY ── */}
@@ -395,18 +395,5 @@ export default async function HomePage() {
         </div>
       </section>
     </>
-  )
-}
-
-function ProductCardSkeleton() {
-  return (
-    <div className="card animate-pulse">
-      <div className="aspect-[4/5] bg-ivory-3" />
-      <div className="p-4">
-        <div className="h-3 bg-ivory-3 rounded mb-2 w-1/2" />
-        <div className="h-4 bg-ivory-3 rounded mb-3 w-3/4" />
-        <div className="h-5 bg-ivory-3 rounded w-1/3" />
-      </div>
-    </div>
   )
 }
