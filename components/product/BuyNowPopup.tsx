@@ -32,6 +32,9 @@ export function BuyNowPopup({
     let active = true
 
     async function fetchRecs() {
+      setLoading(true)
+      setItems([])
+
       // 1. Fetch Kits to see if this product belongs to any
       const { data: kits } = await supabase.from('products').select('variants').eq('category', 'kits')
       
@@ -60,7 +63,11 @@ export function BuyNowPopup({
       }
 
       const { data } = await query.limit(20)
-      if (!active || !data) return
+      if (!active) return
+      if (!data) {
+        setLoading(false)
+        return
+      }
 
       // 3. Sort: kit items first, then others, limit 4
       const sorted = data.sort((a, b) => {
@@ -75,7 +82,12 @@ export function BuyNowPopup({
       setLoading(false)
     }
 
-    fetchRecs()
+    void fetchRecs().catch(() => {
+      if (active) {
+        setItems([])
+        setLoading(false)
+      }
+    })
     return () => { active = false }
   }, [isOpen, currentSlug, category])
 
@@ -116,7 +128,9 @@ export function BuyNowPopup({
 
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto p-5 pb-8">
-          {!loading && items.length > 0 && (
+          {loading ? (
+            <div className="py-10 text-center text-sm text-ink-3">Finding products that go well with this...</div>
+          ) : items.length > 0 ? (
             <>
               <h4 className="font-serif text-lg text-ink mb-4">Frequently bought together</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
@@ -125,13 +139,14 @@ export function BuyNowPopup({
                   const basePrice = defaultVariant?.price || product.price
                   const baseWeight = parseBaseWeightGrams(product.price_per_unit)
                   const inCart = cartItems.some(i => i.product_id === product.id)
+                  const productHref = product.category === 'kits' ? `/kits/${product.slug}` : `/products/${product.slug}`
 
                   return (
                     <div 
                       key={product.id} 
                       className="bg-white border border-ivory-3 rounded-xl p-2.5 flex flex-col transition-shadow hover:shadow-soft"
                     >
-                      <Link href={`/products/${product.slug}`} className="block relative aspect-square rounded-lg overflow-hidden bg-ivory-3 mb-2.5">
+                      <Link href={productHref} onClick={onClose} className="block relative aspect-square rounded-lg overflow-hidden bg-ivory-3 mb-2.5">
                         {product.images?.[0] ? (
                           <Image 
                             src={product.images[0]} 
@@ -145,7 +160,7 @@ export function BuyNowPopup({
                       </Link>
 
                       <div className="flex-1 flex flex-col">
-                        <Link href={`/products/${product.slug}`} className="font-serif text-sm text-ink mb-1 line-clamp-2 hover:text-green transition-colors leading-snug">
+                        <Link href={productHref} onClick={onClose} className="font-serif text-sm text-ink mb-1 line-clamp-2 hover:text-green transition-colors leading-snug">
                           {product.name}
                         </Link>
                         
@@ -191,6 +206,11 @@ export function BuyNowPopup({
                 })}
               </div>
             </>
+          ) : (
+            <div className="py-10 text-center">
+              <h4 className="font-serif text-xl text-ink mb-2">Added to Cart!</h4>
+              <p className="text-sm text-ink-3">No extra recommendations found for this item yet.</p>
+            </div>
           )}
         </div>
 

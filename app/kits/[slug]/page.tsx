@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useCart } from '@/lib/store'
-import { formatPrice } from '@/lib/utils'
 import { formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 import { BuyNowPopup } from '@/components/product/BuyNowPopup'
@@ -248,7 +247,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
   const handleAddToCart = () => {
     if (!selectedItems.length) {
       showToast('Select at least one item')
-      return
+      return false
     }
 
     const tierNamePart = activeVar?.tier_name ? `${activeVar.tier_name} - ` : ''
@@ -265,6 +264,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
     })
     showToast(`${kit.name} added`)
     window.dispatchEvent(new CustomEvent('mana:open-cart'))
+    return true
   }
 
   return (
@@ -501,8 +501,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
               </button>
               <button
                 onClick={() => {
-                  handleAddToCart()
-                  setIsBuyNowOpen(true)
+                  if (handleAddToCart()) setIsBuyNowOpen(true)
                 }}
                 className="btn-outline flex-1 justify-center min-w-[140px]"
               >
@@ -544,6 +543,12 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
           </div>
         </div>
       </div>
+      <BuyNowPopup
+        isOpen={isBuyNowOpen}
+        onClose={() => setIsBuyNowOpen(false)}
+        category="kits"
+        currentSlug={kit.slug}
+      />
     </div>
   )
 }
