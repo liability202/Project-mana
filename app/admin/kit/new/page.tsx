@@ -80,7 +80,10 @@ export default function NewAdminKitPage() {
     productWeights: {}
   }])
   const [activeTierId, setActiveTierId] = useState<string>(tiers[0].id)
-  const activeTierIndex = tiers.findIndex(t => t.id === activeTierId)
+  const activeTierIndex = useMemo(() => {
+    const index = tiers.findIndex(t => t.id === activeTierId)
+    return index >= 0 ? index : 0
+  }, [tiers, activeTierId])
   const activeTier = tiers[activeTierIndex]
 
   const [submitting, setSubmitting] = useState(false)
@@ -153,23 +156,28 @@ export default function NewAdminKitPage() {
   }, [selectableItems, search])
 
   const updateActiveTier = (updater: (tier: KitTier) => KitTier) => {
-    setTiers(prev => prev.map((t, i) => i === activeTierIndex ? updater(t) : t))
+    setTiers(prev => {
+      const index = prev.findIndex(t => t.id === activeTierId)
+      const safeIndex = index >= 0 ? index : 0
+      return prev.map((t, i) => i === safeIndex ? updater(t) : t)
+    })
   }
 
   const getProductWeight = (productId: string, sizeId: string, fallbackGrams: string) => {
-    return activeTier.productWeights[productId]?.[sizeId] || fallbackGrams
+    return activeTier?.productWeights[productId]?.[sizeId] || fallbackGrams
   }
 
   const getSizeTotal = (sizeId: string, fallbackGrams: string) => {
+    if (!activeTier) return 0
     return activeTier.selectedProducts.reduce((sum, product) => {
       const grams = Math.max(0, Number(getProductWeight(product.id, sizeId, fallbackGrams) || '0'))
       return sum + calcPriceForWeight(product.price, product.price_per_unit, grams)
     }, 0)
   }
 
-  const estimatedMediumTotal = getSizeTotal(activeTier.sizes[1]?.id || 'medium', activeTier.sizes[1]?.gramsEach || '200')
+  const estimatedMediumTotal = activeTier ? getSizeTotal(activeTier.sizes[1]?.id || 'medium', activeTier.sizes[1]?.gramsEach || '200') : 0
   const estimatedTotal = estimatedMediumTotal
-  const priceRupees = activeTier.sizes[1]?.priceRupees || ''
+  const priceRupees = activeTier?.sizes[1]?.priceRupees || ''
 
   const updateKitSize = (id: string, next: Partial<KitSize>) => {
     updateActiveTier(tier => ({
@@ -179,6 +187,7 @@ export default function NewAdminKitPage() {
   }
 
   const addKitSize = () => {
+    if (!activeTier) return
     const medium = activeTier.sizes[1] || activeTier.sizes[0]
     const baseGrams = Math.max(1, Number(medium?.gramsEach || '100'))
     const nextGrams = String(baseGrams * 2)
@@ -208,7 +217,7 @@ export default function NewAdminKitPage() {
   }
 
   const removeKitSize = (id: string) => {
-    if (activeTier.sizes.length <= 1) return
+    if (!activeTier || activeTier.sizes.length <= 1) return
     updateActiveTier(tier => {
       const nextSizes = tier.sizes.filter(size => size.id !== id)
       const nextWeights = Object.fromEntries(
@@ -223,6 +232,7 @@ export default function NewAdminKitPage() {
   }
 
   const scaleSizeWeights = (targetSize: KitSize) => {
+    if (!activeTier) return
     const referenceSize = activeTier.sizes[1]?.id === targetSize.id ? activeTier.sizes[0] : (activeTier.sizes[1] || activeTier.sizes[0])
     if (!referenceSize) return
     const referenceDefault = Math.max(1, Number(referenceSize.gramsEach || '1'))
@@ -317,10 +327,13 @@ export default function NewAdminKitPage() {
 
   const removeTier = (id: string) => {
     if (tiers.length <= 1) return
-    setTiers(prev => prev.filter(t => t.id !== id))
-    if (activeTierId === id) {
-      setActiveTierId(tiers[0].id)
-    }
+    setTiers(prev => {
+      const next = prev.filter(t => t.id !== id)
+      if (activeTierId === id) {
+        setActiveTierId(next[0]?.id || '')
+      }
+      return next
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -717,7 +730,7 @@ export default function NewAdminKitPage() {
                         >
                           Scale Weights Proportionally
                         </button>
-                        {activeTier.sizes.length > 1 && (
+                        {(activeTier?.sizes.length || 0) > 1 && (
                           <button
                             type="button"
                             onClick={() => removeKitSize(size.id)}

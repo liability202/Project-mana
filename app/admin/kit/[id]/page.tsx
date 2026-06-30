@@ -273,7 +273,11 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
   }, [selectableItems, search])
 
   const updateActiveTier = (updater: (tier: KitTier) => KitTier) => {
-    setTiers(prev => prev.map((t, i) => i === activeTierIndex ? updater(t) : t))
+    setTiers(prev => {
+      const index = prev.findIndex(t => t.id === activeTierId)
+      const safeIndex = index >= 0 ? index : 0
+      return prev.map((t, i) => i === safeIndex ? updater(t) : t)
+    })
   }
 
   const getProductWeight = (productId: string, sizeId: string, fallbackGrams: string) => {
@@ -440,10 +444,13 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
 
   const removeTier = (id: string) => {
     if (tiers.length <= 1) return
-    setTiers(prev => prev.filter(t => t.id !== id))
-    if (activeTierId === id) {
-      setActiveTierId(tiers[0].id)
-    }
+    setTiers(prev => {
+      const next = prev.filter(t => t.id !== id)
+      if (activeTierId === id) {
+        setActiveTierId(next[0]?.id || '')
+      }
+      return next
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
