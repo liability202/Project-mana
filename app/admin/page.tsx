@@ -416,7 +416,7 @@ export default function AdminPage() {
     )
   }
 
-  const paidRevenue = orders.filter(order => order.payment_status === 'paid').reduce((sum, order) => sum + (order.final_amount || order.total), 0)
+  const paidRevenue = orders.filter(order => order.payment_status === 'paid' && order.status !== 'cancelled').reduce((sum, order) => sum + (order.final_amount || order.total), 0)
   const filteredOrders = orders.filter(order => orderFilter === 'all' ? true : order.status === orderFilter)
 
   return (
