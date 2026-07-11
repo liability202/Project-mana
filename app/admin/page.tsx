@@ -417,7 +417,12 @@ export default function AdminPage() {
   }
 
   const paidRevenue = orders.filter(order => order.payment_status === 'paid' && order.status !== 'cancelled').reduce((sum, order) => sum + (order.final_amount || order.total), 0)
-  const filteredOrders = orders.filter(order => orderFilter === 'all' ? true : order.status === orderFilter)
+  const filteredOrders = orders.filter(order => orderFilter === 'all' ? true : order.status === orderFilter).sort((a, b) => {
+    if (orderFilter === 'pending') {
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    }
+    return 0
+  })
 
   return (
     <div className="min-h-screen bg-ivory">
