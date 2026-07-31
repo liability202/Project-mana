@@ -84,6 +84,14 @@ export default function AdminPage() {
   const [creators, setCreators] = useState<any[]>([])
   const [payouts, setPayouts] = useState<any[]>([])
   const [shipForm, setShipForm] = useState<ShipFormState>(null)
+  const [trackingForm, setTrackingForm] = useState<{
+    id: string
+    orderRef: string
+    courier_name: string
+    tracking_number: string
+    tracking_link: string
+    expected_delivery: string
+  } | null>(null)
   const [shipLoading, setShipLoading] = useState(false)
   const [creatorForm, setCreatorForm] = useState({
     name: '',
@@ -222,6 +230,31 @@ export default function AdminPage() {
       setShipForm(null)
     } catch (error: any) {
       alert(error.message || 'Could not ship this order.')
+    } finally {
+      setShipLoading(false)
+    }
+  }
+
+  const submitTrackingForm = async () => {
+    if (!trackingForm) return
+    const secret = localStorage.getItem('mana_admin') || ''
+    setShipLoading(true)
+    try {
+      const res = await fetch('/api/admin/orders/tracking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          authorization: `Bearer ${secret}`,
+        },
+        body: JSON.stringify(trackingForm),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Could not update tracking.')
+
+      setOrders(prev => prev.map(order => order.id === data.id ? data : order))
+      setTrackingForm(null)
+    } catch (error: any) {
+      alert(error.message || 'Could not update tracking.')
     } finally {
       setShipLoading(false)
     }
@@ -588,10 +621,17 @@ export default function AdminPage() {
                       </button>
                     )}
                     <button
-                      onClick={() => refreshNimbusTracking(order.id)}
+                      onClick={() => setTrackingForm({
+                        id: order.id,
+                        orderRef: order.order_ref || order.id.slice(0, 8).toUpperCase(),
+                        courier_name: order.courier_name || '',
+                        tracking_number: order.tracking_number || '',
+                        tracking_link: order.tracking_link || '',
+                        expected_delivery: order.expected_delivery ? new Date(order.expected_delivery).toISOString().split('T')[0] : '',
+                      })}
                       className="text-xs px-3 py-1 rounded-md border transition-all cursor-pointer bg-white text-green border-green-5 hover:bg-green-6"
                     >
-                      Sync NimbusPost
+                      Tracking Details
                     </button>
                   </div>
                 </div>
@@ -1163,6 +1203,80 @@ on conflict (key) do nothing;`}</pre>
               </button>
               <button onClick={submitShipOrder} disabled={shipLoading} className="btn-primary flex-1 justify-center">
                 <span>{shipLoading ? 'Shipping...' : 'Create Shipment'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Tracking Modal */}
+      {trackingForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl relative animate-scale-in">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="font-serif text-xl text-ink">Tracking Details</h3>
+                <p className="text-sm text-ink-3">Order #{trackingForm.orderRef}</p>
+              </div>
+              <button onClick={() => setTrackingForm(null)} className="text-ink-4 hover:text-ink text-lg leading-none">×</button>
+            </div>
+
+            <div className="mb-6 pb-6 border-b border-ivory-3 flex flex-col items-center">
+              <button onClick={async () => {
+                await refreshNimbusTracking(trackingForm.id)
+                setTrackingForm(null)
+              }} className="text-sm px-4 py-2 rounded-md bg-ivory text-ink-2 hover:text-green hover:bg-green-6 transition-all border border-ivory-3 w-full font-medium">
+                Auto-Sync from NimbusPost
+              </button>
+              <span className="text-xs text-ink-4 mt-2">or update manually below</span>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-ink-3 block mb-1.5">Courier Name</label>
+                <input
+                  value={trackingForm.courier_name}
+                  onChange={e => setTrackingForm(prev => prev ? { ...prev, courier_name: e.target.value } : prev)}
+                  className="input"
+                  placeholder="e.g. Blue Dart"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-ink-3 block mb-1.5">Tracking Number (AWB)</label>
+                <input
+                  value={trackingForm.tracking_number}
+                  onChange={e => setTrackingForm(prev => prev ? { ...prev, tracking_number: e.target.value } : prev)}
+                  className="input"
+                  placeholder="e.g. 1234567890"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-ink-3 block mb-1.5">Tracking Link</label>
+                <input
+                  value={trackingForm.tracking_link}
+                  onChange={e => setTrackingForm(prev => prev ? { ...prev, tracking_link: e.target.value } : prev)}
+                  className="input"
+                  type="url"
+                  placeholder="https://..."
+                />
+              </div>
+              <div>
+                <label className="text-xs text-ink-3 block mb-1.5">Expected Delivery</label>
+                <input
+                  value={trackingForm.expected_delivery}
+                  onChange={e => setTrackingForm(prev => prev ? { ...prev, expected_delivery: e.target.value } : prev)}
+                  className="input"
+                  type="date"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setTrackingForm(null)} disabled={shipLoading} className="btn-outline flex-1 justify-center">
+                Cancel
+              </button>
+              <button onClick={submitTrackingForm} disabled={shipLoading} className="btn-primary flex-1 justify-center">
+                <span>{shipLoading ? 'Saving...' : 'Save Details'}</span>
               </button>
             </div>
           </div>

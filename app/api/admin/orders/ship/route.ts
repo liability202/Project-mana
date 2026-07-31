@@ -82,10 +82,11 @@ export async function POST(req: Request) {
 
     if (updated.customer_phone) {
       const orderCode = updated.order_ref || updated.id.slice(0, 8).toUpperCase()
-      sendWhatsAppMessage(
-        updated.customer_phone,
-        `Your order ${orderCode} is on the way.\n\nExpected delivery is ${updated.expected_delivery || 'being updated soon'}.`
-      ).catch(console.error)
+      let msg = `Your order ${orderCode} is on the way.\n\nExpected delivery is ${updated.expected_delivery || 'being updated soon'}.`
+      if (updated.tracking_link || updated.tracking_number) {
+        msg += `\n\nCourier: ${updated.courier_name || 'Partner'}\nTracking No: ${updated.tracking_number || ''}\nTrack here: ${updated.tracking_link || ''}`
+      }
+      sendWhatsAppMessage(updated.customer_phone, msg).catch(console.error)
     }
 
     return NextResponse.json(updated)

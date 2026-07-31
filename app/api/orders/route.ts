@@ -458,10 +458,11 @@ export async function PUT(req: Request) {
       }
 
       if (nextStatus === 'shipped') {
-        sendWhatsAppMessage(
-          latestOrder.customer_phone,
-          `Your order ${orderCode} is on the way.\n\nExpected delivery is ${latestOrder.expected_delivery || 'being updated soon'}.`
-        ).catch(console.error)
+        let msg = `Your order ${orderCode} is on the way.\n\nExpected delivery is ${latestOrder.expected_delivery || 'being updated soon'}.`
+        if (latestOrder.tracking_link || latestOrder.tracking_number) {
+          msg += `\n\nCourier: ${latestOrder.courier_name || 'Partner'}\nTracking No: ${latestOrder.tracking_number || ''}\nTrack here: ${latestOrder.tracking_link || ''}`
+        }
+        sendWhatsAppMessage(latestOrder.customer_phone, msg).catch(console.error)
       }
 
       if (nextStatus === 'delivered') {

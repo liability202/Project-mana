@@ -449,7 +449,7 @@ export default function ProfilePage() {
 
                           <div className="px-5 pt-4">
                             <TrackingTimeline status={order.status || 'pending'} />
-                            <TrackingDetails order={order} formatDate={formatDate} />
+                            {order.status !== 'cancelled' && <TrackingDetails order={order} formatDate={formatDate} />}
                           </div>
 
                           {/* Order Items */}
