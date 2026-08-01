@@ -124,7 +124,10 @@ export function hasNimbusPostConfig() {
   )
 }
 
-export function getPublicTrackingUrl(orderRef: string, phone: string) {
+export function getPublicTrackingUrl(orderRef: string, phone: string, awb?: string | null) {
+  if (awb) {
+    return `https://ship.nimbuspost.com/shipping/tracking/${awb}`
+  }
   const params = new URLSearchParams({ orderRef, phone })
   return `${siteUrl}/track-order?${params.toString()}`
 }
@@ -384,7 +387,7 @@ export async function buildNimbusShipmentUpdate(order: Order, parcel?: NimbusPar
   if (!hasNimbusPostConfig()) return null
 
   const orderRef = order.order_ref || sanitizeCode(order.id.slice(0, 8))
-  const trackingLink = getPublicTrackingUrl(orderRef, order.customer_phone)
+  const trackingLink = getPublicTrackingUrl(orderRef, order.customer_phone, order.tracking_number)
 
   if (order.tracking_number) {
     const tracking = await trackNimbusAwb(order.tracking_number)
@@ -466,7 +469,7 @@ export async function buildNimbusShipmentUpdate(order: Order, parcel?: NimbusPar
     shiprocket_order_id: providerOrderId ? String(providerOrderId) : null,
     shiprocket_shipment_id: shipmentId ? String(shipmentId) : null,
     tracking_number: awbCode,
-    tracking_link: trackingLink,
+    tracking_link: getPublicTrackingUrl(orderRef, order.customer_phone, awbCode),
     courier_name: tracking?.courierName || courierName || null,
     expected_delivery:
       tracking?.expectedDelivery ||

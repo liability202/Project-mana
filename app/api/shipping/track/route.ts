@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 
     const update = {
       tracking_number: awbToTrack,
-      tracking_link: order.tracking_link || getPublicTrackingUrl(order.order_ref || order.id.slice(0, 8).toUpperCase(), order.customer_phone),
+      tracking_link: getPublicTrackingUrl(order.order_ref || order.id.slice(0, 8).toUpperCase(), order.customer_phone, awbToTrack),
       courier_name: tracking.courierName || order.courier_name || null,
       expected_delivery: tracking.expectedDelivery || order.expected_delivery || null,
       shiprocket_tracking_status: tracking.currentStatus || null,

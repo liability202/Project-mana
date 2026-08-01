@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getPublicTrackingUrl } from '@/lib/nimbuspost'
 
 export async function POST(req: Request) {
   const auth = req.headers.get('authorization')
@@ -15,13 +16,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Order ID is required.' }, { status: 400 })
     }
 
+    const { data: existing } = await supabaseAdmin.from('orders').select('*').eq('id', id).single()
+
+    const computedTrackingLink = tracking_link || (tracking_number ? `https://ship.nimbuspost.com/shipping/tracking/${tracking_number.trim()}` : (existing ? getPublicTrackingUrl(existing.order_ref || id.slice(0, 8).toUpperCase(), existing.customer_phone) : null))
+
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('orders')
       .update({
         courier_name: courier_name || null,
         tracking_number: tracking_number || null,
         expected_delivery: expected_delivery || null,
-        tracking_link: tracking_link || null,
+        tracking_link: computedTrackingLink,
         tracking_synced_at: new Date().toISOString(),
       })
       .eq('id', id)
