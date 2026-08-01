@@ -75,6 +75,9 @@ export default function AdminPage() {
     min_order_amount: '',
     max_discount: '',
     usage_limit: '',
+    free_shipping: false,
+    free_cod: false,
+    free_handling: false,
     is_active: true,
   })
   const [couponMessage, setCouponMessage] = useState('')
@@ -285,6 +288,9 @@ export default function AdminPage() {
         min_order_amount: couponForm.min_order_amount ? Math.round(Number(couponForm.min_order_amount) * 100) : 0,
         max_discount: couponForm.max_discount ? Math.round(Number(couponForm.max_discount) * 100) : null,
         usage_limit: couponForm.usage_limit ? Number(couponForm.usage_limit) : null,
+        free_shipping: couponForm.free_shipping,
+        free_cod: couponForm.free_cod,
+        free_handling: couponForm.free_handling,
         is_active: couponForm.is_active,
       }),
     })
@@ -305,6 +311,9 @@ export default function AdminPage() {
       min_order_amount: '',
       max_discount: '',
       usage_limit: '',
+      free_shipping: false,
+      free_cod: false,
+      free_handling: false,
       is_active: true,
     })
     setCouponMessage('Coupon created successfully.')
@@ -779,6 +788,38 @@ export default function AdminPage() {
                   <label className="text-xs text-ink-3 block mb-1.5">Usage Limit</label>
                   <input value={couponForm.usage_limit} onChange={e => setCouponForm(prev => ({ ...prev, usage_limit: e.target.value }))} className="input" inputMode="numeric" placeholder="100" />
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-ink-3 block mb-2">Additional Fee Removals</label>
+                  <div className="space-y-2 border border-ivory-3 rounded-lg p-3 bg-ivory-2">
+                    <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={couponForm.free_shipping}
+                        onChange={e => setCouponForm(prev => ({ ...prev, free_shipping: e.target.checked }))}
+                        className="h-4 w-4 accent-[var(--green)]"
+                      />
+                      Remove Delivery Charges (Free Delivery)
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={couponForm.free_cod}
+                        onChange={e => setCouponForm(prev => ({ ...prev, free_cod: e.target.checked }))}
+                        className="h-4 w-4 accent-[var(--green)]"
+                      />
+                      Remove COD Charges (Free COD)
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={couponForm.free_handling}
+                        onChange={e => setCouponForm(prev => ({ ...prev, free_handling: e.target.checked }))}
+                        className="h-4 w-4 accent-[var(--green)]"
+                      />
+                      Remove Handling Fee (Free Handling)
+                    </label>
+                  </div>
+                </div>
                 <label className="flex items-center gap-3 text-sm text-ink cursor-pointer">
                   <input type="checkbox" checked={couponForm.is_active} onChange={e => setCouponForm(prev => ({ ...prev, is_active: e.target.checked }))} className="h-4 w-4 accent-[var(--green)]" />
                   Active coupon
@@ -813,7 +854,12 @@ export default function AdminPage() {
                           {coupon.commission_rate != null && <div className="text-xs text-ink-4">{coupon.commission_rate}% commission</div>}
                         </td>
                         <td className="px-4 py-3 text-ink-3">
-                          {coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : formatPrice(coupon.discount_value)}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : formatPrice(coupon.discount_value)}</span>
+                            {coupon.free_shipping && <span className="text-[0.65rem] px-1.5 py-0.5 rounded bg-green-6 text-green-2 border border-green-5">Free Delivery</span>}
+                            {coupon.free_cod && <span className="text-[0.65rem] px-1.5 py-0.5 rounded bg-green-6 text-green-2 border border-green-5">Free COD</span>}
+                            {coupon.free_handling && <span className="text-[0.65rem] px-1.5 py-0.5 rounded bg-green-6 text-green-2 border border-green-5">Free Handling</span>}
+                          </div>
                           {(coupon.min_order_amount || coupon.max_discount || coupon.usage_limit) ? (
                             <div className="text-xs text-ink-4 mt-1">
                               {coupon.min_order_amount ? `Min ${formatPrice(coupon.min_order_amount)}` : 'No min'}

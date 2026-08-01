@@ -25,6 +25,9 @@ type CouponState = {
   code: string
   discountAmount: number
   valid: boolean
+  free_shipping?: boolean
+  free_cod?: boolean
+  free_handling?: boolean
 }
 
 type CustomerType = 'new' | 'returning' | null
@@ -150,10 +153,13 @@ export default function CheckoutPage() {
     () => cartItems.reduce((sum, item) => sum + Number(item.weight_grams || 0) * Number(item.quantity || 1), 0) || 500,
     [cartItems]
   )
-  const shipping = shippingCost(subtotal, form.city)
+  const rawShipping = shippingCost(subtotal, form.city)
+  const shipping = couponState.free_shipping ? 0 : rawShipping
   const discount = couponState.discountAmount
-  const codCharge = paymentMethod === 'cod' ? COD_CHARGE : 0
-  const smallOrderFee = subtotal < 50000 ? SMALL_ORDER_FEE : 0
+  const rawCodCharge = paymentMethod === 'cod' ? COD_CHARGE : 0
+  const codCharge = couponState.free_cod ? 0 : rawCodCharge
+  const rawSmallOrderFee = subtotal < 50000 ? SMALL_ORDER_FEE : 0
+  const smallOrderFee = couponState.free_handling ? 0 : rawSmallOrderFee
   const walletApplied = (useCashback && siteSettings.enable_cashback_spending) ? Math.min(walletBalance, Math.max(0, subtotal - discount)) : 0
   const orderTotal = Math.max(0, subtotal + shipping + codCharge + smallOrderFee - discount - walletApplied)
   const cashbackPreview = siteSettings.enable_cashback_earning ? Math.round((orderTotal * 5) / 100) : 0
@@ -278,12 +284,15 @@ export default function CheckoutPage() {
         code: data.coupon.code,
         discountAmount: data.discount_amount || 0,
         valid: true,
+        free_shipping: Boolean(data.free_shipping || data.coupon?.free_shipping),
+        free_cod: Boolean(data.free_cod || data.coupon?.free_cod),
+        free_handling: Boolean(data.free_handling || data.coupon?.free_handling),
       })
       if (data.customer_type) setCustomerType(data.customer_type)
       showToast(`Coupon ${data.coupon.code} applied`)
       return true
     } catch (err: any) {
-      setCouponState({ code: '', discountAmount: 0, valid: false })
+      setCouponState({ code: '', discountAmount: 0, valid: false, free_shipping: false, free_cod: false, free_handling: false })
       showToast(err.message || 'Invalid coupon')
       return false
     } finally {
@@ -422,7 +431,7 @@ export default function CheckoutPage() {
 
   const clearCoupon = () => {
     setCouponInput('')
-    setCouponState({ code: '', discountAmount: 0, valid: false })
+    setCouponState({ code: '', discountAmount: 0, valid: false, free_shipping: false, free_cod: false, free_handling: false })
   }
 
   const loadRazorpay = () => new Promise<boolean>(resolve => {
@@ -767,12 +776,21 @@ export default function CheckoutPage() {
                   </button>
                 </div>
               ) : (
-                <div className="mt-2 flex items-center justify-between rounded-lg border border-green-5 bg-green-6 px-3 py-2 text-sm text-green-2">
-                  <div>
-                    <span className="font-medium">{couponState.code} applied.</span>
-                    <span className="ml-1">You saved {formatPrice(couponState.discountAmount)}.</span>
+                <div className="mt-2 flex flex-col gap-1 rounded-lg border border-green-5 bg-green-6 px-3 py-2 text-sm text-green-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">{couponState.code} applied.</span>
+                      {discount > 0 && <span className="ml-1">You saved {formatPrice(couponState.discountAmount)}.</span>}
+                    </div>
+                    <button type="button" onClick={clearCoupon} className="text-xs underline bg-transparent border-none cursor-pointer text-green-3 hover:text-green">Remove</button>
                   </div>
-                  <button type="button" onClick={clearCoupon} className="text-xs underline bg-transparent border-none cursor-pointer text-green-3 hover:text-green">Remove</button>
+                  {(couponState.free_shipping || couponState.free_cod || couponState.free_handling) && (
+                    <div className="flex gap-1.5 flex-wrap mt-1">
+                      {couponState.free_shipping && <span className="text-xs bg-green text-ivory px-2 py-0.5 rounded-full font-medium">Free Delivery</span>}
+                      {couponState.free_cod && <span className="text-xs bg-green text-ivory px-2 py-0.5 rounded-full font-medium">Free COD</span>}
+                      {couponState.free_handling && <span className="text-xs bg-green text-ivory px-2 py-0.5 rounded-full font-medium">Free Handling</span>}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -913,16 +931,18 @@ export default function CheckoutPage() {
             )}
             <div className="flex justify-between text-sm text-ink-3">
               <span>Shipping</span>
-              <span>{shipping === 0 ? <span className="text-green-3">Free</span> : formatPrice(shipping)}</span>
+              <span>{shipping === 0 ? <span className="text-green-3 font-medium">{couponState.free_shipping ? 'FREE (Coupon)' : 'Free'}</span> : formatPrice(shipping)}</span>
             </div>
-            {codCharge > 0 && (
+            {(codCharge > 0 || (paymentMethod === 'cod' && couponState.free_cod)) && (
               <div className="flex justify-between text-sm text-ink-3">
-                <span>COD Charge</span><span>{formatPrice(codCharge)}</span>
+                <span>COD Charge</span>
+                <span>{couponState.free_cod ? <span className="text-green-3 font-medium flex items-center gap-1"><span className="line-through text-ink-4 text-xs">₹29</span> FREE</span> : formatPrice(codCharge)}</span>
               </div>
             )}
-            {smallOrderFee > 0 && (
+            {(smallOrderFee > 0 || (subtotal < 50000 && couponState.free_handling)) && (
               <div className="flex justify-between text-sm text-ink-3">
-                <span>Handling Fee</span><span>{formatPrice(smallOrderFee)}</span>
+                <span>Handling Fee</span>
+                <span>{couponState.free_handling ? <span className="text-green-3 font-medium flex items-center gap-1"><span className="line-through text-ink-4 text-xs">₹19</span> FREE</span> : formatPrice(smallOrderFee)}</span>
               </div>
             )}
             <div className="flex justify-between font-medium text-ink border-t border-ivory-3 pt-2 mt-1">

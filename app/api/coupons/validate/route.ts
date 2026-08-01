@@ -47,6 +47,9 @@ export async function POST(req: Request) {
         total_revenue: 0,
         total_discount_given: 0,
         is_active: true,
+        free_shipping: false,
+        free_cod: false,
+        free_handling: false,
       }
 
       const discountAmount = getAppliedCouponDiscount(subtotal, loyaltyCoupon)
@@ -55,13 +58,15 @@ export async function POST(req: Request) {
         coupon: loyaltyCoupon,
         discount_amount: discountAmount,
         final_subtotal: subtotal - discountAmount,
+        free_shipping: false,
+        free_cod: false,
+        free_handling: false,
         customer_type: 'returning',
       })
     }
 
     const coupon = await getCouponByCode(supabaseAdmin, normalizedCode)
     if (!coupon) return NextResponse.json({ error: 'Invalid or inactive coupon code.' }, { status: 404 })
-
 
     const ruleError = validateCouponRules(subtotal, coupon)
     if (ruleError) return NextResponse.json({ error: ruleError }, { status: 400 })
@@ -72,6 +77,9 @@ export async function POST(req: Request) {
       coupon,
       discount_amount: discountAmount,
       final_subtotal: subtotal - discountAmount,
+      free_shipping: Boolean(coupon.free_shipping),
+      free_cod: Boolean(coupon.free_cod),
+      free_handling: Boolean(coupon.free_handling),
       customer_type: orderCount > 0 ? 'returning' : 'new',
     })
   } catch (err: any) {

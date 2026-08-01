@@ -152,6 +152,9 @@ create table if not exists coupons (
   total_revenue bigint default 0,
   total_discount_given bigint default 0,
   is_active boolean default true,
+  free_shipping boolean default false,
+  free_cod boolean default false,
+  free_handling boolean default false,
   created_at timestamptz default now()
 );
 

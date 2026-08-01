@@ -17,6 +17,9 @@ export type CouponRecord = {
   total_revenue: number
   total_discount_given: number
   is_active: boolean
+  free_shipping?: boolean
+  free_cod?: boolean
+  free_handling?: boolean
 }
 
 export type WalletRecord = {
