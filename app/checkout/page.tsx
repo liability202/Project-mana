@@ -70,6 +70,7 @@ export default function CheckoutPage() {
   const [shippingCheckLoading, setShippingCheckLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online')
   const [siteSettings, setSiteSettings] = useState({ enable_cashback_earning: true, enable_cashback_spending: true })
+  const [pincodeLoading, setPincodeLoading] = useState(false)
 
   useEffect(() => {
     fetch(`/api/settings?t=${Date.now()}`, { cache: 'no-store' }).then(res => res.json()).then(data => setSiteSettings(data)).catch(() => {})
@@ -121,6 +122,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (form.pincode.length === 6) {
+      setPincodeLoading(true)
       fetch(`https://api.postalpincode.in/pincode/${form.pincode}`)
         .then(res => res.json())
         .then(data => {
@@ -129,13 +131,16 @@ export default function CheckoutPage() {
             if (postOffice) {
               setForm(prev => ({
                 ...prev,
-                city: prev.city || postOffice.District || postOffice.Region || '',
-                state: prev.state || postOffice.State || ''
+                city: postOffice.District || postOffice.Region || prev.city || '',
+                state: postOffice.State || prev.state || ''
               }))
             }
           }
         })
         .catch(() => {})
+        .finally(() => setPincodeLoading(false))
+    } else {
+      setPincodeLoading(false)
     }
   }, [form.pincode])
 
@@ -693,11 +698,35 @@ export default function CheckoutPage() {
             </div>
             <div>
               <label className="text-xs text-ink-3 block mb-1.5">City *</label>
-              <input name="city" value={form.city} onChange={handleChange} placeholder="City" className="input" />
+              <div className="relative">
+                <input
+                  name="city"
+                  value={form.city}
+                  onChange={handleChange}
+                  placeholder={pincodeLoading ? 'Fetching...' : 'City'}
+                  className={`input pr-16 ${pincodeLoading ? 'opacity-60' : ''}`}
+                  readOnly={pincodeLoading}
+                />
+                {pincodeLoading && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.65rem] text-ink-4 font-medium animate-pulse">Fetching...</span>
+                )}
+              </div>
             </div>
             <div>
               <label className="text-xs text-ink-3 block mb-1.5">State</label>
-              <input name="state" value={form.state} onChange={handleChange} placeholder="State" className="input" />
+              <div className="relative">
+                <input
+                  name="state"
+                  value={form.state}
+                  onChange={handleChange}
+                  placeholder={pincodeLoading ? 'Fetching...' : 'State'}
+                  className={`input pr-16 ${pincodeLoading ? 'opacity-60' : ''}`}
+                  readOnly={pincodeLoading}
+                />
+                {pincodeLoading && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.65rem] text-ink-4 font-medium animate-pulse">Fetching...</span>
+                )}
+              </div>
             </div>
             <div>
               <label className="text-xs text-ink-3 block mb-1.5">Pincode *</label>

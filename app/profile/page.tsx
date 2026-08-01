@@ -75,17 +75,21 @@ function TrackingDetails({ order, formatDate }: { order: any; formatDate: (value
 
   return (
     <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2">
+      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2 min-w-0 overflow-hidden">
         <div className="text-[.62rem] tracking-widest uppercase text-ink-4">Courier</div>
-        <div className="text-sm text-ink mt-1">{order.courier_name || (order.status === 'shipped' ? 'Assigned soon' : 'After dispatch')}</div>
+        <div className="text-sm text-ink mt-1 truncate" title={order.courier_name || ''}>
+          {order.courier_name || (order.status === 'shipped' ? 'Assigned soon' : 'After dispatch')}
+        </div>
       </div>
-      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2">
+      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2 min-w-0 overflow-hidden">
         <div className="text-[.62rem] tracking-widest uppercase text-ink-4">Tracking No.</div>
-        <div className="text-sm text-ink mt-1">{order.tracking_number || 'Not available yet'}</div>
+        <div className="text-sm font-mono text-ink mt-1 truncate select-all" title={order.tracking_number || ''}>
+          {order.tracking_number || 'Not available yet'}
+        </div>
       </div>
-      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2">
+      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2 min-w-0 overflow-hidden">
         <div className="text-[.62rem] tracking-widest uppercase text-ink-4">Expected Delivery</div>
-        <div className="text-sm text-ink mt-1">{expectedDelivery}</div>
+        <div className="text-sm text-ink mt-1 truncate">{expectedDelivery}</div>
       </div>
       {order.tracking_link && (
         <a href={order.tracking_link} target="_blank" rel="noopener noreferrer" className="sm:col-span-3 btn-outline text-center no-underline justify-center">

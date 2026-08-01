@@ -140,9 +140,9 @@ function TrackOrderContent() {
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-ivory-3 bg-ivory-2 px-3 py-3">
+    <div className="rounded-lg border border-ivory-3 bg-ivory-2 px-3 py-3 min-w-0 overflow-hidden">
       <div className="text-[.62rem] tracking-widest uppercase text-ink-4">{label}</div>
-      <div className="text-sm text-ink mt-1">{value}</div>
+      <div className="text-sm text-ink mt-1 truncate" title={value}>{value}</div>
     </div>
   )
 }
