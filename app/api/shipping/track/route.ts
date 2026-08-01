@@ -29,15 +29,18 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: error?.message || 'Order not found.' }, { status: 404 })
     }
 
-    if (!hasNimbusPostConfig() || !order.tracking_number) {
+    const customAwb = String(searchParams.get('awb') || '').trim()
+    const awbToTrack = customAwb || order.tracking_number
+
+    if (!hasNimbusPostConfig() || !awbToTrack) {
       return NextResponse.json({ order, refreshed: false })
     }
 
-    const tracking = await trackNimbusAwb(order.tracking_number).catch(() => null)
+    const tracking = await trackNimbusAwb(awbToTrack).catch(() => null)
     if (!tracking) return NextResponse.json({ order, refreshed: false })
 
     const update = {
-      tracking_number: order.tracking_number,
+      tracking_number: awbToTrack,
       tracking_link: order.tracking_link || getPublicTrackingUrl(order.order_ref || order.id.slice(0, 8).toUpperCase(), order.customer_phone),
       courier_name: tracking.courierName || order.courier_name || null,
       expected_delivery: tracking.expectedDelivery || order.expected_delivery || null,

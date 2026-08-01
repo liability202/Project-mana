@@ -182,15 +182,20 @@ export default function AdminPage() {
     }
   }
 
-  const refreshNimbusTracking = async (id: string) => {
+  const refreshNimbusTracking = async (id: string, awb?: string) => {
     const secret = localStorage.getItem('mana_admin') || ''
-    const res = await fetch(`/api/shipping/track?orderId=${id}`, {
+    const url = awb
+      ? `/api/shipping/track?orderId=${id}&awb=${encodeURIComponent(awb)}`
+      : `/api/shipping/track?orderId=${id}`
+    const res = await fetch(url, {
       headers: { authorization: `Bearer ${secret}` },
     })
     const data = await res.json()
     if (res.ok && data?.order) {
       setOrders(prev => prev.map(order => order.id === id ? data.order : order))
+      return data.order
     }
+    return null
   }
 
   const openShipOrder = (order: Order) => {
@@ -1242,13 +1247,47 @@ on conflict (key) do nothing;`}</pre>
                 />
               </div>
               <div>
-                <label className="text-xs text-ink-3 block mb-1.5">Tracking Number (AWB)</label>
-                <input
-                  value={trackingForm.tracking_number}
-                  onChange={e => setTrackingForm(prev => prev ? { ...prev, tracking_number: e.target.value } : prev)}
-                  className="input"
-                  placeholder="e.g. 1234567890"
-                />
+                <label className="text-xs text-ink-3 block mb-1.5">Tracking Number (AWB / Nimbus ID)</label>
+                <div className="flex gap-2">
+                  <input
+                    value={trackingForm.tracking_number}
+                    onChange={e => setTrackingForm(prev => prev ? { ...prev, tracking_number: e.target.value } : prev)}
+                    className="input flex-1"
+                    placeholder="e.g. NMBP1001266029"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!trackingForm.tracking_number.trim()) {
+                        alert('Please enter an AWB / Tracking Number first.')
+                        return
+                      }
+                      setShipLoading(true)
+                      try {
+                        const updatedOrder = await refreshNimbusTracking(trackingForm.id, trackingForm.tracking_number.trim())
+                        if (updatedOrder) {
+                          setTrackingForm({
+                            id: updatedOrder.id,
+                            orderRef: updatedOrder.order_ref || updatedOrder.id.slice(0, 8).toUpperCase(),
+                            courier_name: updatedOrder.courier_name || '',
+                            tracking_number: updatedOrder.tracking_number || '',
+                            tracking_link: updatedOrder.tracking_link || '',
+                            expected_delivery: updatedOrder.expected_delivery ? new Date(updatedOrder.expected_delivery).toISOString().split('T')[0] : '',
+                          })
+                        } else {
+                          alert('Could not fetch details for this AWB from NimbusPost.')
+                        }
+                      } finally {
+                        setShipLoading(false)
+                      }
+                    }}
+                    disabled={shipLoading}
+                    className="btn-primary text-xs px-3 py-2 whitespace-nowrap"
+                  >
+                    Fetch Info
+                  </button>
+                </div>
+                <span className="text-[0.7rem] text-ink-4 mt-1 block">Enter AWB & click Fetch Info to auto-fill courier & delivery date from NimbusPost.</span>
               </div>
               <div>
                 <label className="text-xs text-ink-3 block mb-1.5">Tracking Link</label>
