@@ -16,6 +16,19 @@ export async function GET(req: Request) {
   return NextResponse.json(data)
 }
 
+// Optional columns that may not exist yet in older DB schemas.
+// If an insert fails citing a missing column, we strip it and retry.
+const OPTIONAL_COLUMNS = [
+  'influencer_name',
+  'commission_rate',
+  'min_order_amount',
+  'max_discount',
+  'usage_limit',
+  'free_shipping',
+  'free_cod',
+  'free_handling',
+]
+
 export async function POST(req: Request) {
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
@@ -47,15 +60,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Discount value must be greater than 0.' }, { status: 400 })
     }
 
-    let { data, error } = await supabaseAdmin.from('coupons').insert(payload).select('*').single()
-    
-    if (error && (error.message.includes('free_shipping') || error.message.includes('free_cod') || error.message.includes('free_handling') || error.message.includes('schema cache'))) {
-      delete payload.free_shipping
-      delete payload.free_cod
-      delete payload.free_handling
-      const retry = await supabaseAdmin.from('coupons').insert(payload).select('*').single()
-      data = retry.data
-      error = retry.error
+    // Try inserting. If a column is missing from the schema cache, strip it and retry.
+    let currentPayload = { ...payload }
+    let data: any = null
+    let error: any = null
+    let attempts = 0
+
+    while (attempts < OPTIONAL_COLUMNS.length + 1) {
+      const result = await supabaseAdmin.from('coupons').insert(currentPayload).select('*').single()
+      data = result.data
+      error = result.error
+
+      if (!error) break
+
+      const isSchemaError =
+        error.message.includes('schema cache') ||
+        error.message.includes('column') ||
+        error.message.includes('does not exist') ||
+        error.code === 'PGRST204'
+
+      if (!isSchemaError) break
+
+      // Find which optional column is mentioned in the error and remove it
+      const culprit = OPTIONAL_COLUMNS.find(col => error.message.includes(col))
+      if (!culprit) break
+
+      delete currentPayload[culprit]
+      attempts++
     }
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -1,4 +1,15 @@
--- Add free_shipping, free_cod, and free_handling columns to coupons table
+-- Run this in your Supabase SQL Editor to add all missing columns to the coupons table
+
+alter table public.coupons add column if not exists influencer_name text;
+alter table public.coupons add column if not exists commission_rate numeric(5,2);
+alter table public.coupons add column if not exists min_order_amount integer default 0;
+alter table public.coupons add column if not exists max_discount integer;
+alter table public.coupons add column if not exists usage_limit integer;
+alter table public.coupons add column if not exists usage_count integer default 0;
+alter table public.coupons add column if not exists total_orders integer default 0;
+alter table public.coupons add column if not exists total_revenue bigint default 0;
+alter table public.coupons add column if not exists total_discount_given bigint default 0;
 alter table public.coupons add column if not exists free_shipping boolean default false;
 alter table public.coupons add column if not exists free_cod boolean default false;
 alter table public.coupons add column if not exists free_handling boolean default false;
+alter table public.coupons add column if not exists is_active boolean default true;
