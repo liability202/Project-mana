@@ -1382,9 +1382,19 @@ on conflict (key) do nothing;`}</pre>
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mana.in'
         const orderRef = order.order_ref || order.id.slice(0, 8).toUpperCase()
         const items: any[] = Array.isArray(order.items) ? order.items : []
+
+        // Resolve slug: use stored slug → lookup in products list → generate from name
+        const resolveSlug = (item: any): string => {
+          if (item.product_slug) return item.product_slug
+          const found = products.find((p: any) => p.id === item.product_id)
+          if (found?.slug) return found.slug
+          // Fallback: generate slug from product name
+          return (item.product_name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+        }
+
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl relative animate-scale-in">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl relative animate-scale-in max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h3 className="font-serif text-xl text-ink">Send Review Links</h3>
@@ -1396,8 +1406,9 @@ on conflict (key) do nothing;`}</pre>
               <p className="text-xs text-ink-4 mb-4">Share a direct link to the review form for each product. The customer can write their review after verifying their number.</p>
 
               <div className="space-y-3">
-                {items.filter(item => item.product_slug).map((item: any, i: number) => {
-                  const reviewUrl = `${siteUrl}/products/${item.product_slug}#reviews`
+                {items.map((item: any, i: number) => {
+                  const slug = resolveSlug(item)
+                  const reviewUrl = `${siteUrl}/products/${slug}#reviews`
                   const whatsappText = encodeURIComponent(
                     `Hi ${order.customer_name?.split(' ')[0] || 'there'}! 🌿\n\nThank you for your order #${orderRef}.\n\nWe'd love to hear what you think about *${item.product_name}*. Your review helps other customers make better choices!\n\n👉 Leave your review here:\n${reviewUrl}\n\nTake care,\nTeam MANA`
                   )
@@ -1431,8 +1442,8 @@ on conflict (key) do nothing;`}</pre>
                   )
                 })}
 
-                {items.filter(item => item.product_slug).length === 0 && (
-                  <div className="text-sm text-ink-3 text-center py-4">No products with review links found in this order.</div>
+                {items.length === 0 && (
+                  <div className="text-sm text-ink-3 text-center py-4">No items found in this order.</div>
                 )}
               </div>
 
