@@ -138,10 +138,17 @@ export default async function HomePage() {
       </section>
 
       {/* ── MARQUEE ── */}
-      <div className="bg-green py-2.5 overflow-hidden select-none">
-        <div className="flex w-max animate-marquee">
-          {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS, ...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((item, i) => (
-            <span key={i} className="text-[.68rem] tracking-[.18em] uppercase text-green-4 whitespace-nowrap px-7 flex items-center gap-2.5 font-light after:content-['✦'] after:text-[.52rem] after:text-green-3">
+      <div className="bg-green py-2.5 overflow-hidden select-none flex">
+        <div className="flex shrink-0 min-w-full justify-around items-center animate-marquee">
+          {MARQUEE_ITEMS.map((item, i) => (
+            <span key={i} className="text-[.68rem] tracking-[.18em] uppercase text-green-4 whitespace-nowrap px-6 flex items-center gap-2.5 font-light after:content-['✦'] after:text-[.52rem] after:text-green-3">
+              {item}
+            </span>
+          ))}
+        </div>
+        <div className="flex shrink-0 min-w-full justify-around items-center animate-marquee" aria-hidden="true">
+          {MARQUEE_ITEMS.map((item, i) => (
+            <span key={`dup-${i}`} className="text-[.68rem] tracking-[.18em] uppercase text-green-4 whitespace-nowrap px-6 flex items-center gap-2.5 font-light after:content-['✦'] after:text-[.52rem] after:text-green-3">
               {item}
             </span>
           ))}
