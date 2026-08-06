@@ -1412,7 +1412,7 @@ on conflict (key) do nothing;`}</pre>
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(reviewUrl)
-                            showToast('Review link copied!')
+                            alert('Review link copied to clipboard!')
                           }}
                           className="flex-1 text-xs px-3 py-2 rounded-lg border border-ivory-3 bg-white text-ink-2 hover:text-green hover:border-green-4 transition-all font-medium"
                         >
