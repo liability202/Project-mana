@@ -95,6 +95,7 @@ export default function AdminPage() {
     tracking_link: string
     expected_delivery: string
   } | null>(null)
+  const [reviewModal, setReviewModal] = useState<{ order: any } | null>(null)
   const [shipLoading, setShipLoading] = useState(false)
   const [creatorForm, setCreatorForm] = useState({
     name: '',
@@ -634,6 +635,14 @@ export default function AdminPage() {
                         Ship Order
                       </button>
                     )}
+                  <button
+                      onClick={() =>
+                        setReviewModal({ order })
+                      }
+                      className="text-xs px-3 py-1 rounded-md border transition-all cursor-pointer bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                    >
+                      ⭐ Review Link
+                    </button>
                     <button
                       onClick={() => setTrackingForm({
                         id: order.id,
@@ -1367,6 +1376,71 @@ on conflict (key) do nothing;`}</pre>
           </div>
         </div>
       )}
+      {/* Review Link Modal */}
+      {reviewModal && (() => {
+        const order = reviewModal.order
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mana.in'
+        const orderRef = order.order_ref || order.id.slice(0, 8).toUpperCase()
+        const items: any[] = Array.isArray(order.items) ? order.items : []
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl relative animate-scale-in">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="font-serif text-xl text-ink">Send Review Links</h3>
+                  <p className="text-sm text-ink-3">Order #{orderRef} · {order.customer_name}</p>
+                </div>
+                <button onClick={() => setReviewModal(null)} className="text-ink-4 hover:text-ink text-lg leading-none">×</button>
+              </div>
+
+              <p className="text-xs text-ink-4 mb-4">Share a direct link to the review form for each product. The customer can write their review after verifying their number.</p>
+
+              <div className="space-y-3">
+                {items.filter(item => item.product_slug).map((item: any, i: number) => {
+                  const reviewUrl = `${siteUrl}/products/${item.product_slug}#reviews`
+                  const whatsappText = encodeURIComponent(
+                    `Hi ${order.customer_name?.split(' ')[0] || 'there'}! 🌿\n\nThank you for your order #${orderRef}.\n\nWe'd love to hear what you think about *${item.product_name}*. Your review helps other customers make better choices!\n\n👉 Leave your review here:\n${reviewUrl}\n\nTake care,\nTeam MANA`
+                  )
+                  const whatsappLink = `https://wa.me/91${order.customer_phone}?text=${whatsappText}`
+
+                  return (
+                    <div key={i} className="border border-ivory-3 rounded-xl p-4 bg-ivory-2">
+                      <div className="text-sm font-medium text-ink mb-1 line-clamp-1">{item.product_name}</div>
+                      {item.variant_name && <div className="text-xs text-ink-4 mb-2">{item.variant_name}</div>}
+                      <div className="text-[0.7rem] text-ink-4 font-mono break-all mb-3 bg-white border border-ivory-3 rounded px-2 py-1.5">{reviewUrl}</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(reviewUrl)
+                            showToast('Review link copied!')
+                          }}
+                          className="flex-1 text-xs px-3 py-2 rounded-lg border border-ivory-3 bg-white text-ink-2 hover:text-green hover:border-green-4 transition-all font-medium"
+                        >
+                          📋 Copy Link
+                        </button>
+                        <a
+                          href={whatsappLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 text-xs px-3 py-2 rounded-lg bg-green text-ivory font-medium text-center hover:bg-green-2 transition-all no-underline"
+                        >
+                          💬 Send via WhatsApp
+                        </a>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {items.filter(item => item.product_slug).length === 0 && (
+                  <div className="text-sm text-ink-3 text-center py-4">No products with review links found in this order.</div>
+                )}
+              </div>
+
+              <button onClick={() => setReviewModal(null)} className="btn-outline w-full justify-center mt-5">Close</button>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

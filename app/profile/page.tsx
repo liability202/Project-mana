@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useCart } from '@/lib/store'
 import { formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
-import { Package, Wallet, Clock, ChevronRight } from 'lucide-react'
+import { Package, Wallet, Clock, ChevronRight, Star } from 'lucide-react'
+import Link from 'next/link'
 
 const ACCOUNT_PHONE_KEY = 'mana_account_phone'
 const ACCOUNT_COOKIE_KEY = 'mana_account_phone'
@@ -459,13 +460,22 @@ export default function ProfilePage() {
                           {/* Order Items */}
                           <div className="px-5 py-4 divide-y divide-ivory-3">
                             {order.items?.map((item: any, i: number) => (
-                              <div key={i} className="py-3 flex justify-between items-center gap-4 first:pt-0 last:pb-0">
-                                <div className="min-w-0">
+                              <div key={i} className="py-3 flex justify-between items-start gap-4 first:pt-0 last:pb-0">
+                                <div className="min-w-0 flex-1">
                                   <div className="text-sm font-medium text-ink line-clamp-1">{item.product_name}</div>
                                   <div className="text-xs text-ink-3 mt-0.5">
                                     {item.quantity} × {item.weight_grams >= 1000 ? (item.weight_grams / 1000).toFixed(1) + 'kg' : item.weight_grams + 'g'}
                                     {item.variant_name ? ` • ${item.variant_name}` : ''}
                                   </div>
+                                  {order.status === 'delivered' && item.product_slug && (
+                                    <Link
+                                      href={`/products/${item.product_slug}#reviews`}
+                                      className="inline-flex items-center gap-1 mt-2 text-[0.7rem] font-medium text-amber-600 hover:text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full transition-colors no-underline"
+                                    >
+                                      <Star size={10} fill="currentColor" />
+                                      Leave a Review
+                                    </Link>
+                                  )}
                                 </div>
                                 <div className="text-sm font-serif text-ink-2 whitespace-nowrap">
                                   {formatPrice(item.price * item.quantity)}
