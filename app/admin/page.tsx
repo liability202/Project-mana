@@ -1379,7 +1379,8 @@ on conflict (key) do nothing;`}</pre>
       {/* Review Link Modal */}
       {reviewModal && (() => {
         const order = reviewModal.order
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mana.in'
+        const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
+        const siteUrl = (rawUrl && !rawUrl.includes('localhost')) ? rawUrl : 'https://manadryfruits.com'
         const orderRef = order.order_ref || order.id.slice(0, 8).toUpperCase()
         const items: any[] = Array.isArray(order.items) ? order.items : []
 

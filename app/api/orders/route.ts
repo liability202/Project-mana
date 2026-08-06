@@ -502,7 +502,7 @@ export async function PUT(req: Request) {
 
           sendWhatsAppMessage(
             creator.phone,
-            `Congratulations! You've earned Rs. ${comm.commission_amount / 100} commission for order ${latestOrder.order_ref || latestOrder.id.slice(0, 8).toUpperCase()}.\n\nCheck your balance: mana.in/creator`
+            `Congratulations! You've earned Rs. ${comm.commission_amount / 100} commission for order ${latestOrder.order_ref || latestOrder.id.slice(0, 8).toUpperCase()}.\n\nCheck your balance: manadryfruits.com/creator`
           ).catch(console.error)
         }
       }

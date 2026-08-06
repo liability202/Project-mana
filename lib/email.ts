@@ -11,7 +11,8 @@ import { CashbackCreditedEmail } from '@/emails/CashbackCredited'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const fromEmail = process.env.RESEND_FROM_EMAIL || 'orders@yourdomain.com'
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
+const siteUrl = (rawSiteUrl && !rawSiteUrl.includes('localhost')) ? rawSiteUrl : 'https://manadryfruits.com'
 const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || ''
 
 function getWhatsappUrl(message: string) {

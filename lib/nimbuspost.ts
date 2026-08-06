@@ -19,7 +19,8 @@ import type { Order } from '@/lib/supabase'
 // NIMBUSPOST_TRACKING_PATH=/shipments/track/:awb
 
 const NIMBUSPOST_BASE_URL = (process.env.NIMBUSPOST_BASE_URL || 'https://api.nimbuspost.com/v1').replace(/\/+$/, '')
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
+const siteUrl = (rawSiteUrl && !rawSiteUrl.includes('localhost')) ? rawSiteUrl : 'https://manadryfruits.com'
 
 const PATHS = {
   auth: process.env.NIMBUSPOST_AUTH_PATH || '/users/login',
