@@ -52,12 +52,23 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   const [refCode, setRefCode] = useState('')
   const [refPct, setRefPct] = useState(10)
   const [isBuyNowOpen, setIsBuyNowOpen] = useState(false)
+  const [avgRating, setAvgRating] = useState<number | null>(null)
+  const [reviewCount, setReviewCount] = useState(0)
 
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
 
   const addItem = useCart(s => s.addItem)
   const cartItems = useCart(s => s.items)
+
+  // Auto-scroll to reviews section if URL has #reviews
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#reviews') {
+      setTimeout(() => {
+        document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 800)
+    }
+  }, [])
 
   useEffect(() => {
     supabase.from('products').select('*').eq('slug', params.slug).single()
@@ -67,6 +78,17 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
           setActiveVar(data.variants?.[0] || null)
           setGrams(getDefaultWeight(data.category))
           setCustomWeight(false)
+          // Fetch real review average
+          fetch(`/api/reviews?slug=${data.slug}`)
+            .then(r => r.json())
+            .then((reviews: any[]) => {
+              if (Array.isArray(reviews) && reviews.length > 0) {
+                const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+                setAvgRating(Math.round(avg * 10) / 10)
+                setReviewCount(reviews.length)
+              }
+            })
+            .catch(() => {})
         }
         setLoading(false)
       })
@@ -287,11 +309,22 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
           {product.vendor && <div className="text-[.6rem] tracking-[.18em] uppercase text-ink-4 mb-2">{product.vendor}</div>}
           <h1 className="font-serif text-[clamp(1.8rem,3vw,2.6rem)] text-ink font-light leading-tight mb-2 tracking-tight">{product.name}</h1>
 
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-terra text-base">★★★★★</span>
-            <span className="text-sm font-medium text-ink">4.9</span>
-            <span className="text-sm text-green-3 underline cursor-pointer">See reviews</span>
-          </div>
+          {avgRating !== null && reviewCount > 0 && (
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-terra text-base">
+                {[1,2,3,4,5].map(s => (
+                  <span key={s} className={s <= Math.round(avgRating) ? 'text-terra' : 'text-ivory-4'}>★</span>
+                ))}
+              </span>
+              <span className="text-sm font-medium text-ink">{avgRating.toFixed(1)}</span>
+              <span
+                className="text-sm text-green-3 underline cursor-pointer"
+                onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              >
+                {reviewCount} review{reviewCount !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
 
           <p className="text-[.88rem] text-ink-3 leading-[1.85] mb-5 pb-5 border-b border-ivory-3">{product.description}</p>
 
@@ -545,7 +578,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
         currentSlug={product.slug} 
       />
 
-      <div className="px-[5%] pb-14 max-w-[1400px] mx-auto mt-8">
+      <div id="reviews" className="px-[5%] pb-14 max-w-[1400px] mx-auto mt-8 scroll-mt-20">
         <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_.9fr] gap-8 items-start">
           <ReviewList productSlug={product.slug} />
           {reviewCheckLoading ? (
