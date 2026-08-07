@@ -244,7 +244,8 @@ export async function POST(req: Request) {
       })
     }
 
-    if (coupon && coupon.id !== 'loyal12') {
+    // Only update real coupons table rows — skip 'loyal12' (virtual) and creator-* (virtual IDs from creators table)
+    if (coupon && coupon.id !== 'loyal12' && !String(coupon.id).startsWith('creator-')) {
       const { error: couponUpdateError } = await supabaseAdmin
         .from('coupons')
         .update({

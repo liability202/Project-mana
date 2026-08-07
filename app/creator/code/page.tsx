@@ -7,8 +7,22 @@ export default function CreatorCodePage() {
 
   useEffect(() => {
     const creatorStr = sessionStorage.getItem('mana_creator')
-    if (creatorStr) {
-      setCreator(JSON.parse(creatorStr))
+    if (!creatorStr) return
+    const cached = JSON.parse(creatorStr)
+    setCreator(cached) // show cached first for instant render
+
+    // Then fetch fresh data from the API so edited codes are reflected immediately
+    if (cached?.id) {
+      fetch(`/api/creator/profile?id=${cached.id}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(fresh => {
+          if (fresh && !fresh.error) {
+            const updated = { ...cached, ...fresh }
+            setCreator(updated)
+            sessionStorage.setItem('mana_creator', JSON.stringify(updated))
+          }
+        })
+        .catch(() => {/* keep cached */})
     }
   }, [])
 

@@ -29,11 +29,22 @@ export default function CreatorDashboard() {
 
   useEffect(() => {
     const creatorStr = sessionStorage.getItem('mana_creator')
-    if (creatorStr) {
-      const c = JSON.parse(creatorStr)
-      setCreator(c)
-      fetchStats(c.id)
-    }
+    if (!creatorStr) return
+    const c = JSON.parse(creatorStr)
+    setCreator(c)
+    fetchStats(c.id)
+
+    // Refresh creator data in case admin edited the code
+    fetch(`/api/creator/profile?id=${c.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(fresh => {
+        if (fresh && !fresh.error) {
+          const updated = { ...c, ...fresh }
+          setCreator(updated)
+          sessionStorage.setItem('mana_creator', JSON.stringify(updated))
+        }
+      })
+      .catch(() => {/* keep cached */})
   }, [])
 
   const fetchStats = async (id: string) => {
