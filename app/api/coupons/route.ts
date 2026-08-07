@@ -68,7 +68,43 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json(enriched)
+  // ── Enrich with real order stats ──────────────────────────────────────────
+  // Fetch all orders that have a coupon_code so we can show accurate totals
+  // in the admin panel (covers both DB coupons and creator codes).
+  const { data: orderRows } = await supabaseAdmin
+    .from('orders')
+    .select('coupon_code, final_amount, discount_amount, discount')
+    .not('coupon_code', 'is', null)
+
+  // Build a map: UPPER(coupon_code) → aggregated stats
+  const orderStats = new Map<string, { total_orders: number; total_revenue: number; total_discount_given: number }>()
+  for (const row of (orderRows || [])) {
+    const code = String(row.coupon_code || '').toUpperCase()
+    if (!code) continue
+    const existing = orderStats.get(code) || { total_orders: 0, total_revenue: 0, total_discount_given: 0 }
+    existing.total_orders += 1
+    existing.total_revenue += row.final_amount || 0
+    existing.total_discount_given += row.discount_amount || row.discount || 0
+    orderStats.set(code, existing)
+  }
+
+  // Merge real order stats into every coupon entry.
+  // The DB column value takes priority when already populated (> 0);
+  // otherwise fall back to the order-derived value.
+  const final = enriched.map((c: any) => {
+    const code = String(c.code || '').toUpperCase()
+    const real = orderStats.get(code)
+    if (!real) return c
+    return {
+      ...c,
+      total_orders:        (c.total_orders || 0)        > 0 ? c.total_orders        : real.total_orders,
+      usage_count:         (c.usage_count || 0)          > 0 ? c.usage_count          : real.total_orders,
+      total_revenue:       (c.total_revenue || 0)        > 0 ? c.total_revenue        : real.total_revenue,
+      total_discount_given: (c.total_discount_given || 0) > 0 ? c.total_discount_given : real.total_discount_given,
+    }
+  })
+
+  return NextResponse.json(final)
 }
 
 // Optional columns that may not exist yet in older DB schemas.
