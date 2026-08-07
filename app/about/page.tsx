@@ -1,5 +1,12 @@
+import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'About Mana Dry Fruits – Our Story, Sourcing & Standards',
+  description: 'Meet MK and Sons, the family behind Mana Dry Fruits. Direct sourcing of Kashmiri saffron, Mamra almonds and Himalayan herbs, lab tested and packed fresh to order.',
+  alternates: { canonical: '/about' },
+}
 
 export default function AboutPage() {
   return (

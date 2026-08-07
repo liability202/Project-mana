@@ -13,6 +13,12 @@ export function ProductCard({ product }: { product: Product }) {
   const basePrice = firstVariant?.price || product.price
   const baseWeight = parseBaseWeightGrams(product.price_per_unit)
 
+  // Kits are shot in landscape (1.25–1.5) because they line up five packets in
+  // a row; single products are shot portrait (mostly 4:5). Forcing both into
+  // one frame either letterboxes the kits or beheads the products, so the
+  // image area follows the category.
+  const isKit = product.category === 'kits'
+
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault()
     addItem({
@@ -34,18 +40,40 @@ export function ProductCard({ product }: { product: Product }) {
       href={`/products/${product.slug}`}
       className="card flex flex-col no-underline group"
     >
-      {/* Image */}
-      <div className="aspect-[4/5] overflow-hidden relative bg-ivory-2">
+      {/* Image
+          Both frames fill edge-to-edge with `object-cover` — no letterboxing.
+          The frame ratio is picked per category to match how each set was shot,
+          so the crop stays on backdrop rather than on product:
+
+          • Products → 4:5. 29 of 53 product shots are already exactly 4:5 and
+            crop by nothing at all. The 2:3 shots lose 17% split across top and
+            bottom, and the square ones 20% across the sides — in both cases
+            that is the empty backdrop around a centred packet.
+          • Kits → 9:8. They are shot landscape (~3:2) to fit five packets in a
+            row, so a portrait frame left half the card empty. 9:8 gives the
+            card a bit more height (0.89x the width rather than 0.8x) at the
+            cost of trimming ~25% off the sides — the point where the crop
+            starts approaching the outer packets, so don't push it squarer.
+
+          `photo-well` stays as the backdrop: it matches the measured average
+          photo background (#140A04), so it covers the frame cleanly while an
+          image is still loading instead of flashing a pale box. */}
+      <div className={`photo-well overflow-hidden relative ${isKit ? 'aspect-[9/8]' : 'aspect-[4/5]'}`}>
         {product.images?.[0] ? (
           <Image
             src={product.images[0]}
             alt={product.name}
             fill
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            // Framed slightly above centre. These packets are shot standing on
+            // a slab with the product filling the upper two thirds, so a dead-
+            // centre crop clipped the top of the pouch on the tighter shots.
+            // Only affects the portrait sources — the square and landscape ones
+            // crop horizontally, where this has no effect.
+            className="object-cover object-[50%_35%] group-hover:scale-105 transition-transform duration-500"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
         ) : (
-          <div className="w-full h-full bg-ivory-2 flex items-center justify-center text-ink-4 text-xs">No image</div>
+          <div className="w-full h-full flex items-center justify-center text-ink-4 text-xs">No image</div>
         )}
 
         {/* Badges */}

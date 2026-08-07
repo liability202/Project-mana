@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { commissionableAmount, estimateCommission } from '@/lib/commissions'
 
 export async function GET(req: Request) {
   try {
@@ -70,11 +71,9 @@ export async function GET(req: Request) {
         id: `order-${o.id}`,
         creator_id: creatorId,
         order_id: o.id,
-        order_total: o.subtotal || o.total || o.final_amount || 0,
+        order_total: commissionableAmount(o),
         commission_pct: commissionPct,
-        commission_amount: Math.round(
-          ((o.subtotal || o.total || o.final_amount || 0) * commissionPct) / 100
-        ),
+        commission_amount: estimateCommission(commissionableAmount(o), commissionPct),
         status: o.status === 'cancelled' ? 'cancelled' : 'pending',
         created_at: o.created_at,
         orders: {

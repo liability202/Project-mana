@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Menu, Search, ShoppingBag, X, User } from 'lucide-react'
 import { useCart } from '@/lib/store'
 import { SearchOverlay } from '@/components/ui/SearchOverlay'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 const NAV_LINKS = [
   { label: 'Dry Fruits', href: '/products?category=dry-fruits' },
@@ -78,14 +79,7 @@ export function Navbar() {
             <Search size={19} />
           </button>
 
-          <a
-            href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=Hi%20Mana!%20I%20need%20help.`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden rounded-md border border-green-3 px-4 py-1.5 text-[.72rem] tracking-wide text-green transition-colors hover:bg-green-6 no-underline sm:block"
-          >
-            Chat & Buy
-          </a>
+          <ThemeToggle />
 
           <Link href="/profile" className="flex items-center justify-center p-1.5 text-ink-2 transition-colors hover:text-green" aria-label="My Account">
             <User size={19} />

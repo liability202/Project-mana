@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendCashbackCredited, sendOrderConfirmation, sendOrderShipped } from '@/lib/email'
 import { hasNimbusPostConfig, trackNimbusAwb } from '@/lib/nimbuspost'
+import { estimateCommission } from '@/lib/commissions'
 import { shippingCost } from '@/lib/utils'
 import {
   creditCashback,
@@ -262,7 +263,7 @@ export async function POST(req: Request) {
 
     if (creatorMatch && data) {
       const commPct = creatorMatch.commission_pct || 10
-      const commissionAmt = Math.round((body.subtotal * commPct) / 100)
+      const commissionAmt = estimateCommission(body.subtotal, commPct)
 
       await supabaseAdmin.from('commissions').insert({
         creator_id: creatorMatch.id,

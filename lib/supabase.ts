@@ -24,6 +24,8 @@ export type Order = {
   tracking_number?: string | null; tracking_link?: string | null
   courier_name?: string | null; expected_delivery?: string | null
   tracking_events?: any[] | null; tracking_synced_at?: string | null
+  invoice_url?: string | null; invoice_number?: string | null
+  invoice_uploaded_at?: string | null
   coupon_code?: string; discount_amount?: number; final_amount?: number
   wallet_used?: number; cashback_earned?: number
   status: string; payment_status: string
@@ -58,6 +60,11 @@ export type Coupon = {
   total_revenue: number
   total_discount_given: number
   total_commission?: number | null
+  // Commission breakdown mirroring the creator portal's ledger statuses.
+  commission_pending?: number | null
+  commission_confirmed?: number | null
+  commission_paid?: number | null
+  commission_source?: 'commissions' | 'orders_fallback'
   is_active: boolean
   free_shipping?: boolean
   free_cod?: boolean

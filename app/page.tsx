@@ -3,7 +3,10 @@ import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { ProductCard } from '@/components/product/ProductCard'
 import { NewsletterForm } from '@/components/NewsletterForm'
-import { formatPrice } from '@/lib/utils'
+import { TestimonialsCarousel, type Testimonial } from '@/components/home/TestimonialsCarousel'
+import { KitCard } from '@/components/home/KitCard'
+import { PackedFreshPromise } from '@/components/home/PackedFreshPromise'
+import { ChatAndBuy } from '@/components/home/ChatAndBuy'
 import type { Product } from '@/lib/supabase'
 
 export const revalidate = 60
@@ -47,7 +50,7 @@ const CATEGORIES = [
   { name: 'Pansari', slug: 'pansari', pill: 'Traditional', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/Pansari%20category.png', count: '62 varieties' },
 ]
 
-const TESTIMONIALS = [
+const TESTIMONIALS: Testimonial[] = [
   { stars: 5, text: 'The Mamra almonds are unlike anything I have bought before. Premium packaging keeps them fresh for weeks.', name: 'Sunita Rao', city: 'Mumbai' },
   { stars: 5, text: 'Video appointment felt like a real store visit. Expert showed every herb live before I ordered.', name: 'Vikram Patel', city: 'Ahmedabad' },
   { stars: 5, text: 'The Triphala kit is my holy grail. Consistent quality every single month.', name: 'Deepa Krishnan', city: 'Delhi' },
@@ -71,34 +74,30 @@ export default async function HomePage() {
   return (
     <>
       {/* ── HERO ── */}
-      <section className="relative flex items-center justify-center min-h-[85vh] px-[5%] py-20 overflow-hidden text-center">
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes kenburns {
-            0% { transform: scale(1); }
-            100% { transform: scale(1.15); }
-          }
-          .animate-kenburns {
-            animation: kenburns 30s ease-in-out infinite alternate;
-          }
-        `}} />
-
+      <section className="relative flex items-center justify-center min-h-[60vh] sm:min-h-[85vh] px-[5%] py-12 sm:py-20 overflow-hidden text-center">
         {/* Cinematic Background */}
         <div className="absolute inset-0 z-0 bg-ink">
           <Image
             src="https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/hero%20banner.png"
             alt="Premium Spices Background"
             fill
+            sizes="100vw"
+            quality={70}
             className="object-cover object-center opacity-80 animate-kenburns"
             priority
           />
-          {/* Elegant Dark Overlay ensuring text readability on all devices */}
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
+          {/* Elegant Dark Overlay ensuring text readability on all devices.
+              This used to carry `backdrop-blur-[2px]`, which forced the browser
+              to re-blur the entire viewport on every frame of the 30s Ken Burns
+              animation underneath — the main source of the scroll stutter.
+              A slightly stronger tint gives the same readability for free. */}
+          <div className="absolute inset-0 bg-black/55" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/40" />
         </div>
 
         {/* Content */}
-        <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col items-center mt-8">
-          <div className="flex items-center gap-3 text-[.65rem] tracking-[.4em] uppercase text-ivory/90 font-medium mb-6 animate-fade-up" style={{ animationDelay: '.1s', animationFillMode: 'both' }}>
+        <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col items-center mt-2 sm:mt-8">
+          <div className="flex items-center gap-2 text-[.55rem] sm:text-[.65rem] tracking-[.4em] uppercase text-ivory/90 font-medium mb-4 sm:mb-6 animate-fade-up" style={{ animationDelay: '.1s', animationFillMode: 'both' }}>
             <span className="w-8 h-px bg-ivory/60 block" />
             Pure · Natural · Handpicked
             <span className="w-8 h-px bg-ivory/60 block" />
@@ -109,28 +108,33 @@ export default async function HomePage() {
             of Nature.
           </h1>
 
-          <p className="text-[1.05rem] md:text-[1.2rem] leading-[1.8] text-ivory-3 max-w-[580px] mx-auto mb-10 animate-fade-up font-light" style={{ animationDelay: '.35s', animationFillMode: 'both' }}>
+          <p className="text-[.9rem] sm:text-[1.05rem] md:text-[1.2rem] leading-[1.7] text-ivory-3 max-w-[580px] mx-auto mb-6 sm:mb-10 animate-fade-up font-light" style={{ animationDelay: '.35s', animationFillMode: 'both' }}>
             Premium dry fruits, Ayurvedic herbs, hand-picked spices and pansari staples — sourced directly from the finest origins across World.
           </p>
 
-          <div className="flex gap-5 flex-col sm:flex-row justify-center w-full sm:w-auto animate-fade-up px-4 sm:px-0" style={{ animationDelay: '.5s', animationFillMode: 'both' }}>
-            <Link href="/products" className="btn-primary no-underline px-10 py-4 text-[.95rem] shadow-xl shadow-green/20 hover:shadow-green/40 hover:-translate-y-1 transition-all bg-green hover:bg-green-4 text-white border-none w-full sm:w-auto flex items-center justify-center">
-              <span>view collection</span>
+          <div className="flex gap-3 sm:gap-5 flex-col sm:flex-row justify-center w-full sm:w-auto animate-fade-up px-3 sm:px-0" style={{ animationDelay: '.5s', animationFillMode: 'both' }}>
+            {/* No drop shadow: a coloured glow over the photographic hero read
+                as a halo rather than elevation. Hover now lifts and deepens the
+                green instead. */}
+            <Link href="/products" className="btn-primary no-underline px-6 sm:px-10 py-3 sm:py-4 text-[.9rem] sm:text-[1.05rem] hover:-translate-y-1 transition-[transform,background-color] duration-300 bg-green hover:bg-green-2 text-white border-none w-full sm:w-auto flex items-center justify-center rounded-lg">
+              <span>View Collection</span>
             </Link>
-            <Link href="/kits" className="btn-outline no-underline px-10 py-4 text-[.95rem] border-white/40 text-white hover:bg-white hover:text-ink transition-all w-full sm:w-auto backdrop-blur-sm bg-white/5 flex items-center justify-center">
+            {/* `backdrop-blur-sm` removed: it sat over the animating hero image,
+                so the browser re-sampled it every frame for no visual gain. */}
+            <Link href="/kits" className="btn-outline no-underline px-6 sm:px-10 py-3 sm:py-4 text-[.9rem] sm:text-[1.05rem] border-white/40 text-white hover:bg-white hover:text-ink transition-colors duration-300 w-full sm:w-auto bg-white/10 flex items-center justify-center rounded-lg">
               Explore Our Kits
             </Link>
           </div>
 
-          <div className="flex gap-10 sm:gap-16 pt-12 mt-12 border-t border-white/15 flex-wrap justify-center animate-fade-up w-full" style={{ animationDelay: '.65s', animationFillMode: 'both' }}>
+          <div className="flex gap-6 sm:gap-10 md:gap-16 pt-8 sm:pt-12 mt-8 sm:mt-12 border-t border-white/15 flex-wrap justify-center animate-fade-up w-full" style={{ animationDelay: '.65s', animationFillMode: 'both' }}>
             {[
               ['400+', 'Premium Products'],
               ['2K+', 'Happy Families'],
               ['100%', 'Pure & Natural']
             ].map(([n, l]) => (
-              <div key={l} className="flex flex-col items-center gap-1.5">
-                <div className="font-serif text-[1.8rem] sm:text-[2.2rem] text-green-4 leading-none drop-shadow-lg">{n}</div>
-                <div className="text-[.6rem] sm:text-[.65rem] tracking-[.2em] uppercase text-ivory/70 font-medium">{l}</div>
+              <div key={l} className="flex flex-col items-center gap-1">
+                <div className="font-serif text-[1.4rem] sm:text-[1.8rem] md:text-[2.2rem] text-green-4 leading-none drop-shadow-lg">{n}</div>
+                <div className="text-[.5rem] sm:text-[.6rem] md:text-[.65rem] tracking-[.15em] uppercase text-ivory/70 font-medium">{l}</div>
               </div>
             ))}
           </div>
@@ -138,17 +142,17 @@ export default async function HomePage() {
       </section>
 
       {/* ── MARQUEE ── */}
-      <div className="bg-green py-2.5 overflow-hidden select-none flex">
+      <div className="bg-green py-2 sm:py-2.5 overflow-hidden select-none flex">
         <div className="flex shrink-0 min-w-full justify-around items-center animate-marquee">
           {MARQUEE_ITEMS.map((item, i) => (
-            <span key={i} className="text-[.68rem] tracking-[.18em] uppercase text-green-4 whitespace-nowrap px-6 flex items-center gap-2.5 font-light after:content-['✦'] after:text-[.52rem] after:text-green-3">
+            <span key={i} className="text-[.55rem] sm:text-[.68rem] tracking-[.15em] sm:tracking-[.18em] uppercase text-green-4 whitespace-nowrap px-3 sm:px-6 flex items-center gap-1.5 sm:gap-2.5 font-light after:content-['✦'] after:text-[.4rem] sm:after:text-[.52rem] after:text-green-3">
               {item}
             </span>
           ))}
         </div>
         <div className="flex shrink-0 min-w-full justify-around items-center animate-marquee" aria-hidden="true">
           {MARQUEE_ITEMS.map((item, i) => (
-            <span key={`dup-${i}`} className="text-[.68rem] tracking-[.18em] uppercase text-green-4 whitespace-nowrap px-6 flex items-center gap-2.5 font-light after:content-['✦'] after:text-[.52rem] after:text-green-3">
+            <span key={`dup-${i}`} className="text-[.55rem] sm:text-[.68rem] tracking-[.15em] sm:tracking-[.18em] uppercase text-green-4 whitespace-nowrap px-3 sm:px-6 flex items-center gap-1.5 sm:gap-2.5 font-light after:content-['✦'] after:text-[.4rem] sm:after:text-[.52rem] after:text-green-3">
               {item}
             </span>
           ))}
@@ -157,16 +161,26 @@ export default async function HomePage() {
 
       {/* ── CATEGORIES ── */}
       <section className="section fade-in">
-        <div className="text-center mb-12">
-          <div className="eyebrow justify-center">Shop by Category</div>
-          <h2 className="section-title">The <em className="not-italic text-green">essence</em> of nature</h2>
-          <p className="text-[.92rem] text-ink-3 mt-2 max-w-md mx-auto">Four pillars of natural goodness, curated for your home.</p>
+        <div className="text-center mb-7 sm:mb-12">
+          <div className="eyebrow justify-center text-[.5rem] sm:text-[.56rem]">Shop by Category</div>
+          <h2 className="section-title text-[1.8rem] sm:text-[2.2rem] md:text-[2.8rem]">The <em className="not-italic text-green">essence</em> of nature</h2>
+          <p className="text-[.78rem] sm:text-[.92rem] text-ink-3 mt-2 max-w-md mx-auto">Four pillars of natural goodness, curated for your home.</p>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {CATEGORIES.map(cat => (
             <Link key={cat.slug} href={`/products?category=${cat.slug}`} className="card no-underline group">
-              <div className="aspect-[3/4] overflow-hidden">
-                <Image src={cat.img} alt={cat.name} width={500} height={650} className="object-cover w-full h-full group-hover:scale-[1.06] transition-transform duration-500" />
+              {/* 4:5 rather than 3:4 — matches ProductCard, and the taller
+                  crop was stretching these compositions vertically. */}
+              <div className="aspect-[4/5] overflow-hidden">
+                <Image
+                  src={cat.img}
+                  alt={cat.name}
+                  width={500}
+                  height={625}
+                  sizes="(max-width: 1024px) 50vw, 25vw"
+                  quality={72}
+                  className="object-cover w-full h-full group-hover:scale-[1.06] transition-transform duration-500"
+                />
               </div>
               <div className="p-4">
                 <div className="text-[.55rem] tracking-[.14em] uppercase bg-green-6 text-green-2 px-1.5 py-0.5 rounded-sm inline-block mb-1.5 font-medium">{cat.pill}</div>
@@ -180,10 +194,10 @@ export default async function HomePage() {
       </section>
 
       {/* ── KITS ── */}
-      <section className="section bg-terra-4 fade-in">
-        <div className="text-center mb-10">
-          <div className="eyebrow justify-center">Pre-made Kits</div>
-          <h2 className="section-title">Everything <em className="not-italic text-green">together,</em><br />perfectly curated</h2>
+      <section className="section bg-terra-4 fade-in px-[5%] py-12 sm:py-16">
+        <div className="text-center mb-7">
+          <div className="eyebrow justify-center text-[.5rem] sm:text-[.56rem]">Pre-made Kits</div>
+          <h2 className="font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.8rem] font-light leading-tight text-ink">Everything <em className="not-italic text-green">together,</em><br />perfectly curated</h2>
         </div>
         {kits.length === 0 ? (
           <div className="text-center py-12 text-ink-3 bg-white/40 border border-ivory-3 rounded-2xl">
@@ -191,86 +205,59 @@ export default async function HomePage() {
             <p className="text-xs text-ink-4 mt-1">Please check back later or customize your order via WhatsApp!</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {kits.map(kit => (
-              <ProductCard key={kit.id} product={kit} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {kits.map(kit => (
+                <KitCard key={kit.id} kit={kit} />
+              ))}
+            </div>
+            <div className="mt-8 flex justify-center">
+              <Link href="/kits" className="btn-primary no-underline px-9 py-4 text-[1.02rem]">
+                View All Kits →
+              </Link>
+            </div>
+          </>
         )}
       </section>
 
+      {/* ── PACKED FRESH PROMISE ── */}
+      <PackedFreshPromise />
+
       {/* ── FEATURED PRODUCTS ── */}
-      <section className="section fade-in">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-10 gap-4">
+      <section className="section fade-in px-[5%] py-12 sm:py-16">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-7 sm:mb-10 gap-4">
           <div>
-            <div className="eyebrow">Customer Favorites</div>
-            <h2 className="section-title">Featured <em className="not-italic text-green">selections</em></h2>
+            <div className="eyebrow text-[.5rem] sm:text-[.56rem]">Customer Favorites</div>
+            <h2 className="font-serif text-[1.8rem] sm:text-[2.2rem] md:text-[2.8rem] font-light leading-tight text-ink">Featured <em className="not-italic text-green">selections</em></h2>
           </div>
-          <Link href="/products" className="text-[.72rem] tracking-[.18em] uppercase text-green-3 font-medium no-underline hover:text-green transition-colors">
+          <Link href="/products" className="text-[.6rem] sm:text-[.72rem] tracking-[.15em] sm:tracking-[.18em] uppercase text-green-3 font-medium no-underline hover:text-green transition-colors whitespace-nowrap">
             View All Products ({featuredProducts.length}+) →
           </Link>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {featuredProducts.map(product => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
       </section>
 
-      {/* ── WHY MANA ── */}
-      <section className="section bg-ivory-2 fade-in">
-        <div className="text-center mb-12">
-          <div className="eyebrow justify-center">The Mana Standard</div>
-          <h2 className="section-title">Purity you can <em className="not-italic text-green">see & feel</em></h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            {
-              title: 'Source Direct',
-              desc: 'We source Kashmiri saffron, Mamra almonds, and Himalayan shilajit directly from trusted farming families.',
-              icon: '🌱',
-            },
-            {
-              title: 'Lab Tested Quality',
-              desc: 'Every batch undergoes rigorous quality testing for purity, moisture content, and zero adulteration.',
-              icon: '🔬',
-            },
-            {
-              title: 'Freshly Packed',
-              desc: 'Items are nitrogen-sealed in food-grade packaging immediately after order confirmation to lock in natural oils.',
-              icon: '✨',
-            },
-          ].map((item, i) => (
-            <div key={i} className="bg-white border border-ivory-3 rounded-2xl p-8 text-center shadow-soft">
-              <div className="text-4xl mb-4">{item.icon}</div>
-              <h3 className="font-serif text-xl text-ink mb-3 font-normal">{item.title}</h3>
-              <p className="text-sm text-ink-3 leading-relaxed font-light">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* The "Mana Standard / Purity you can see & feel" block used to sit here.
+          Removed — the Packed Fresh promise band above now carries the same
+          three claims (natural, lab tested, freshly packed) without repeating
+          them twice on one page. */}
 
       {/* ── TESTIMONIALS ── */}
-      <section className="section fade-in">
+      <section className="section fade-in overflow-hidden">
         <div className="text-center mb-12">
           <div className="eyebrow justify-center">Loved by Families</div>
           <h2 className="section-title">What our <em className="not-italic text-green">customers say</em></h2>
+          <p className="text-[.92rem] text-ink-3 mt-2 max-w-md mx-auto">Over 2,000 families across India trust Mana for their daily wellness.</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {TESTIMONIALS.map((t, i) => (
-            <div key={i} className="bg-white border border-ivory-3 rounded-2xl p-6 shadow-soft flex flex-col justify-between">
-              <div>
-                <div className="text-gold text-sm mb-3">{'★'.repeat(t.stars)}</div>
-                <p className="text-sm text-ink-2 leading-relaxed italic mb-4 font-light">"{t.text}"</p>
-              </div>
-              <div className="border-t border-ivory-3 pt-3 flex justify-between items-center text-xs">
-                <span className="font-medium text-ink">{t.name}</span>
-                <span className="text-ink-4">{t.city}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <TestimonialsCarousel items={TESTIMONIALS} />
       </section>
+
+      {/* ── CHAT & BUY ── */}
+      <ChatAndBuy />
 
       {/* ── NEWSLETTER ── */}
       <section className="section bg-green text-white rounded-3xl mx-[5%] my-12 py-16 px-6 text-center fade-in">

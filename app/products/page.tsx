@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { supabase } from '@/lib/supabase'
 import { ProductCard } from '@/components/product/ProductCard'
 import { SortSelect } from '@/components/product/SortSelect'
@@ -7,6 +8,44 @@ import type { Product } from '@/lib/supabase'
 export const revalidate = 60
 
 type Props = { searchParams: { category?: string; tag?: string; sort?: string; q?: string } }
+
+const CATEGORY_META: Record<string, { title: string; description: string }> = {
+  'dry-fruits': {
+    title: 'Buy Premium Dry Fruits Online – Almonds, Cashews, Pistachios',
+    description: 'Shop premium dry fruits online — Mamra almonds, cashews, pistachios, walnuts and more. Lab tested, FSSAI certified, packed fresh to order. Free shipping above ₹999.',
+  },
+  herbs: {
+    title: 'Buy Ayurvedic Herbs Online – Ashwagandha, Shilajit & More',
+    description: 'Authentic Ayurvedic herbs online — Ashwagandha, Shilajit, Triphala, Brahmi and more. Single origin, lab tested for purity, packed fresh to order.',
+  },
+  spices: {
+    title: 'Buy Single-Origin Spices Online – Kashmiri Saffron & More',
+    description: 'Single-origin Indian spices online — Kashmiri saffron, cardamom, black pepper, cinnamon and more. Lab tested, FSSAI certified, freshly packed.',
+  },
+  pansari: {
+    title: 'Buy Pansari Items Online – Traditional Kirana Staples',
+    description: 'Traditional pansari and kirana staples online. Sourced direct, lab tested and packed fresh to order by Mana Dry Fruits.',
+  },
+}
+
+export function generateMetadata({ searchParams }: Props): Metadata {
+  const meta = CATEGORY_META[searchParams?.category || '']
+
+  // Filtered/searched listings canonicalise to the clean category (or root)
+  // URL so Google doesn't index dozens of near-duplicate permutations.
+  const canonical = searchParams?.category
+    ? `/products?category=${searchParams.category}`
+    : '/products'
+
+  return {
+    title: meta?.title || 'Shop All Products – Dry Fruits, Herbs & Spices',
+    description:
+      meta?.description ||
+      'Browse the full Mana Dry Fruits catalogue — premium dry fruits, Ayurvedic herbs, single-origin spices and pansari staples. Lab tested, FSSAI certified, packed fresh to order.',
+    alternates: { canonical },
+    robots: searchParams?.q ? { index: false, follow: true } : undefined,
+  }
+}
 
 const CATEGORIES = [
   { value: '', label: 'All' },

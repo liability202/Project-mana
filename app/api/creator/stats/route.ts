@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { commissionableAmount, estimateCommission, isLiveCommissionStatus } from '@/lib/commissions'
 
 export async function GET(req: Request) {
   try {
@@ -74,7 +75,7 @@ export async function GET(req: Request) {
 
     if (useCommissions) {
       // Use commissions table (preferred — accurate commission amounts)
-      totalOrders = allCommissions.filter(c => c.status !== 'cancelled').length
+      totalOrders = allCommissions.filter(c => isLiveCommissionStatus(c.status)).length
       pendingPayout = allCommissions
         .filter(c => c.status === 'confirmed')
         .reduce((sum, c) => sum + (c.commission_amount || 0), 0)
@@ -88,18 +89,18 @@ export async function GET(req: Request) {
     } else {
       // Fallback: derive stats from orders table by coupon_code
       const fallbackOrders = (ordersRes as any).data || []
-      const activeOrders = fallbackOrders.filter((o: any) => o.status !== 'cancelled')
+      const activeOrders = fallbackOrders.filter((o: any) => isLiveCommissionStatus(o.status))
 
       totalOrders = activeOrders.length
 
-      // Estimate commission from order subtotals
-      const estimateCommission = (o: any) =>
-        Math.round(((o.subtotal || o.total || o.final_amount || 0) * commissionPct) / 100)
+      // Estimate commission from order subtotals — same rules the admin coupon
+      // report uses, so the two views always agree.
+      const orderCommission = (o: any) => estimateCommission(commissionableAmount(o), commissionPct)
 
-      pendingPayout = activeOrders.reduce((sum: number, o: any) => sum + estimateCommission(o), 0)
+      pendingPayout = activeOrders.reduce((sum: number, o: any) => sum + orderCommission(o), 0)
       thisMonthEarnings = activeOrders
         .filter((o: any) => new Date(o.created_at) >= startOfMonth)
-        .reduce((sum: number, o: any) => sum + estimateCommission(o), 0)
+        .reduce((sum: number, o: any) => sum + orderCommission(o), 0)
       totalEarnedLifetime = creatorData?.total_earned || pendingPayout
       chartSourceData = activeOrders.map((o: any) => ({ created_at: o.created_at }))
     }
