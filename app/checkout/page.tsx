@@ -262,7 +262,7 @@ export default function CheckoutPage() {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
-  const applyCouponCode = async (code: string) => {
+  const applyCouponCode = async (code: string, options: { silent?: boolean } = {}) => {
     const normalizedCode = code.trim().toUpperCase()
     if (!normalizedCode) {
       showToast('Enter a coupon code')
@@ -289,11 +289,11 @@ export default function CheckoutPage() {
         free_handling: Boolean(data.free_handling || data.coupon?.free_handling),
       })
       if (data.customer_type) setCustomerType(data.customer_type)
-      showToast(`Coupon ${data.coupon.code} applied`)
+      if (!options.silent) showToast(`Coupon ${data.coupon.code} applied`)
       return true
     } catch (err: any) {
       setCouponState({ code: '', discountAmount: 0, valid: false, free_shipping: false, free_cod: false, free_handling: false })
-      showToast(err.message || 'Invalid coupon')
+      if (!options.silent) showToast(err.message || 'Invalid coupon')
       return false
     } finally {
       setCouponLoading(false)
@@ -304,7 +304,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (customerType === 'returning' && otpStatus === 'verified' && subtotal > 0 && !loyaltyAppliedRef.current && !couponState.code) {
       loyaltyAppliedRef.current = true
-      applyCouponCode('LOYAL12').catch(() => {})
+      applyCouponCode('LOYAL12', { silent: true }).catch(() => {})
     }
   }, [customerType, otpStatus, subtotal, couponState.code])
 
@@ -395,7 +395,7 @@ export default function CheckoutPage() {
       setCustomerType(nextCustomerType)
 
       if (nextCustomerType === 'returning') {
-        await applyCouponCode('LOYAL12')
+        await applyCouponCode('LOYAL12', { silent: true })
       } else {
         const refCookie = document.cookie.split('; ').find((row) => row.startsWith('mana_ref='))?.split('=')[1]
         setCouponInput(refCookie || '')
