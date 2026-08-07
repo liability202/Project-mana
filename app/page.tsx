@@ -138,9 +138,9 @@ export default async function HomePage() {
       </section>
 
       {/* ── MARQUEE ── */}
-      <div className="bg-green py-2.5 overflow-hidden select-none">
+      <div className="bg-green py-2.5 overflow-hidden">
         <div className="flex w-max animate-marquee">
-          {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS, ...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((item, i) => (
+          {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((item, i) => (
             <span key={i} className="text-[.68rem] tracking-[.18em] uppercase text-green-4 whitespace-nowrap px-7 flex items-center gap-2.5 font-light after:content-['✦'] after:text-[.52rem] after:text-green-3">
               {item}
             </span>
@@ -184,97 +184,213 @@ export default async function HomePage() {
             <p className="text-xs text-ink-4 mt-1">Please check back later or customize your order via WhatsApp!</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {kits.map(kit => (
-              <ProductCard key={kit.id} product={kit} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {kits.map(kit => {
+              const firstVariant = kit.variants?.[0]
+              const price = firstVariant?.price || kit.price
+              const comparePrice = firstVariant?.compare_price || kit.compare_price
+              const savePct = comparePrice && comparePrice > price
+                ? Math.round(((comparePrice - price) / comparePrice) * 100)
+                : 0
+              const image = kit.images?.[0] || 'https://images.unsplash.com/photo-1574226516831-e1dff420e562?w=600&q=80'
+              const tag = kit.tags?.filter(t => t !== 'kit')[0] || 'Wellness Kit'
+
+              return (
+                <Link key={kit.id} href="/kits" className="card no-underline group flex flex-col">
+                  <div className="aspect-[4/3] overflow-hidden relative">
+                    <Image src={image} alt={kit.name} fill sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
+                  </div>
+                  <div className="p-4 flex flex-col flex-1">
+                    <div className="text-[.56rem] tracking-wide uppercase bg-green-6 text-green-2 px-1.5 py-0.5 rounded-sm inline-block mb-2 font-medium w-fit">{tag}</div>
+                    <div className="font-serif text-[1.1rem] text-ink mb-1 leading-tight">{kit.name}</div>
+                    <div className="text-[.74rem] text-ink-3 mb-3 line-clamp-2">{kit.description}</div>
+                    <div className="mt-auto flex items-center justify-between pt-3 border-t border-ivory-3">
+                      <div>
+                        <div className="font-serif text-[1.2rem] text-green leading-none">{formatPrice(price)}</div>
+                        <div className="text-[.58rem] text-ink-4 mt-0.5">{kit.price_per_unit || 'per kit'}</div>
+                      </div>
+                      {savePct > 0 && (
+                        <span className="text-[.58rem] bg-terra-4 text-terra border border-terra-3 px-2 py-0.5 rounded-sm font-medium">Save {savePct}%</span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+        <div className="text-center">
+          <Link href="/kits" className="btn-primary no-underline inline-flex items-center gap-2">
+            <span>View All Kit →</span>
+          </Link>
+        </div>
+      </section>
+
+      {/* ── QUALITY PROMISE ── */}
+      <section className="section bg-green fade-in">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <div className="eyebrow" style={{ color: 'var(--green4)' }}>Our Promise</div>
+            <h2 className="section-title text-ivory mb-4">
+              Ground and packed <em className="not-italic" style={{ color: 'var(--green4)' }}>after your order.</em>
+            </h2>
+            <p className="text-[.92rem] text-green-5/70 leading-[1.88] mb-5">
+              For all powders, churnas and ground spices — we do not pre-grind in bulk. Your order triggers the grinding. The difference in freshness and potency is immediate.
+            </p>
+            <div className="flex flex-col gap-3">
+              {['Ashwagandha powder — ground after order', 'Triphala churna — blended to order', 'Ground spices — never pre-ground in bulk', 'All powders sealed immediately after grinding'].map(item => (
+                <div key={item} className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full border border-green-5/25 bg-green-5/10 flex items-center justify-center text-green-4 text-xs flex-shrink-0">✓</div>
+                  <span className="text-[.84rem] text-green-4">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: '🌿', title: '100% Natural', desc: 'No additives, fillers or preservatives. Ever.' },
+              { icon: '🔬', title: 'Lab Tested', desc: 'Every batch quality checked before dispatch.' },
+              { icon: '📦', title: 'Packed Fresh', desc: 'Ground and packed to order, not to stock.' },
+              { icon: '🤝', title: 'Direct Sourcing', desc: 'Straight from farmers to your home.' },
+            ].map(card => (
+              <div key={card.title} className="bg-green-5/10 border border-green-5/15 rounded-xl p-5">
+                <div className="text-2xl mb-2">{card.icon}</div>
+                <div className="font-serif text-ivory text-base mb-1">{card.title}</div>
+                <div className="text-[.78rem] text-green-5/60 leading-relaxed">{card.desc}</div>
+              </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── BESTSELLERS ── */}
+      <section className="section bg-white fade-in">
+        <div className="flex justify-between items-end mb-10 flex-wrap gap-4">
+          <div>
+            <div className="eyebrow">Bestsellers</div>
+            <h2 className="section-title">Curated <em className="not-italic text-green">favourites</em></h2>
+          </div>
+          <Link href="/products" className="btn-outline text-sm py-2 px-5 no-underline">View All →</Link>
+        </div>
+        {featuredProducts.length > 0 ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {featuredProducts.map(p => <ProductCard key={p.id} product={p} />)}
+          </div>
+        ) : (
+          <div className="text-center py-16 border-2 border-dashed border-ivory-3 rounded-2xl bg-ivory-2">
+            <div className="text-5xl mb-4">🌿</div>
+            <h3 className="font-serif text-xl text-ink mb-2">Products coming soon</h3>
+            <p className="text-[.84rem] text-ink-3 mb-6 max-w-xs mx-auto">
+              Add your first products in Supabase to see them appear here automatically.
+            </p>
+            <Link href="/products" className="btn-primary no-underline inline-flex">
+              <span>Browse All →</span>
+            </Link>
           </div>
         )}
       </section>
 
-      {/* ── FEATURED PRODUCTS ── */}
-      <section className="section fade-in">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-10 gap-4">
-          <div>
-            <div className="eyebrow">Customer Favorites</div>
-            <h2 className="section-title">Featured <em className="not-italic text-green">selections</em></h2>
-          </div>
-          <Link href="/products" className="text-[.72rem] tracking-[.18em] uppercase text-green-3 font-medium no-underline hover:text-green transition-colors">
-            View All Products ({featuredProducts.length}+) →
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {featuredProducts.map(product => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      </section>
-
-      {/* ── WHY MANA ── */}
-      <section className="section bg-ivory-2 fade-in">
-        <div className="text-center mb-12">
-          <div className="eyebrow justify-center">The Mana Standard</div>
-          <h2 className="section-title">Purity you can <em className="not-italic text-green">see & feel</em></h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            {
-              title: 'Source Direct',
-              desc: 'We source Kashmiri saffron, Mamra almonds, and Himalayan shilajit directly from trusted farming families.',
-              icon: '🌱',
-            },
-            {
-              title: 'Lab Tested Quality',
-              desc: 'Every batch undergoes rigorous quality testing for purity, moisture content, and zero adulteration.',
-              icon: '🔬',
-            },
-            {
-              title: 'Freshly Packed',
-              desc: 'Items are nitrogen-sealed in food-grade packaging immediately after order confirmation to lock in natural oils.',
-              icon: '✨',
-            },
-          ].map((item, i) => (
-            <div key={i} className="bg-white border border-ivory-3 rounded-2xl p-8 text-center shadow-soft">
-              <div className="text-4xl mb-4">{item.icon}</div>
-              <h3 className="font-serif text-xl text-ink mb-3 font-normal">{item.title}</h3>
-              <p className="text-sm text-ink-3 leading-relaxed font-light">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* ── TESTIMONIALS ── */}
-      <section className="section fade-in">
-        <div className="text-center mb-12">
-          <div className="eyebrow justify-center">Loved by Families</div>
-          <h2 className="section-title">What our <em className="not-italic text-green">customers say</em></h2>
+      <section className="section bg-ivory-2 overflow-hidden fade-in">
+        <div className="text-center mb-10">
+          <div className="eyebrow justify-center">Testimonials</div>
+          <h2 className="section-title">Loved by <em className="not-italic text-green">thousands</em></h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {TESTIMONIALS.map((t, i) => (
-            <div key={i} className="bg-white border border-ivory-3 rounded-2xl p-6 shadow-soft flex flex-col justify-between">
-              <div>
-                <div className="text-gold text-sm mb-3">{'★'.repeat(t.stars)}</div>
-                <p className="text-sm text-ink-2 leading-relaxed italic mb-4 font-light">"{t.text}"</p>
+        <div className="overflow-hidden">
+          <div className="flex gap-4 w-max" style={{ animation: 'scroll-left 28s linear infinite' }}>
+            {[...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
+              <div key={i} className="w-[290px] flex-shrink-0 bg-white border border-ivory-3 rounded-xl p-5 shadow-soft">
+                <div className="text-terra text-[.78rem] mb-2.5">{'★'.repeat(t.stars)}</div>
+                <p className="text-[.8rem] text-ink-3 leading-[1.7] mb-3.5 italic">"{t.text}"</p>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-green-6 border border-green-5 flex items-center justify-center text-[.7rem] font-medium text-green flex-shrink-0">
+                    {t.name[0]}
+                  </div>
+                  <div>
+                    <div className="text-[.74rem] text-ink font-medium">{t.name}</div>
+                    <div className="text-[.6rem] text-ink-4">{t.city} · Verified</div>
+                  </div>
+                </div>
               </div>
-              <div className="border-t border-ivory-3 pt-3 flex justify-between items-center text-xs">
-                <span className="font-medium text-ink">{t.name}</span>
-                <span className="text-ink-4">{t.city}</span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CHAT & BUY ── */}
+      <section className="section bg-green-6 fade-in">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="bg-white border border-ivory-3 rounded-2xl p-5 shadow-soft max-w-md mx-auto w-full">
+            <div className="flex items-center gap-2.5 pb-3.5 border-b border-ivory-3 mb-3.5">
+              <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-green-5">
+                <Image src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&q=80" alt="assistant" width={36} height={36} className="object-cover" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-ink">Mana Assistant</div>
+                <div className="text-[.6rem] text-green-3 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-3 inline-block" />Online · Instant Reply</div>
               </div>
             </div>
-          ))}
+            <div className="flex flex-col gap-3 mb-3.5">
+              <div className="bg-ivory-2 rounded-[10px_10px_10px_3px] px-3.5 py-2.5 max-w-[85%] text-[.78rem] text-ink leading-relaxed">
+                Namaste! 🙏 Share your list or tell me what you need.
+              </div>
+              <div className="bg-green text-ivory rounded-[10px_10px_3px_10px] px-3.5 py-2.5 max-w-[85%] text-[.78rem] self-end leading-relaxed">
+                Almonds, ashwagandha and tulsi for this month
+              </div>
+              <div className="bg-ivory-2 rounded-[10px_10px_10px_3px] px-3.5 py-2.5 max-w-[90%] text-[.78rem] text-ink leading-relaxed">
+                How should I pick them?
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {['⭐ Highest Quality', '🔥 Most Selling', '💰 Best Price'].map(c => (
+                    <span key={c} className="px-2.5 py-1 rounded-full text-[.62rem] bg-green-6 border border-green-5 text-green-2 cursor-pointer">{c}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 items-center bg-ivory-2 border border-ivory-3 rounded-lg px-3 py-2">
+              <span className="text-[.76rem] text-ink-4 flex-1">Type or upload your list…</span>
+              <div className="w-7 h-7 rounded-md bg-green flex items-center justify-center text-ivory text-sm cursor-pointer">↑</div>
+            </div>
+          </div>
+          <div>
+            <div className="eyebrow">Chat & Buy</div>
+            <h3 className="font-serif text-[clamp(1.7rem,2.6vw,2.5rem)] font-light text-ink mb-3 leading-tight">
+              Tell us what you need,<br /><em className="not-italic text-green">we do the rest.</em>
+            </h3>
+            <div className="flex flex-col gap-4 mb-7">
+              {[
+                ['1', 'Upload your list', 'Image, PDF or text — whatever works for you'],
+                ['2', 'Choose a preference', 'Highest quality, most popular, or best price'],
+                ['3', 'Pay a small advance', '10–20% to confirm your order'],
+                ['4', 'Remaining at dispatch', 'Or pay in full anytime before delivery'],
+              ].map(([n, t, d]) => (
+                <div key={n} className="flex gap-4">
+                  <div className="w-7 h-7 rounded-full bg-green-6 border border-green-4 flex items-center justify-center text-[.66rem] text-green font-medium flex-shrink-0 mt-0.5">{n}</div>
+                  <div>
+                    <div className="text-sm font-medium text-ink">{t}</div>
+                    <div className="text-[.8rem] text-ink-3 mt-0.5">{d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <a
+              href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=Hi%20Mana!%20I%20want%20to%20Chat%20%26%20Buy.`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary no-underline inline-flex"
+            >
+              <span>Start Chat & Buy →</span>
+            </a>
+          </div>
         </div>
       </section>
 
       {/* ── NEWSLETTER ── */}
-      <section className="section bg-green text-white rounded-3xl mx-[5%] my-12 py-16 px-6 text-center fade-in">
-        <div className="max-w-xl mx-auto">
-          <div className="eyebrow text-green-4 justify-center">Join Our Circle</div>
-          <h2 className="font-serif text-3xl sm:text-4xl text-white font-light mb-4">
-            Get <em className="not-italic text-green-4">10% off</em> your first order
-          </h2>
-          <p className="text-sm text-ivory/80 mb-8 leading-relaxed font-light">
-            Subscribe for seasonal harvest updates, exclusive wellness kits, and traditional Ayurvedic recipes directly in your inbox.
-          </p>
+      <section className="section text-center bg-white relative overflow-hidden fade-in">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full bg-green-6/40 pointer-events-none" />
+        <div className="relative">
+          <div className="eyebrow justify-center">Stay Connected</div>
+          <h2 className="section-title mb-2">Nature's finest, <em className="not-italic text-green">in your inbox.</em></h2>
+          <p className="text-[.88rem] text-ink-3 mb-6">Early access, seasonal drops and wellness tips — no spam, ever.</p>
           <NewsletterForm />
         </div>
       </section>

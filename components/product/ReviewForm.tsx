@@ -117,7 +117,7 @@ export function ReviewForm({
       </div>
 
       <div className="text-xs font-medium text-ink-3 mt-3 px-3 py-2 bg-ivory-2 rounded-lg border border-ivory-3 leading-relaxed">
-        Please use the same WhatsApp number you used during checkout.
+        Please use the same WhatsApp number you used during checkout. Reviews still go for admin approval before appearing publicly.
       </div>
 
       {error && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
