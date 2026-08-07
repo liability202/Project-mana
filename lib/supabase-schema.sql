@@ -143,6 +143,8 @@ create table if not exists coupons (
   discount_type text not null check (discount_type in ('percentage','fixed')),
   discount_value integer not null,
   influencer_name text,
+  influencer_phone text,
+  creator_id uuid references creators(id),
   commission_rate numeric(5,2),
   min_order_amount integer default 0,
   max_discount integer,

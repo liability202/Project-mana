@@ -13,13 +13,33 @@ export async function GET(req: Request) {
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+
+  const { data: creators } = await supabaseAdmin
+    .from('creators')
+    .select('id,name,phone,code,commission_pct')
+
+  const creatorsByCode = new Map((creators || []).map((creator: any) => [String(creator.code || '').toUpperCase(), creator]))
+  const enriched = (data || []).map((coupon: any) => {
+    const creator = creatorsByCode.get(String(coupon.code || '').toUpperCase())
+    if (!creator) return coupon
+    return {
+      ...coupon,
+      creator_id: coupon.creator_id || creator.id,
+      influencer_name: coupon.influencer_name || creator.name,
+      influencer_phone: coupon.influencer_phone || creator.phone,
+      commission_rate: coupon.commission_rate ?? creator.commission_pct,
+    }
+  })
+
+  return NextResponse.json(enriched)
 }
 
 // Optional columns that may not exist yet in older DB schemas.
 // If an insert fails citing a missing column, we strip it and retry.
 const OPTIONAL_COLUMNS = [
   'influencer_name',
+  'influencer_phone',
+  'creator_id',
   'commission_rate',
   'min_order_amount',
   'max_discount',
@@ -42,6 +62,8 @@ export async function POST(req: Request) {
       discount_type: body.discount_type,
       discount_value: Number(body.discount_value || 0),
       influencer_name: body.influencer_name || null,
+      influencer_phone: body.influencer_phone ? String(body.influencer_phone).replace(/\D/g, '').slice(-10) : null,
+      creator_id: body.creator_id || null,
       commission_rate: body.commission_rate ? Number(body.commission_rate) : null,
       min_order_amount: body.min_order_amount ? Number(body.min_order_amount) : 0,
       max_discount: body.max_discount ? Number(body.max_discount) : null,

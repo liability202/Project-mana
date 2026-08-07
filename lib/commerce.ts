@@ -8,6 +8,8 @@ export type CouponRecord = {
   discount_type: DiscountType
   discount_value: number
   influencer_name?: string | null
+  influencer_phone?: string | null
+  creator_id?: string | null
   commission_rate?: number | null
   min_order_amount?: number | null
   max_discount?: number | null
