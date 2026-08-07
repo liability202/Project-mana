@@ -69,38 +69,46 @@ export async function GET(req: Request) {
   }
 
   // ── Enrich with real order stats ──────────────────────────────────────────
-  // Fetch all orders that have a coupon_code so we can show accurate totals
-  // in the admin panel (covers both DB coupons and creator codes).
+  // Use subtotal (product value only) for revenue — matches what the creator
+  // portal uses when calculating commissions. final_amount includes shipping
+  // and fees which creators don't earn on.
   const { data: orderRows } = await supabaseAdmin
     .from('orders')
-    .select('coupon_code, final_amount, discount_amount, discount')
+    .select('coupon_code, subtotal, discount_amount, discount')
     .not('coupon_code', 'is', null)
 
-  // Build a map: UPPER(coupon_code) → aggregated stats
+  // Build a map: UPPER(coupon_code) → aggregated stats from orders table
   const orderStats = new Map<string, { total_orders: number; total_revenue: number; total_discount_given: number }>()
   for (const row of (orderRows || [])) {
     const code = String(row.coupon_code || '').toUpperCase()
     if (!code) continue
     const existing = orderStats.get(code) || { total_orders: 0, total_revenue: 0, total_discount_given: 0 }
     existing.total_orders += 1
-    existing.total_revenue += row.final_amount || 0
+    existing.total_revenue += row.subtotal || 0
     existing.total_discount_given += row.discount_amount || row.discount || 0
     orderStats.set(code, existing)
   }
 
-  // Merge real order stats into every coupon entry.
-  // The DB column value takes priority when already populated (> 0);
-  // otherwise fall back to the order-derived value.
+  // Merge live order stats into every coupon entry.
+  // Always use the live aggregated value — it is always accurate and up-to-date.
+  // For commission, estimate using the coupon's commission_rate (or creator's pct).
   const final = enriched.map((c: any) => {
     const code = String(c.code || '').toUpperCase()
     const real = orderStats.get(code)
-    if (!real) return c
+    const liveOrders = real?.total_orders ?? 0
+    const liveRevenue = real?.total_revenue ?? 0
+    const liveDiscount = real?.total_discount_given ?? 0
+    const commPct = c.commission_rate ?? 10
+    const totalCommission = Math.round((liveRevenue * commPct) / 100)
     return {
       ...c,
-      total_orders:        (c.total_orders || 0)        > 0 ? c.total_orders        : real.total_orders,
-      usage_count:         (c.usage_count || 0)          > 0 ? c.usage_count          : real.total_orders,
-      total_revenue:       (c.total_revenue || 0)        > 0 ? c.total_revenue        : real.total_revenue,
-      total_discount_given: (c.total_discount_given || 0) > 0 ? c.total_discount_given : real.total_discount_given,
+      // Always use live order data — single source of truth
+      total_orders: liveOrders,
+      usage_count: liveOrders,
+      total_revenue: liveRevenue,
+      total_discount_given: liveDiscount,
+      // Extra field: estimated commission earned by the creator/influencer
+      total_commission: totalCommission,
     }
   })
 

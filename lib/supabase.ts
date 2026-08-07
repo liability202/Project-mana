@@ -57,6 +57,7 @@ export type Coupon = {
   total_orders: number
   total_revenue: number
   total_discount_given: number
+  total_commission?: number | null
   is_active: boolean
   free_shipping?: boolean
   free_cod?: boolean
