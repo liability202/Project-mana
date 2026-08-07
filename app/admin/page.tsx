@@ -83,6 +83,8 @@ export default function AdminPage() {
     is_active: true,
   })
   const [couponMessage, setCouponMessage] = useState('')
+  const [editingCoupon, setEditingCoupon] = useState<any | null>(null)
+  const [editCouponMessage, setEditCouponMessage] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerData, setCustomerData] = useState<CustomerSnapshot | null>(null)
   const [customerMessage, setCustomerMessage] = useState('')
@@ -473,9 +475,11 @@ export default function AdminPage() {
   const paidRevenue = orders.filter(order => order.payment_status === 'paid' && order.status !== 'cancelled').reduce((sum, order) => sum + (order.final_amount || order.total), 0)
   const filteredOrders = orders.filter(order => orderFilter === 'all' ? true : order.status === orderFilter).sort((a, b) => {
     if (orderFilter === 'pending') {
+      // Oldest first for pending orders (to focus on oldest/overdue pending orders first)
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     }
-    return 0
+    // Newest first for other order filters
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 
   return (
@@ -898,6 +902,7 @@ export default function AdminPage() {
                       <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Revenue</th>
                       <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Discount Given</th>
                       <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Status</th>
+                      <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ivory-3">
@@ -951,11 +956,49 @@ export default function AdminPage() {
                             {coupon.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => {
+                                setEditingCoupon({
+                                  ...coupon,
+                                  min_order_amount: coupon.min_order_amount ? (coupon.min_order_amount / 100) : '',
+                                  max_discount: coupon.max_discount ? (coupon.max_discount / 100) : '',
+                                })
+                                setEditCouponMessage('')
+                              }}
+                              className="text-xs text-green-3 hover:text-green font-medium underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Are you sure you want to delete coupon ${coupon.code}?`)) return
+                                const secret = localStorage.getItem('mana_admin') || ''
+                                const res = await fetch(`/api/coupons?id=${coupon.id}`, {
+                                  method: 'DELETE',
+                                  headers: {
+                                    authorization: `Bearer ${secret}`,
+                                  },
+                                })
+                                if (res.ok) {
+                                  setCoupons(prev => prev.filter(c => c.id !== coupon.id))
+                                } else {
+                                  const err = await res.json()
+                                  alert(err?.error || 'Failed to delete coupon')
+                                }
+                              }}
+                              className="text-xs text-red-600 hover:text-red-800 font-medium underline"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                     {coupons.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-6 text-center text-sm text-ink-3">No coupons created yet.</td>
+                        <td colSpan={8} className="px-4 py-6 text-center text-sm text-ink-3">No coupons created yet.</td>
                       </tr>
                     )}
                   </tbody>
@@ -1518,6 +1561,226 @@ on conflict (key) do nothing;`}</pre>
           </div>
         )
       })()}
+
+      {/* Edit Coupon Modal */}
+      {editingCoupon && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm" onClick={e => e.target === e.currentTarget && setEditingCoupon(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl relative max-h-[95vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-serif text-xl text-ink">Edit Coupon: <span className="font-sans font-bold text-green-3">{editingCoupon.code}</span></h3>
+              <button onClick={() => setEditingCoupon(null)} className="text-ink-4 hover:text-ink text-lg leading-none">×</button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-ink-3 block mb-1.5 font-medium">Coupon Code</label>
+                <input
+                  type="text"
+                  value={editingCoupon.code || ''}
+                  onChange={e => setEditingCoupon({ ...editingCoupon, code: e.target.value.toUpperCase() })}
+                  className="input"
+                  placeholder="CODE"
+                />
+              </div>
+
+              {!editingCoupon.is_influencer_code ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-ink-3 block mb-1.5 font-medium">Discount Type</label>
+                      <select
+                        value={editingCoupon.discount_type || 'percentage'}
+                        onChange={e => setEditingCoupon({ ...editingCoupon, discount_type: e.target.value })}
+                        className="input"
+                      >
+                        <option value="percentage">Percentage (%)</option>
+                        <option value="fixed">Fixed (₹)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-ink-3 block mb-1.5 font-medium">Discount Value</label>
+                      <input
+                        type="number"
+                        value={editingCoupon.discount_value ?? ''}
+                        onChange={e => setEditingCoupon({ ...editingCoupon, discount_value: e.target.value })}
+                        className="input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-ink-3 block mb-1.5 font-medium">Min Order (₹)</label>
+                      <input
+                        type="number"
+                        value={editingCoupon.min_order_amount ?? ''}
+                        onChange={e => setEditingCoupon({ ...editingCoupon, min_order_amount: e.target.value })}
+                        className="input"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-ink-3 block mb-1.5 font-medium">Max Discount (₹)</label>
+                      <input
+                        type="number"
+                        value={editingCoupon.max_discount ?? ''}
+                        onChange={e => setEditingCoupon({ ...editingCoupon, max_discount: e.target.value })}
+                        className="input"
+                        placeholder="Unlimited"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-ink-3 block mb-1.5 font-medium">Usage Limit</label>
+                    <input
+                      type="number"
+                      value={editingCoupon.usage_limit ?? ''}
+                      onChange={e => setEditingCoupon({ ...editingCoupon, usage_limit: e.target.value })}
+                      className="input"
+                      placeholder="Unlimited"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-ink-3 block mb-2">Additional Fee Removals</label>
+                    <div className="space-y-2 border border-ivory-3 rounded-lg p-3 bg-ivory-2">
+                      <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(editingCoupon.free_shipping)}
+                          onChange={e => setEditingCoupon({ ...editingCoupon, free_shipping: e.target.checked })}
+                          className="h-4 w-4 accent-[var(--green)]"
+                        />
+                        Remove Delivery Charges (Free Delivery)
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(editingCoupon.free_cod)}
+                          onChange={e => setEditingCoupon({ ...editingCoupon, free_cod: e.target.checked })}
+                          className="h-4 w-4 accent-[var(--green)]"
+                        />
+                        Remove COD Charges (Free COD)
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(editingCoupon.free_handling)}
+                          onChange={e => setEditingCoupon({ ...editingCoupon, free_handling: e.target.checked })}
+                          className="h-4 w-4 accent-[var(--green)]"
+                        />
+                        Remove Handling Fee (Free Handling)
+                      </label>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+
+              {(editingCoupon.is_influencer_code || editingCoupon.influencer_phone || editingCoupon.influencer_name) ? (
+                <div className="space-y-4 pt-2 border-t border-ivory-3">
+                  <h4 className="text-sm font-serif font-bold text-ink">Influencer Details</h4>
+                  <div>
+                    <label className="text-xs text-ink-3 block mb-1.5 font-medium">Influencer Name</label>
+                    <input
+                      type="text"
+                      value={editingCoupon.influencer_name || ''}
+                      onChange={e => setEditingCoupon({ ...editingCoupon, influencer_name: e.target.value })}
+                      className="input"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-ink-3 block mb-1.5 font-medium">Influencer Phone</label>
+                    <input
+                      type="text"
+                      value={editingCoupon.influencer_phone || ''}
+                      onChange={e => setEditingCoupon({ ...editingCoupon, influencer_phone: e.target.value })}
+                      className="input"
+                      placeholder="9876543210"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-ink-3 block mb-1.5 font-medium">Commission Rate (%)</label>
+                    <input
+                      type="number"
+                      value={editingCoupon.commission_rate ?? ''}
+                      onChange={e => setEditingCoupon({ ...editingCoupon, commission_rate: e.target.value })}
+                      className="input"
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <label className="flex items-center gap-3 text-sm text-ink cursor-pointer pt-2">
+                <input
+                  type="checkbox"
+                  checked={Boolean(editingCoupon.is_active)}
+                  onChange={e => setEditingCoupon({ ...editingCoupon, is_active: e.target.checked })}
+                  className="h-4 w-4 accent-[var(--green)]"
+                />
+                Active coupon
+              </label>
+
+              {editCouponMessage && (
+                <div className="text-sm font-medium text-ink-2 bg-ivory-2 border border-ivory-3 rounded-lg px-3 py-2">
+                  {editCouponMessage}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setEditingCoupon(null)}
+                  className="btn-outline flex-1 justify-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setEditCouponMessage('Saving...')
+                    const secret = localStorage.getItem('mana_admin') || ''
+                    
+                    const payload = {
+                      ...editingCoupon,
+                      discount_value: Number(editingCoupon.discount_value || 0),
+                      min_order_amount: editingCoupon.min_order_amount ? Math.round(Number(editingCoupon.min_order_amount) * 100) : 0,
+                      max_discount: editingCoupon.max_discount ? Math.round(Number(editingCoupon.max_discount) * 100) : null,
+                      commission_rate: editingCoupon.commission_rate ? Number(editingCoupon.commission_rate) : null,
+                      usage_limit: editingCoupon.usage_limit ? Number(editingCoupon.usage_limit) : null,
+                    }
+
+                    const res = await fetch('/api/coupons', {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        authorization: `Bearer ${secret}`,
+                      },
+                      body: JSON.stringify(payload),
+                    })
+
+                    const data = await res.json()
+                    if (!res.ok) {
+                      setEditCouponMessage(data?.error || 'Failed to save coupon.')
+                      return
+                    }
+
+                    // Update local state
+                    setCoupons(prev => prev.map(c => c.id === editingCoupon.id ? data : c))
+                    setEditCouponMessage('Saved successfully!')
+                    setTimeout(() => {
+                      setEditingCoupon(null)
+                    }, 1000)
+                  }}
+                  className="btn-primary flex-1 justify-center"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

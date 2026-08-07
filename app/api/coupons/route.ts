@@ -154,3 +154,114 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
+export async function PUT(req: Request) {
+  const auth = req.headers.get('authorization')
+  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const body = await req.json()
+    const { id, code, discount_type, discount_value, influencer_name, influencer_phone, creator_id, commission_rate, min_order_amount, max_discount, usage_limit, free_shipping, free_cod, free_handling, is_active } = body
+
+    if (!id) return NextResponse.json({ error: 'Coupon ID is required.' }, { status: 400 })
+
+    if (String(id).startsWith('creator-')) {
+      const realCreatorId = String(id).replace('creator-', '')
+      const creatorPayload: any = {}
+      if (code) creatorPayload.code = String(code).trim().toUpperCase()
+      if (influencer_name) creatorPayload.name = influencer_name
+      if (influencer_phone) creatorPayload.phone = String(influencer_phone).replace(/\D/g, '').slice(-10)
+      if (commission_rate != null) creatorPayload.commission_pct = Number(commission_rate)
+      if (is_active != null) creatorPayload.active = Boolean(is_active)
+
+      const { data: updatedCreator, error: creatorErr } = await supabaseAdmin
+        .from('creators')
+        .update(creatorPayload)
+        .eq('id', realCreatorId)
+        .select()
+        .single()
+
+      if (creatorErr) return NextResponse.json({ error: creatorErr.message }, { status: 500 })
+
+      return NextResponse.json({
+        id,
+        code: updatedCreator.code,
+        discount_type: 'percentage',
+        discount_value: 10,
+        influencer_name: updatedCreator.name,
+        influencer_phone: updatedCreator.phone,
+        creator_id: updatedCreator.id,
+        commission_rate: updatedCreator.commission_pct || 10,
+        is_active: updatedCreator.active ?? true,
+        is_influencer_code: true,
+      })
+    }
+
+    const payload: any = {
+      code: String(code || '').trim().toUpperCase(),
+      discount_type,
+      discount_value: Number(discount_value || 0),
+      influencer_name: influencer_name || null,
+      influencer_phone: influencer_phone ? String(influencer_phone).replace(/\D/g, '').slice(-10) : null,
+      creator_id: creator_id || null,
+      commission_rate: commission_rate ? Number(commission_rate) : null,
+      min_order_amount: min_order_amount != null ? Number(min_order_amount) : 0,
+      max_discount: max_discount != null ? Number(max_discount) : null,
+      usage_limit: usage_limit != null ? Number(usage_limit) : null,
+      free_shipping: Boolean(free_shipping),
+      free_cod: Boolean(free_cod),
+      free_handling: Boolean(free_handling),
+      is_active: is_active ?? true,
+    }
+
+    let currentPayload = { ...payload }
+    let data: any = null
+    let error: any = null
+    let attempts = 0
+
+    while (attempts < OPTIONAL_COLUMNS.length + 1) {
+      const result = await supabaseAdmin.from('coupons').update(currentPayload).eq('id', id).select('*').single()
+      data = result.data
+      error = result.error
+
+      if (!error) break
+      const isSchemaError = error.message.includes('schema cache') || error.message.includes('column') || error.message.includes('does not exist') || error.code === 'PGRST204'
+      if (!isSchemaError) break
+
+      const culprit = OPTIONAL_COLUMNS.find(col => error.message.includes(col))
+      if (!culprit) break
+
+      delete currentPayload[culprit]
+      attempts++
+    }
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(data)
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: Request) {
+  const auth = req.headers.get('authorization')
+  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { searchParams } = new URL(req.url)
+  const id = searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'Coupon ID required' }, { status: 400 })
+
+  if (id.startsWith('creator-')) {
+    const realCreatorId = id.replace('creator-', '')
+    const { error } = await supabaseAdmin.from('creators').delete().eq('id', realCreatorId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  const { error } = await supabaseAdmin.from('coupons').delete().eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
+}

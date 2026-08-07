@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendCashbackCredited, sendOrderConfirmation, sendOrderShipped } from '@/lib/email'
 import { hasNimbusPostConfig, trackNimbusAwb } from '@/lib/nimbuspost'
+import { shippingCost } from '@/lib/utils'
 import {
   creditCashback,
   debitWallet,
@@ -127,9 +128,17 @@ export async function POST(req: Request) {
     const walletRequested = Math.max(0, Number(body.wallet_amount || 0))
     const walletUsed = Math.min(walletRequested, walletSnapshot.wallet.balance || 0, Math.max(0, body.subtotal - discountAmount))
 
-    const shipping = body.shipping || 0
-    const codCharge = body.cod_charge || 0
-    const smallOrderFee = body.small_order_fee || 0
+    // Backend fee recalculation and validation
+    const rawShipping = shippingCost(body.subtotal, body.city)
+    const shipping = (coupon && coupon.free_shipping) ? 0 : rawShipping
+
+    const isCod = !body.razorpay_order_id && !body.payment_id
+    const rawCodCharge = isCod ? 2900 : 0
+    const codCharge = (coupon && coupon.free_cod) ? 0 : rawCodCharge
+
+    const rawSmallOrderFee = body.subtotal < 50000 ? 1900 : 0
+    const smallOrderFee = (coupon && coupon.free_handling) ? 0 : rawSmallOrderFee
+
     const finalAmount = Math.max(0, body.subtotal + shipping + codCharge + smallOrderFee - discountAmount - walletUsed)
     const cashbackEarned = enableEarning ? Math.round((finalAmount * 5) / 100) : 0
     const orderRef = body.order_ref || `MANA${Date.now().toString().slice(-6)}`
@@ -163,8 +172,8 @@ export async function POST(req: Request) {
       discount: discountAmount,
       discount_amount: discountAmount,
       shipping,
-      cod_charge: body.cod_charge || 0,
-      small_order_fee: body.small_order_fee || 0,
+      cod_charge: codCharge,
+      small_order_fee: smallOrderFee,
       total: finalAmount,
       final_amount: finalAmount,
       wallet_used: walletUsed,
