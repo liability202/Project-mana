@@ -8,6 +8,7 @@ import { formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 import { BuyNowPopup } from '@/components/product/BuyNowPopup'
 import type { Product, Variant } from '@/lib/supabase'
+import { breadcrumbJsonLd, productJsonLd } from '@/lib/seo'
 
 type KitItem = {
   id: string
@@ -110,8 +111,41 @@ export default function KitSlugPage({ params }: { params: { slug: string } }) {
   if (loading) return <div className="p-12 text-center text-ink-3">Loading kit...</div>
   if (!kit) return <div className="p-12 text-center text-ink-3">Kit not found</div>
 
+  const kitVariants = normalizeVariants(kit)
+  const kitOfferPrice = kitVariants.reduce((lowest, variant) => {
+    const variantPrice = variant.price || kit.price
+    return lowest > 0 && lowest < variantPrice ? lowest : variantPrice
+  }, kit.price || kitVariants[0]?.price || 0)
+  const kitImages = [
+    ...(kit.images || []),
+    ...kitVariants.flatMap(variant => variant.tier_images || []),
+    ...kitVariants.flatMap(variant => variant.items?.map(item => item.image).filter((image): image is string => Boolean(image)) || []),
+  ]
+
   return (
-    <div className="bg-ivory2 min-h-screen pb-12">
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(productJsonLd({
+            product: kit,
+            path: `/kits/${kit.slug}`,
+            price: kitOfferPrice,
+            images: Array.from(new Set(kitImages)),
+          })),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'Kits', path: '/kits' },
+            { name: kit.name, path: `/kits/${kit.slug}` },
+          ])),
+        }}
+      />
+      <div className="bg-ivory2 min-h-screen pb-12">
       <div className="bg-green px-[5%] py-8 mb-6">
         <Link href="/kits" className="text-sm text-green-3 hover:text-white transition-colors flex items-center gap-1 mb-4">
           ← Back to Kits
@@ -124,7 +158,8 @@ export default function KitSlugPage({ params }: { params: { slug: string } }) {
       <div className="max-w-[1000px] mx-auto px-[5%]">
         <KitBuilder kit={kit} onClose={() => {}} />
       </div>
-    </div>
+      </div>
+    </>
   )
 }
 

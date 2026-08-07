@@ -11,6 +11,7 @@ import { ReviewList } from '@/components/product/ReviewList'
 import { ProductRecommendations } from '@/components/product/ProductRecommendations'
 import { BuyNowPopup } from '@/components/product/BuyNowPopup'
 import type { Product, Variant } from '@/lib/supabase'
+import { breadcrumbJsonLd, productJsonLd } from '@/lib/seo'
 
 const ACCOUNT_PHONE_KEY = 'mana_account_phone'
 
@@ -239,6 +240,38 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
 
   return (
     <>
+      {/* ── Product JSON-LD Structured Data (Google Rich Results) ── */}
+      {product && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(productJsonLd({
+              product,
+              path: `/products/${product.slug}`,
+              price: livePrice,
+              images: galleryImages,
+              aggregateRating: avgRating !== null && reviewCount > 0
+                ? { ratingValue: avgRating, reviewCount }
+                : null,
+            }))
+          }}
+        />
+      )}
+
+      {/* Breadcrumb JSON-LD */}
+      {product && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(breadcrumbJsonLd([
+              { name: 'Home', path: '/' },
+              { name: product.category.replace('-', ' '), path: `/products?category=${product.category}` },
+              { name: product.name, path: `/products/${product.slug}` },
+            ]))
+          }}
+        />
+      )}
+
       {/* Breadcrumb */}
       <div className="px-[5%] py-3 flex gap-1.5 text-[.68rem] text-ink-4">
         <Link href="/" className="hover:text-green transition-colors">Home</Link>
