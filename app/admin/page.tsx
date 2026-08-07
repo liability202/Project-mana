@@ -71,6 +71,8 @@ export default function AdminPage() {
     discount_type: 'percentage',
     discount_value: '',
     influencer_name: '',
+    influencer_phone: '',
+    creator_id: '',
     commission_rate: '',
     min_order_amount: '',
     max_discount: '',
@@ -285,6 +287,8 @@ export default function AdminPage() {
         discount_type: couponForm.discount_type,
         discount_value: Number(couponForm.discount_value || 0),
         influencer_name: couponForm.influencer_name || null,
+        influencer_phone: couponForm.influencer_phone || null,
+        creator_id: couponForm.creator_id || null,
         commission_rate: couponForm.commission_rate ? Number(couponForm.commission_rate) : null,
         min_order_amount: couponForm.min_order_amount ? Math.round(Number(couponForm.min_order_amount) * 100) : 0,
         max_discount: couponForm.max_discount ? Math.round(Number(couponForm.max_discount) * 100) : null,
@@ -308,6 +312,8 @@ export default function AdminPage() {
       discount_type: 'percentage',
       discount_value: '',
       influencer_name: '',
+      influencer_phone: '',
+      creator_id: '',
       commission_rate: '',
       min_order_amount: '',
       max_discount: '',
@@ -778,8 +784,47 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div>
+                  <label className="text-xs text-ink-3 block mb-1.5">Link Influencer (Optional)</label>
+                  <select
+                    value={couponForm.creator_id || couponForm.influencer_phone || ''}
+                    onChange={e => {
+                      const sel = e.target.value
+                      const creator = creators.find(c => String(c.id) === sel || String(c.phone) === sel)
+                      if (creator) {
+                        setCouponForm(prev => ({
+                          ...prev,
+                          creator_id: creator.id,
+                          influencer_name: creator.name,
+                          influencer_phone: creator.phone,
+                          code: prev.code || creator.code || '',
+                          commission_rate: prev.commission_rate || String(creator.commission_pct || 10),
+                        }))
+                      } else {
+                        setCouponForm(prev => ({
+                          ...prev,
+                          creator_id: '',
+                          influencer_name: '',
+                          influencer_phone: '',
+                        }))
+                      }
+                    }}
+                    className="input"
+                  >
+                    <option value="">-- General Coupon (No Influencer) --</option>
+                    {creators.map(c => (
+                      <option key={c.id} value={c.phone || c.id}>
+                        {c.name} ({c.phone}) — Code: {c.code}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="text-xs text-ink-3 block mb-1.5">Influencer Name</label>
                   <input value={couponForm.influencer_name} onChange={e => setCouponForm(prev => ({ ...prev, influencer_name: e.target.value }))} className="input" placeholder="Shubh" />
+                </div>
+                <div>
+                  <label className="text-xs text-ink-3 block mb-1.5">Influencer Phone Number</label>
+                  <input value={couponForm.influencer_phone} onChange={e => setCouponForm(prev => ({ ...prev, influencer_phone: e.target.value }))} className="input" placeholder="9876543210" />
                 </div>
                 <div>
                   <label className="text-xs text-ink-3 block mb-1.5">Commission Rate (%)</label>
@@ -877,7 +922,27 @@ export default function AdminPage() {
                             </div>
                           ) : null}
                         </td>
-                        <td className="px-4 py-3 text-ink-3">{coupon.influencer_name || '-'}</td>
+                        <td className="px-4 py-3 text-ink-3">
+                          {coupon.influencer_name || coupon.influencer_phone ? (
+                            <div>
+                              <div className="font-medium text-ink flex items-center gap-1.5 flex-wrap">
+                                <span>{coupon.influencer_name || 'Influencer'}</span>
+                                {coupon.is_influencer_code && (
+                                  <span className="text-[0.6rem] px-1.5 py-0.2 bg-purple-50 text-purple-700 border border-purple-200 rounded font-semibold uppercase">
+                                    Creator Code
+                                  </span>
+                                )}
+                              </div>
+                              {coupon.influencer_phone && (
+                                <div className="text-xs text-ink-4 font-mono font-medium mt-0.5">
+                                  📞 {coupon.influencer_phone}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-ink-4 italic">General Coupon</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-ink-3">{coupon.total_orders || coupon.usage_count || 0}</td>
                         <td className="px-4 py-3 text-ink-3">{formatPrice(coupon.total_revenue || 0)}</td>
                         <td className="px-4 py-3 text-ink-3">{formatPrice(coupon.total_discount_given || 0)}</td>

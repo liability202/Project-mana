@@ -84,8 +84,35 @@ export async function getCouponByCode(client: SupabaseClient, code: string) {
     .eq('is_active', true)
     .maybeSingle()
 
-  if (error) throw error
-  return data as CouponRecord | null
+  if (error && !isMissingRelationError(error)) throw error
+  if (data) return data as CouponRecord
+
+  // Fallback: check creators table for influencer codes
+  const { data: creator } = await client
+    .from('creators')
+    .select('*')
+    .eq('code', normalized)
+    .maybeSingle()
+
+  if (creator && (creator.active ?? true)) {
+    return {
+      id: `creator-${creator.id}`,
+      code: creator.code,
+      discount_type: 'percentage' as const,
+      discount_value: 10,
+      influencer_name: creator.name,
+      influencer_phone: creator.phone,
+      creator_id: creator.id,
+      commission_rate: creator.commission_pct || 10,
+      usage_count: 0,
+      total_orders: 0,
+      total_revenue: 0,
+      total_discount_given: 0,
+      is_active: true,
+    } as CouponRecord
+  }
+
+  return null
 }
 
 export async function ensureUserProfile(

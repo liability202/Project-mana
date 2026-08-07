@@ -16,12 +16,25 @@ export async function GET(req: Request) {
 
   const { data: creators } = await supabaseAdmin
     .from('creators')
-    .select('id,name,phone,code,commission_pct')
+    .select('id,name,phone,code,commission_pct,active')
 
   const creatorsByCode = new Map((creators || []).map((creator: any) => [String(creator.code || '').toUpperCase(), creator]))
+  const creatorsByPhone = new Map((creators || []).map((creator: any) => [String(creator.phone || '').replace(/\D/g, '').slice(-10), creator]))
+  const creatorsById = new Map((creators || []).map((creator: any) => [String(creator.id || ''), creator]))
+
+  const seenCodes = new Set<string>()
+
   const enriched = (data || []).map((coupon: any) => {
-    const creator = creatorsByCode.get(String(coupon.code || '').toUpperCase())
+    const couponCode = String(coupon.code || '').toUpperCase()
+    seenCodes.add(couponCode)
+
+    const creator =
+      (coupon.creator_id ? creatorsById.get(String(coupon.creator_id)) : null) ||
+      (coupon.influencer_phone ? creatorsByPhone.get(String(coupon.influencer_phone).replace(/\D/g, '').slice(-10)) : null) ||
+      creatorsByCode.get(couponCode)
+
     if (!creator) return coupon
+
     return {
       ...coupon,
       creator_id: coupon.creator_id || creator.id,
@@ -30,6 +43,30 @@ export async function GET(req: Request) {
       commission_rate: coupon.commission_rate ?? creator.commission_pct,
     }
   })
+
+  // Append any creator codes that are not in the coupons table yet
+  for (const creator of (creators || [])) {
+    const creatorCode = String(creator.code || '').toUpperCase()
+    if (creatorCode && !seenCodes.has(creatorCode)) {
+      seenCodes.add(creatorCode)
+      enriched.push({
+        id: `creator-${creator.id}`,
+        code: creator.code,
+        discount_type: 'percentage',
+        discount_value: 10,
+        influencer_name: creator.name,
+        influencer_phone: creator.phone,
+        creator_id: creator.id,
+        commission_rate: creator.commission_pct || 10,
+        usage_count: 0,
+        total_orders: 0,
+        total_revenue: 0,
+        total_discount_given: 0,
+        is_active: creator.active ?? true,
+        is_influencer_code: true,
+      })
+    }
+  }
 
   return NextResponse.json(enriched)
 }

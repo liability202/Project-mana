@@ -61,6 +61,7 @@ export type Coupon = {
   free_shipping?: boolean
   free_cod?: boolean
   free_handling?: boolean
+  is_influencer_code?: boolean
   created_at: string
 }
 export type Wallet = {
