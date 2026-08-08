@@ -206,7 +206,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── QUALITY PROMISE ── */}
-      <section className="section fade-in" style={{ background: 'var(--green)' }}>
+      <section className="section fade-in bg-green dark:bg-[#0A1810]">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <div className="eyebrow" style={{ color: 'var(--green4)' }}>Our Promise</div>
