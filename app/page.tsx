@@ -36,7 +36,7 @@ async function getKits(): Promise<Product[]> {
 }
 
 const CATEGORIES = [
-  { name: 'Dry Fruits', slug: 'dry-fruits', pill: 'Most Popular', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/objechttps://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/ChatGPT%20Image%20Aug%208,%202026,%2001_17_56%20PM%20copy.pngt/public/product%20image/ChatGPT%20Image%20Aug%208,%202026,%2001_10_45%20PM.png', count: '48 varieties' },
+  { name: 'Dry Fruits', slug: 'dry-fruits', pill: 'Most Popular', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/ChatGPT%20Image%20Aug%208,%202026,%2001_17_56%20PM%20copy.png', count: '48 varieties' },
   { name: 'Herbs', slug: 'herbs', pill: 'Ayurvedic', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/herbs%20category.png', count: '36 varieties' },
   { name: 'Spices', slug: 'spices', pill: 'Single Origin', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/Spices%20category.png', count: '54 varieties' },
   { name: 'Pansari', slug: 'pansari', pill: 'Traditional', img: 'https://dktkyiwuegyievucnoxc.supabase.co/storage/v1/object/public/product%20image/Pansari%20category.png', count: '62 varieties' },
