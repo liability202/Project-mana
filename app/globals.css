@@ -117,6 +117,9 @@
 .dark .bg-white\/80      { background-color: rgb(var(--c-surface) / 0.8); }
 .dark .bg-white\/40      { background-color: rgb(var(--c-surface) / 0.4); }
 
+/* nav links + icon buttons are lighter in dark mode */
+.dark .text-ink-2        { color: var(--ink2); }
+
 .dark .bg-green          { background-color: #1E4433; }
 .dark .bg-green-2        { background-color: #27563F; }
 .dark .bg-green-3        { background-color: #346B50; }
@@ -359,5 +362,6 @@ input[type=range]::-webkit-slider-thumb {
     background: rgb(var(--c-ivory2));
     color: var(--ink);
   }
+  .input::placeholder { color: var(--ink4); opacity: 1; }
   .input:focus { border-color: var(--green3); }
 }
