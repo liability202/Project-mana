@@ -98,6 +98,7 @@ const websiteSchema = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: 'Mana Dry Fruits',
+  alternateName: ['manadryfruits', 'Mana', 'manadryfruits.com'],
   url: siteUrl,
   potentialAction: {
     '@type': 'SearchAction',

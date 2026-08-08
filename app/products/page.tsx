@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { supabase } from '@/lib/supabase'
 import { ProductCard } from '@/components/product/ProductCard'
 import { SortSelect } from '@/components/product/SortSelect'
@@ -15,6 +16,23 @@ const CATEGORIES = [
   { value: 'spices', label: 'Spices' },
   { value: 'pansari', label: 'Pansari Items' },
 ]
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const activeCategory = searchParams.category || ''
+  const catLabel = CATEGORIES.find(c => c.value === activeCategory)?.label || 'All Products'
+  const canonical = activeCategory 
+    ? `https://manadryfruits.com/products?category=${activeCategory}` 
+    : 'https://manadryfruits.com/products'
+
+  return {
+    title: `${catLabel}`,
+    description: `Shop high-quality, visually graded, FSSAI certified ${catLabel.toLowerCase()} online at Mana. Freshly packaged to order with fast shipping across India.`,
+    alternates: {
+      canonical,
+    },
+  }
+}
+
 
 const TAGS = ['All', 'Bestseller', 'Organic', 'Premium']
 

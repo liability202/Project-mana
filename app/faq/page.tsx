@@ -189,8 +189,27 @@ export default function FAQPage() {
     }))
   }
 
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqGroups.flatMap(group =>
+      group.items.map(item => ({
+        '@type': 'Question',
+        name: item.q,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: item.a
+        }
+      }))
+    )
+  }
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
       <header className="bg-green px-[5%] py-16 md:py-20">
         <div className="mx-auto max-w-[980px]">
           <nav aria-label="Breadcrumb" className="mb-5 text-[0.72rem] text-green-4">

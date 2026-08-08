@@ -1,5 +1,14 @@
+import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'Our Story',
+  description: 'Discover how MK and Sons brings decades of direct farm relationships to offer the finest, visually graded, lab tested dry fruits, herbs, and spices.',
+  alternates: {
+    canonical: 'https://manadryfruits.com/about',
+  },
+}
 
 export default function AboutPage() {
   return (
