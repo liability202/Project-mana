@@ -348,11 +348,11 @@ input[type=range]::-webkit-slider-thumb {
   }
 
   .section-title {
-    @apply font-serif text-2xl sm:text-3xl md:text-4xl font-light text-ink dark:text-ink leading-tight tracking-tight;
+    @apply font-serif text-2xl sm:text-3xl md:text-4xl font-light text-ink dark:text-ivory leading-tight tracking-tight;
   }
 
   .input {
-    @apply w-full px-4 py-3 border border-ivory-3 dark:border-green-5/20 rounded-md font-sans text-base sm:text-sm text-ink dark:text-ink
+    @apply w-full px-4 py-3 border border-ivory-3 dark:border-green-5/20 rounded-md font-sans text-base sm:text-sm text-ink dark:text-ivory
            bg-white dark:bg-[rgb(var(--c-ivory2))] outline-none transition-colors duration-200;
   }
   .input:focus { @apply border-green-3 dark:border-green; }

@@ -64,14 +64,14 @@ export function Navbar() {
           </div>
           <div>
             <div className="font-serif text-2xl font-normal leading-none tracking-wide text-green dark:text-green">MANA</div>
-            <div className="mt-0.5 hidden text-[.42rem] uppercase tracking-[.4em] text-ink-3 dark:text-ink-3 sm:block">The Essence of Nature</div>
+            <div className="mt-0.5 hidden text-[.42rem] uppercase tracking-[.4em] text-ink-3 dark:text-ivory-3 sm:block">The Essence of Nature</div>
           </div>
         </Link>
 
         <ul className="hidden list-none items-center gap-7 lg:flex">
           {NAV_LINKS.map((link) => (
             <li key={link.href}>
-              <Link href={link.href} className="text-[.76rem] font-normal tracking-wide text-ink-2 transition-colors hover:text-green no-underline">
+              <Link href={link.href} className="text-[.76rem] font-normal tracking-wide text-ink-2 dark:text-ivory-3 transition-colors hover:text-green dark:hover:text-green no-underline">
                 {link.label}
               </Link>
             </li>
@@ -81,7 +81,7 @@ export function Navbar() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSearchOpen(true)}
-            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ink-3 transition-colors hover:text-green dark:hover:text-green"
+            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ivory-3 transition-colors hover:text-green dark:hover:text-green"
             aria-label="Search"
           >
             <Search size={19} />
@@ -91,7 +91,7 @@ export function Navbar() {
           <button
             id="theme-toggle"
             onClick={handleThemeToggle}
-            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ink-3 transition-colors hover:text-green dark:hover:text-green"
+            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ivory-3 transition-colors hover:text-green dark:hover:text-green"
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {theme === 'dark'
@@ -132,7 +132,7 @@ export function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className="border-b border-ivory-3 dark:border-green-5/10 px-[5%] py-4 text-sm text-ink-2 dark:text-ink-2 transition-colors hover:bg-ivory-2 dark:hover:bg-green-6/10 hover:text-green no-underline"
+                className="border-b border-ivory-3 dark:border-green-5/10 px-[5%] py-4 text-sm text-ink-2 dark:text-ivory-3 transition-colors hover:bg-ivory-2 dark:hover:bg-green-6/10 hover:text-green no-underline"
               >
                 {link.label}
               </Link>
