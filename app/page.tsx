@@ -67,8 +67,11 @@ export default async function HomePage() {
       {/* ── HERO ── */}
       <section className="relative flex items-center justify-center min-h-[85vh] px-[5%] py-20 overflow-hidden text-center">
         <style dangerouslySetInnerHTML={{__html: `
-          @keyframes kenburns { 0% { transform: scale(1); } 100% { transform: scale(1.15); } }
-          .animate-kenburns { animation: kenburns 30s ease-in-out infinite alternate; }
+          @keyframes kenburns { 0% { transform: scale(1) translateZ(0); } 100% { transform: scale(1.15) translateZ(0); } }
+          .animate-kenburns { 
+            animation: kenburns 30s ease-in-out infinite alternate; 
+            will-change: transform;
+          }
         `}} />
         <div className="absolute inset-0 z-0 bg-ink">
           <Image
@@ -78,7 +81,7 @@ export default async function HomePage() {
             className="object-cover object-center opacity-80 animate-kenburns"
             priority
           />
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
+          <div className="absolute inset-0 bg-black/60" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/40" />
         </div>
         <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col items-center mt-8">
@@ -297,7 +300,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── CHAT & BUY ── */}
-      <section className="section fade-in" style={{ background: 'rgb(var(--c-ivory))' }}>
+      <section className="section fade-in bg-green-6 dark:bg-[rgb(var(--c-ivory))]">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div className="rounded-2xl p-5 max-w-md mx-auto w-full" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgba(var(--c-green5), 0.2)', boxShadow: 'var(--shadow-soft)' }}>
             <div className="flex items-center gap-2.5 pb-3.5 mb-3.5" style={{ borderBottom: '1px solid rgba(var(--c-green5), 0.15)' }}>
