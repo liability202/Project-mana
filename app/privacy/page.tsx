@@ -1,4 +1,11 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy',
+  description: 'How Mana Dry Fruits collects, uses and protects your personal information.',
+  alternates: { canonical: '/privacy' },
+}
 
 const LAST_UPDATED = 'April 14, 2026'
 

@@ -2,6 +2,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type DiscountType = 'percentage' | 'fixed'
 
+/**
+ * The loyalty code is built into the app rather than stored in `coupons`: it is
+ * granted automatically to anyone with a prior order, so there is no row to
+ * create or expire. Both the validator that issues the discount and the admin
+ * analytics that report on it read these constants, so the two cannot drift.
+ */
+export const LOYALTY_CODE = 'LOYAL12'
+export const LOYALTY_DISCOUNT_PCT = 12
+
 export type CouponRecord = {
   id: string
   code: string

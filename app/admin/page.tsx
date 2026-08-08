@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/utils'
+import { LoyaltyPanel } from '@/components/admin/LoyaltyPanel'
 import type { Coupon, Order, Product, Review } from '@/lib/supabase'
 
 type AdminTab = 'orders' | 'products' | 'kits' | 'coupons' | 'customers' | 'reviews' | 'creators' | 'settings'
@@ -57,8 +59,12 @@ function isOverdue(order: Order) {
 }
 
 export default function AdminPage() {
+  const router = useRouter()
   const [auth, setAuth] = useState(false)
   const [password, setPassword] = useState('')
+  // Mirrors localStorage `mana_admin`; child panels need it during render, and
+  // reading localStorage there would break server rendering.
+  const [adminSecret, setAdminSecret] = useState('')
   const [tab, setTab] = useState<AdminTab>('orders')
   const [orders, setOrders] = useState<Order[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -101,6 +107,15 @@ export default function AdminPage() {
   } | null>(null)
   const [reviewModal, setReviewModal] = useState<{ order: any } | null>(null)
   const [shipLoading, setShipLoading] = useState(false)
+  const [invoiceForm, setInvoiceForm] = useState<{
+    id: string
+    orderRef: string
+    invoice_number: string
+    invoice_url: string
+    file: File | null
+  } | null>(null)
+  const [invoiceLoading, setInvoiceLoading] = useState(false)
+  const [invoiceMessage, setInvoiceMessage] = useState('')
   const [creatorForm, setCreatorForm] = useState({
     name: '',
     phone: '',
@@ -130,6 +145,7 @@ export default function AdminPage() {
     if (res.ok) {
       localStorage.setItem('mana_admin', password)
       setAuth(true)
+      setAdminSecret(password)
       loadData(password)
     } else {
       alert('Wrong password')
@@ -172,6 +188,7 @@ export default function AdminPage() {
           return
         }
         setAuth(true)
+        setAdminSecret(saved)
         loadData(saved)
       })
     }
@@ -187,6 +204,72 @@ export default function AdminPage() {
     const updated = await res.json()
     if (res.ok) {
       setOrders(prev => prev.map(order => order.id === id ? updated : order))
+    }
+  }
+
+  const uploadInvoice = async () => {
+    if (!invoiceForm) return
+    if (!invoiceForm.file) {
+      setInvoiceMessage('Choose an invoice file to upload.')
+      return
+    }
+
+    setInvoiceLoading(true)
+    setInvoiceMessage('')
+
+    const secret = localStorage.getItem('mana_admin') || ''
+    const body = new FormData()
+    body.append('order_id', invoiceForm.id)
+    body.append('invoice_number', invoiceForm.invoice_number)
+    body.append('file', invoiceForm.file)
+
+    try {
+      const res = await fetch('/api/admin/orders/invoice', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${secret}` },
+        body,
+      })
+      const updated = await res.json()
+
+      if (!res.ok) {
+        setInvoiceMessage(updated?.error || 'Invoice upload failed.')
+        return
+      }
+
+      setOrders(prev => prev.map(order => (order.id === updated.id ? updated : order)))
+      setInvoiceForm(null)
+    } catch (err: any) {
+      setInvoiceMessage(err?.message || 'Invoice upload failed.')
+    } finally {
+      setInvoiceLoading(false)
+    }
+  }
+
+  const removeInvoice = async (orderId: string) => {
+    if (!confirm('Remove the uploaded invoice from this order?')) return
+
+    setInvoiceLoading(true)
+    setInvoiceMessage('')
+
+    const secret = localStorage.getItem('mana_admin') || ''
+    try {
+      const res = await fetch(`/api/admin/orders/invoice?orderId=${orderId}`, {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${secret}` },
+      })
+      const updated = await res.json()
+
+      if (!res.ok) {
+        setInvoiceMessage(updated?.error || 'Could not remove the invoice.')
+        return
+      }
+
+      setOrders(prev => prev.map(order => (order.id === updated.id ? updated : order)))
+      setInvoiceForm(null)
+    } catch (err: any) {
+      setInvoiceMessage(err?.message || 'Could not remove the invoice.')
+    } finally {
+      setInvoiceLoading(false)
     }
   }
 
@@ -618,6 +701,32 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  <div className="rounded-lg bg-ivory-2 p-3 mb-3 text-xs flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-ink-4 mb-1">Customer Invoice</div>
+                      {order.invoice_url ? (
+                        <div className="font-medium text-green-3">
+                          Uploaded{order.invoice_number ? ` · ${order.invoice_number}` : ''}
+                          {order.invoice_uploaded_at
+                            ? ` · ${new Date(order.invoice_uploaded_at).toLocaleDateString('en-IN')}`
+                            : ''}
+                        </div>
+                      ) : (
+                        <div className="font-medium text-ink-3">Not uploaded — customer sees no download button</div>
+                      )}
+                    </div>
+                    {order.invoice_url && (
+                      <a
+                        href={order.invoice_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-green-3 hover:text-green underline"
+                      >
+                        View file
+                      </a>
+                    )}
+                  </div>
+
                   <div className="flex flex-col gap-1 mb-3 text-sm text-ink-3">
                     {(order.items as any[]).map((item, i) => (
                       <div key={i} className="flex justify-between">
@@ -665,6 +774,25 @@ export default function AdminPage() {
                       className="text-xs px-3 py-1 rounded-md border transition-all cursor-pointer bg-white text-green border-green-5 hover:bg-green-6"
                     >
                       Tracking Details
+                    </button>
+                    <button
+                      onClick={() => {
+                        setInvoiceMessage('')
+                        setInvoiceForm({
+                          id: order.id,
+                          orderRef: order.order_ref || order.id.slice(0, 8).toUpperCase(),
+                          invoice_number: order.invoice_number || '',
+                          invoice_url: order.invoice_url || '',
+                          file: null,
+                        })
+                      }}
+                      className={`text-xs px-3 py-1 rounded-md border transition-all cursor-pointer ${
+                        order.invoice_url
+                          ? 'bg-green-6 text-green-2 border-green-5 hover:bg-green-5'
+                          : 'bg-white text-ink-3 border-ivory-3 hover:border-green-4 hover:text-green'
+                      }`}
+                    >
+                      {order.invoice_url ? '🧾 Invoice ✓' : '🧾 Upload Invoice'}
                     </button>
                   </div>
                 </div>
@@ -766,6 +894,7 @@ export default function AdminPage() {
             </div>
           </div>
         ) : tab === 'coupons' ? (
+          <div className="space-y-6">
           <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
             <form onSubmit={createCoupon} className="bg-white border border-ivory-3 rounded-xl p-5">
               <h2 className="font-serif text-xl text-ink mb-4">Create Coupon</h2>
@@ -951,8 +1080,18 @@ export default function AdminPage() {
                         <td className="px-4 py-3 text-ink-3">{coupon.total_orders || 0}</td>
                         <td className="px-4 py-3 text-ink-3">
                           <div>{formatPrice(coupon.total_revenue || 0)}</div>
-                          {coupon.total_commission != null && (
-                            <div className="text-xs text-green-3 mt-0.5">↳ Commission: {formatPrice(coupon.total_commission)}</div>
+                          {(coupon.total_commission || 0) > 0 && (
+                            <>
+                              <div className="text-xs text-green-3 mt-0.5">↳ Commission: {formatPrice(coupon.total_commission || 0)}</div>
+                              <div className="text-[0.65rem] text-ink-4 mt-0.5">
+                                {formatPrice(coupon.commission_pending || 0)} pending ·{' '}
+                                {formatPrice(coupon.commission_confirmed || 0)} ready ·{' '}
+                                {formatPrice(coupon.commission_paid || 0)} paid
+                              </div>
+                              {coupon.commission_source === 'orders_fallback' && (
+                                <div className="text-[0.6rem] text-ink-4 italic mt-0.5">estimated from orders</div>
+                              )}
+                            </>
                           )}
                         </td>
                         <td className="px-4 py-3 text-ink-3">{formatPrice(coupon.total_discount_given || 0)}</td>
@@ -1011,11 +1150,17 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
+
+          {/* LOYAL12 lives in code, not in the coupons table — its analytics
+              get their own panel so they aren't invisible. */}
+          <LoyaltyPanel adminSecret={adminSecret} />
+          </div>
         ) : tab === 'creators' ? (
           <div className="space-y-8">
             <div className="flex items-start justify-between gap-6 flex-wrap">
                <div className="flex-1 min-w-[300px]">
-                  <h2 className="font-serif text-xl text-ink mb-4">Manage Creators</h2>
+                  <h2 className="font-serif text-xl text-ink mb-1">Manage Creators</h2>
+                  <p className="text-xs text-ink-4 mb-4">Click any creator to open their full dashboard and payout requests.</p>
                   <div className="bg-white border border-ivory-3 rounded-xl overflow-hidden shadow-soft">
                     <table className="w-full text-left text-sm">
                       <thead className="bg-ivory-2 border-b border-ivory-3 font-serif">
@@ -1027,7 +1172,12 @@ export default function AdminPage() {
                       </thead>
                       <tbody className="divide-y divide-ivory-3">
                         {creators.map(c => (
-                          <tr key={c.id}>
+                          <tr
+                            key={c.id}
+                            onClick={() => router.push(`/admin/creator/${c.id}`)}
+                            title={`Open ${c.name}'s full dashboard`}
+                            className="cursor-pointer hover:bg-ivory-2/60 transition-colors"
+                          >
                             <td className="px-4 py-3">
                               <div className="font-medium text-ink">{c.name}</div>
                               <div className="text-[.68rem] text-green-3 font-bold uppercase tracking-widest mt-0.5">{c.code} · {c.phone}</div>
@@ -1036,10 +1186,11 @@ export default function AdminPage() {
                               <div className="text-[.75rem] font-medium"><span className="text-ink-4 uppercase text-[.6rem] font-bold tracking-tighter">Earned</span> {formatPrice(c.total_earned)}</div>
                               <div className="text-[.75rem] font-medium"><span className="text-ink-4 uppercase text-[.6rem] font-bold tracking-tighter">Paid</span> {formatPrice(c.total_paid)}</div>
                             </td>
-                            <td className="px-4 py-3 text-right">
+                            <td className="px-4 py-3 text-right whitespace-nowrap">
                                <span className={`px-2 py-0.5 rounded text-[.6rem] font-bold uppercase tracking-widest ${c.active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
                                  {c.active ? 'Active' : 'Inactive'}
                                </span>
+                               <span className="text-ink-4 ml-2 text-xs">›</span>
                             </td>
                           </tr>
                         ))}
@@ -1113,8 +1264,14 @@ export default function AdminPage() {
                         payouts.map(p => (
                           <tr key={p.id} className={`hover:bg-ivory-2/20 transition-colors ${p.status === 'pending' ? 'bg-amber-50/20' : ''}`}>
                             <td className="px-4 py-4">
-                              <div className="font-medium text-ink">{p.creators?.name}</div>
-                              <div className="text-[.68rem] text-green-3 font-bold uppercase mt-0.5 tracking-widest">{p.creators?.code}</div>
+                              <button
+                                onClick={() => p.creator_id && router.push(`/admin/creator/${p.creator_id}`)}
+                                title="Open this creator's dashboard"
+                                className="text-left bg-transparent border-none cursor-pointer p-0 group"
+                              >
+                                <div className="font-medium text-ink group-hover:text-green transition-colors">{p.creators?.name}</div>
+                                <div className="text-[.68rem] text-green-3 font-bold uppercase mt-0.5 tracking-widest">{p.creators?.code} ›</div>
+                              </button>
                             </td>
                             <td className="px-4 py-4">
                                <div className="font-serif font-bold text-lg text-ink">{formatPrice(p.amount)}</div>
@@ -1383,6 +1540,102 @@ on conflict (key) do nothing;`}</pre>
       )}
 
       {/* Manual Tracking Modal */}
+      {/* Invoice Upload Modal */}
+      {invoiceForm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm"
+          onClick={e => e.target === e.currentTarget && setInvoiceForm(null)}
+        >
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl relative">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="font-serif text-xl text-ink">Customer Invoice</h3>
+                <p className="text-sm text-ink-3">Order #{invoiceForm.orderRef}</p>
+              </div>
+              <button onClick={() => setInvoiceForm(null)} className="text-ink-4 hover:text-ink text-lg leading-none">×</button>
+            </div>
+
+            {invoiceForm.invoice_url && (
+              <div className="mb-5 rounded-lg border border-green-5 bg-green-6 p-3 text-sm">
+                <div className="text-green-2 font-medium mb-1">An invoice is already attached</div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={invoiceForm.invoice_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-3 underline hover:text-green"
+                  >
+                    View current file
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => removeInvoice(invoiceForm.id)}
+                    disabled={invoiceLoading}
+                    className="text-red-600 hover:text-red-700 underline disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <p className="text-xs text-green-2/80 mt-2">Uploading a new file replaces this one.</p>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-ink-3 block mb-1.5">Invoice Number (optional)</label>
+                <input
+                  value={invoiceForm.invoice_number}
+                  onChange={e => setInvoiceForm(prev => (prev ? { ...prev, invoice_number: e.target.value } : prev))}
+                  className="input"
+                  placeholder="e.g. MANA/2026/00123"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-ink-3 block mb-1.5">Invoice File (PDF, PNG, JPG · max 10MB)</label>
+                <input
+                  type="file"
+                  accept="application/pdf,image/png,image/jpeg,image/webp"
+                  onChange={e =>
+                    setInvoiceForm(prev => (prev ? { ...prev, file: e.target.files?.[0] || null } : prev))
+                  }
+                  className="w-full text-sm text-ink-2 file:mr-3 file:rounded-md file:border-0 file:bg-green file:px-4 file:py-2 file:text-ivory file:text-sm file:cursor-pointer"
+                />
+                {invoiceForm.file && (
+                  <p className="text-xs text-ink-4 mt-1.5">
+                    {invoiceForm.file.name} · {(invoiceForm.file.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                )}
+              </div>
+
+              {invoiceMessage && <div className="text-sm text-red-600">{invoiceMessage}</div>}
+
+              <p className="text-xs text-ink-4">
+                Once uploaded, the customer sees a “Download Invoice” button on this order in their profile.
+              </p>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setInvoiceForm(null)}
+                  className="btn-outline flex-1 justify-center py-2.5"
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={uploadInvoice}
+                  disabled={invoiceLoading || !invoiceForm.file}
+                  className="btn-primary flex-1 justify-center py-2.5 disabled:opacity-50"
+                  type="button"
+                >
+                  {invoiceLoading ? 'Uploading...' : 'Upload Invoice'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {trackingForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl relative animate-scale-in">

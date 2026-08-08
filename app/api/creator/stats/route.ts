@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { commissionableAmount, estimateCommission, isLiveCommissionStatus } from '@/lib/commissions'
+import { bucketByRange, isDateRange, rangeStartISO, type DateRange } from '@/lib/date-ranges'
 
 export async function GET(req: Request) {
   try {
@@ -10,9 +12,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Creator ID is required.' }, { status: 400 })
     }
 
+    // Chart range only — the stat cards stay lifetime/this-month figures.
+    const rangeParam = searchParams.get('range')
+    const chartRange: DateRange = isDateRange(rangeParam) ? rangeParam : 'month'
+    const chartSince = rangeStartISO(chartRange)
+
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    const eightWeeksAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
 
     // Fetch creator profile — need code and commission_pct
     const { data: creatorData } = await supabaseAdmin
@@ -24,6 +30,19 @@ export async function GET(req: Request) {
     const creatorCode = creatorData?.code || ''
     const commissionPct = creatorData?.commission_pct || 10
 
+    // "All time" has no lower bound; every other range is trimmed server-side
+    // so a year view doesn't drag the whole ledger over the wire.
+    let chartQuery = supabaseAdmin
+      .from('commissions')
+      .select('created_at')
+      .eq('creator_id', creatorId)
+      .order('created_at', { ascending: true })
+
+    if (chartSince) {
+      chartQuery = chartQuery.gte('created_at', chartSince)
+    }
+
+    // Fetch commissions + visits in parallel
     // ── Resolve ALL coupon codes linked to this creator ──────────────────────
     // A creator may have multiple coupons assigned by admin via creator_id,
     // or their code may differ from what's stored in the coupons table.
@@ -54,12 +73,7 @@ export async function GET(req: Request) {
         .gte('created_at', startOfMonth.toISOString())
         .in('status', ['confirmed', 'paid']),
 
-      supabaseAdmin
-        .from('commissions')
-        .select('created_at')
-        .eq('creator_id', creatorId)
-        .gte('created_at', eightWeeksAgo.toISOString())
-        .order('created_at', { ascending: true }),
+      chartQuery,
 
       // Visits — match any of the creator's codes
       codesArray.length > 0
@@ -90,7 +104,7 @@ export async function GET(req: Request) {
 
     if (useCommissions) {
       // Use commissions table (preferred — accurate commission amounts)
-      totalOrders = allCommissions.filter(c => c.status !== 'cancelled').length
+      totalOrders = allCommissions.filter(c => isLiveCommissionStatus(c.status)).length
       pendingPayout = allCommissions
         .filter(c => c.status === 'confirmed')
         .reduce((sum, c) => sum + (c.commission_amount || 0), 0)
@@ -104,12 +118,12 @@ export async function GET(req: Request) {
     } else {
       // Fallback: derive stats from orders table using all linked coupon codes
       const fallbackOrders = (ordersRes as any).data || []
-      const activeOrders = fallbackOrders.filter((o: any) => o.status !== 'cancelled')
+      const activeOrders = fallbackOrders.filter((o: any) => isLiveCommissionStatus(o.status))
 
       totalOrders = activeOrders.length
 
-      // Use the commission_rate stored on the specific coupon that was used,
-      // falling back to the creator's default commission_pct
+      // Rate comes from the specific coupon that was used, falling back to the
+      // creator's default — a creator can own several codes at different rates.
       const getCommissionRate = (usedCode: string) => {
         const matched = (linkedCoupons || []).find(
           c => String(c.code || '').toUpperCase() === String(usedCode || '').toUpperCase()
@@ -117,15 +131,15 @@ export async function GET(req: Request) {
         return matched?.commission_rate ?? commissionPct
       }
 
-      const estimateCommission = (o: any) => {
-        const rate = getCommissionRate(o.coupon_code)
-        return Math.round(((o.subtotal || o.total || o.final_amount || 0) * rate) / 100)
-      }
+      // The amount and the rounding come from lib/commissions.ts so this agrees
+      // with the admin coupon report to the rupee.
+      const orderCommission = (o: any) =>
+        estimateCommission(commissionableAmount(o), getCommissionRate(o.coupon_code))
 
-      pendingPayout = activeOrders.reduce((sum: number, o: any) => sum + estimateCommission(o), 0)
+      pendingPayout = activeOrders.reduce((sum: number, o: any) => sum + orderCommission(o), 0)
       thisMonthEarnings = activeOrders
         .filter((o: any) => new Date(o.created_at) >= startOfMonth)
-        .reduce((sum: number, o: any) => sum + estimateCommission(o), 0)
+        .reduce((sum: number, o: any) => sum + orderCommission(o), 0)
       totalEarnedLifetime = creatorData?.total_earned || pendingPayout
       chartSourceData = activeOrders.map((o: any) => ({ created_at: o.created_at }))
     }
@@ -133,29 +147,12 @@ export async function GET(req: Request) {
     // Visits — gracefully handle if referral_visits table doesn't exist
     const totalVisits = (visitsRes as any).count || 0
 
-    // Build weekly chart for last 8 weeks
-    const chartData = []
-    for (let i = 7; i >= 0; i--) {
-      const d = new Date()
-      d.setDate(d.getDate() - i * 7)
-
-      const startOfWeek = new Date(d)
-      startOfWeek.setHours(0, 0, 0, 0)
-      startOfWeek.setDate(d.getDate() - d.getDay())
-
-      const endOfWeek = new Date(startOfWeek)
-      endOfWeek.setDate(startOfWeek.getDate() + 7)
-
-      const weekOrders = chartSourceData.filter(c => {
-        const cDate = new Date(c.created_at)
-        return cDate >= startOfWeek && cDate < endOfWeek
-      }).length
-
-      chartData.push({
-        name: startOfWeek.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-        orders: weekOrders,
-      })
-    }
+    // Bucket size follows the selected range (3-hourly → yearly).
+    const { points: chartData, granularity: chartGranularity } = bucketByRange(
+      chartRange,
+      chartSourceData.map(c => c.created_at),
+      now
+    )
 
     return NextResponse.json({
       totalOrders,
@@ -164,6 +161,8 @@ export async function GET(req: Request) {
       totalEarnedLifetime,
       totalVisits,
       chartData,
+      chartRange,
+      chartGranularity,
       codesTracked: codesArray,  // useful for debugging from creator portal
       dataSource: useCommissions ? 'commissions' : 'orders_fallback',
     })

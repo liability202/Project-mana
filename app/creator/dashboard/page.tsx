@@ -21,11 +21,15 @@ import {
   ResponsiveContainer 
 } from 'recharts'
 import { formatPrice } from '@/lib/utils'
+import { RangeFilter } from '@/components/ui/RangeFilter'
+import { chartCaption, type DateRange } from '@/lib/date-ranges'
 
 export default function CreatorDashboard() {
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [creator, setCreator] = useState<any>(null)
+  const [chartRange, setChartRange] = useState<DateRange>('month')
+  const [chartLoading, setChartLoading] = useState(false)
   const [linkedCodes, setLinkedCodes] = useState<string[]>([])
 
   useEffect(() => {
@@ -33,7 +37,6 @@ export default function CreatorDashboard() {
     if (!creatorStr) return
     const c = JSON.parse(creatorStr)
     setCreator(c)
-    fetchStats(c.id)
 
     // Refresh creator data in case admin edited the code
     fetch(`/api/creator/profile?id=${c.id}`)
@@ -56,9 +59,22 @@ export default function CreatorDashboard() {
       .catch(() => {})
   }, [])
 
-  const fetchStats = async (id: string) => {
+  // Keyed on the id rather than the creator object so the profile refresh above
+  // doesn't trigger a second stats fetch.
+  useEffect(() => {
+    if (!creator?.id) return
+    fetchStats(creator.id, chartRange)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creator?.id, chartRange])
+
+  const fetchStats = async (id: string, range: DateRange) => {
+    // Only the first load blanks the page; changing the range just dims the
+    // chart, so the stat cards don't flash away under the cursor.
+    const firstLoad = stats === null
+    if (!firstLoad) setChartLoading(true)
+
     try {
-      const res = await fetch(`/api/creator/stats?creatorId=${id}`)
+      const res = await fetch(`/api/creator/stats?creatorId=${id}&range=${range}`)
       const data = await res.json()
       if (res.ok) {
         setStats(data)
@@ -67,6 +83,7 @@ export default function CreatorDashboard() {
       console.error('Failed to fetch stats:', err)
     } finally {
       setLoading(false)
+      setChartLoading(false)
     }
   }
 
@@ -90,6 +107,10 @@ export default function CreatorDashboard() {
       <button onClick={() => window.location.reload()} className="btn-primary">Try Again</button>
     </div>
   )
+
+  // A month view is 31 bars — thin them out so the axis stays readable.
+  const chartPoints = stats.chartData || []
+  const tickInterval = chartPoints.length > 12 ? Math.ceil(chartPoints.length / 10) - 1 : 0
 
   return (
     <div className="space-y-10 animate-fade-in pb-10">
@@ -134,11 +155,12 @@ export default function CreatorDashboard() {
           icon={<Users size={18} />} 
           subtitle="People who verified via your link"
         />
-        <StatCard 
-          label="Total Orders" 
-          value={stats.totalOrders} 
-          icon={<ShoppingBag size={18} />} 
+        <StatCard
+          label="Total Orders"
+          value={stats.totalOrders}
+          icon={<ShoppingBag size={18} />}
           subtitle="Orders placed using your code"
+          href="/creator/orders"
         />
         <StatCard 
           label="This Month" 
@@ -163,27 +185,34 @@ export default function CreatorDashboard() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Performance Chart */}
         <div className="xl:col-span-2 bg-white border border-ivory-3 rounded-2xl p-6 lg:p-8 shadow-soft">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
             <div>
-              <h3 className="font-serif text-xl text-ink font-light">Weekly Performance</h3>
-              <p className="text-[.68rem] text-ink-4 uppercase tracking-wider mt-1">Last 8 weeks order volume</p>
+              <h3 className="font-serif text-xl text-ink font-light">Performance</h3>
+              <p className="text-[.68rem] text-ink-4 uppercase tracking-wider mt-1">
+                {chartCaption(chartRange, stats.chartGranularity || 'day')}
+              </p>
             </div>
+            <RangeFilter value={chartRange} onChange={setChartRange} size="sm" />
           </div>
-          <div className="h-[320px] w-full">
+          <div className={`h-[320px] w-full transition-opacity ${chartLoading ? 'opacity-40' : 'opacity-100'}`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="6 6" vertical={false} stroke="#F5F0E8" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fill: '#8A7860', fontWeight: 500 }} 
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: '#8A7860', fontWeight: 500 }}
                   dy={15}
+                  interval={tickInterval}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fill: '#8A7860', fontWeight: 500 }} 
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: '#8A7860', fontWeight: 500 }}
+                  // Orders are whole things — without this a max of 1 renders
+                  // ticks at 0.25 / 0.5 / 0.75.
+                  allowDecimals={false}
                 />
                 <Tooltip 
                   cursor={{ fill: '#FDF0E8', radius: 4 }}
@@ -196,12 +225,12 @@ export default function CreatorDashboard() {
                   }}
                   itemStyle={{ fontWeight: 700, color: '#1C3D2E' }}
                 />
-                <Bar 
-                  dataKey="orders" 
-                  fill="#1C3D2E" 
-                  radius={[6, 6, 0, 0]} 
-                  barSize={40}
-                  animationDuration={1500}
+                <Bar
+                  dataKey="orders"
+                  fill="#1C3D2E"
+                  radius={[6, 6, 0, 0]}
+                  maxBarSize={40}
+                  animationDuration={800}
                 />
               </BarChart>
             </ResponsiveContainer>

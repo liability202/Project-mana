@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useCart } from '@/lib/store'
 import { formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
-import { Package, Wallet, Clock, ChevronRight, Star } from 'lucide-react'
+import { Package, Wallet, Clock, ChevronRight, Star, Download } from 'lucide-react'
 import Link from 'next/link'
 
 const ACCOUNT_PHONE_KEY = 'mana_account_phone'
@@ -489,9 +489,28 @@ export default function ProfilePage() {
                           </div>
 
                           {/* Order Action */}
-                          <div className="px-5 py-3 border-t" style={{ background: 'rgba(var(--c-ivory), 0.3)', borderColor: 'rgb(var(--c-ivory3))' }}>
-                            <button 
-                              onClick={() => handleReorder(order)} 
+                          <div className="px-5 py-3 border-t flex flex-wrap items-center justify-between gap-3" style={{ background: 'rgba(var(--c-ivory), 0.3)', borderColor: 'rgb(var(--c-ivory3))' }}>
+                            {order.invoice_url ? (
+                              <a
+                                href={order.invoice_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                className="text-sm font-medium text-ink-2 flex items-center gap-1.5 hover:text-green transition-colors no-underline"
+                              >
+                                <Download size={15} />
+                                Download Invoice
+                                {order.invoice_number && (
+                                  <span className="text-xs text-ink-4">({order.invoice_number})</span>
+                                )}
+                              </a>
+                            ) : (
+                              <span className="text-xs text-ink-4">
+                                Invoice will appear here once it&apos;s issued.
+                              </span>
+                            )}
+                            <button
+                              onClick={() => handleReorder(order)}
                               className="text-sm font-medium flex items-center gap-1 hover:text-green-2 transition-colors ml-auto bg-transparent border-none cursor-pointer"
                               style={{ color: 'var(--green)' }}
                             >

@@ -30,6 +30,12 @@ export default function CreatorLoginPage() {
       })
       const data = await res.json()
       if (res.ok) {
+        // Test-login numbers come back already authenticated — skip the OTP step.
+        if (data.bypass && data.creator) {
+          sessionStorage.setItem('mana_creator', JSON.stringify(data.creator))
+          router.push('/creator/dashboard')
+          return
+        }
         setStep('otp')
       } else {
         setError(data.error || 'Failed to send OTP. Please ensure your number is registered.')

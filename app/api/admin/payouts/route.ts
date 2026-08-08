@@ -8,10 +8,19 @@ export async function GET(req: Request) {
   }
 
   try {
-    const { data: payouts, error } = await supabaseAdmin
+    // ?creatorId= narrows to one creator's requests for their insights page.
+    const creatorId = new URL(req.url).searchParams.get('creatorId')
+
+    let query = supabaseAdmin
       .from('payout_requests')
-      .select('*, creators(name, code, upi_id, bank_account, bank_ifsc)')
+      .select('*, creators(name, code, phone, upi_id, bank_account, bank_ifsc)')
       .order('created_at', { ascending: false })
+
+    if (creatorId) {
+      query = query.eq('creator_id', creatorId)
+    }
+
+    const { data: payouts, error } = await query
 
     if (error) throw error
     return NextResponse.json(payouts || [])

@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getAppliedCouponDiscount, getCouponByCode, validateCouponRules } from '@/lib/commerce'
+import {
+  getAppliedCouponDiscount,
+  getCouponByCode,
+  validateCouponRules,
+  LOYALTY_CODE,
+  LOYALTY_DISCOUNT_PCT,
+} from '@/lib/commerce'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: Request) {
@@ -25,19 +31,19 @@ export async function POST(req: Request) {
 
     const normalizedCode = code.trim().toUpperCase()
 
-    if (normalizedCode === 'LOYAL12') {
+    if (normalizedCode === LOYALTY_CODE) {
       if (!phone) {
         return NextResponse.json({ error: 'Phone verification is required for loyalty discount.' }, { status: 400 })
       }
       if (orderCount < 1) {
-        return NextResponse.json({ error: 'LOYAL12 is available only for returning customers.' }, { status: 400 })
+        return NextResponse.json({ error: `${LOYALTY_CODE} is available only for returning customers.` }, { status: 400 })
       }
 
       const loyaltyCoupon = {
         id: 'loyal12',
-        code: 'LOYAL12',
+        code: LOYALTY_CODE,
         discount_type: 'percentage' as const,
-        discount_value: 12,
+        discount_value: LOYALTY_DISCOUNT_PCT,
         influencer_name: null,
         min_order_amount: 0,
         max_discount: null,

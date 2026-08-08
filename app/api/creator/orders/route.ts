@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { commissionableAmount, estimateCommission } from '@/lib/commissions'
+import { rangeStartISO } from '@/lib/date-ranges'
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const creatorId = searchParams.get('creatorId')
     const status = searchParams.get('status')
+    const since = rangeStartISO(searchParams.get('range'))
 
     if (!creatorId) {
       return NextResponse.json({ error: 'Creator ID is required.' }, { status: 400 })
@@ -21,33 +24,47 @@ export async function GET(req: Request) {
     const creatorCode = creatorData?.code || ''
     const commissionPct = creatorData?.commission_pct || 10
 
-    // Try commissions table first
-    let query = supabaseAdmin
+    // Does this creator have a commission ledger at all? Ask before applying
+    // any filter. Deciding the source from the *filtered* result would mean a
+    // filter that legitimately matches nothing falls through to the orders
+    // estimate instead of returning an empty list — and since the two sources
+    // value an order differently (ledger rate vs. current rate), the same order
+    // would change amount as the creator clicks between filters.
+    const { count: ledgerCount, error: ledgerError } = await supabaseAdmin
       .from('commissions')
-      .select(`
-        *,
-        orders (
-          order_ref,
-          customer_name,
-          items,
-          total,
-          final_amount,
-          status,
-          created_at
-        )
-      `)
+      .select('id', { count: 'exact', head: true })
       .eq('creator_id', creatorId)
-      .order('created_at', { ascending: false })
 
-    if (status && status !== 'all') {
-      query = query.eq('status', status)
-    }
+    // A missing commissions table errors here; that's the fallback's cue.
+    if (!ledgerError && (ledgerCount || 0) > 0) {
+      let query = supabaseAdmin
+        .from('commissions')
+        .select(`
+          *,
+          orders (
+            order_ref,
+            customer_name,
+            items,
+            total,
+            final_amount,
+            status,
+            created_at
+          )
+        `)
+        .eq('creator_id', creatorId)
+        .order('created_at', { ascending: false })
 
-    const { data: commissionData, error: commissionError } = await query
+      if (status && status !== 'all') {
+        query = query.eq('status', status)
+      }
+      if (since) {
+        query = query.gte('created_at', since)
+      }
 
-    // If commissions table exists and has data, return it
-    if (!commissionError && commissionData && commissionData.length > 0) {
-      return NextResponse.json(commissionData)
+      const { data: commissionData, error: commissionError } = await query
+      if (commissionError) throw commissionError
+
+      return NextResponse.json(commissionData || [])
     }
 
     // If commissions table is missing or empty, fall back to orders table
@@ -61,6 +78,9 @@ export async function GET(req: Request) {
       if (status && status !== 'all') {
         ordersQuery = ordersQuery.eq('status', status)
       }
+      if (since) {
+        ordersQuery = ordersQuery.gte('created_at', since)
+      }
 
       const { data: ordersData, error: ordersError } = await ordersQuery
       if (ordersError) throw ordersError
@@ -70,11 +90,9 @@ export async function GET(req: Request) {
         id: `order-${o.id}`,
         creator_id: creatorId,
         order_id: o.id,
-        order_total: o.subtotal || o.total || o.final_amount || 0,
+        order_total: commissionableAmount(o),
         commission_pct: commissionPct,
-        commission_amount: Math.round(
-          ((o.subtotal || o.total || o.final_amount || 0) * commissionPct) / 100
-        ),
+        commission_amount: estimateCommission(commissionableAmount(o), commissionPct),
         status: o.status === 'cancelled' ? 'cancelled' : 'pending',
         created_at: o.created_at,
         orders: {

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendCashbackCredited, sendOrderConfirmation, sendOrderShipped } from '@/lib/email'
 import { hasNimbusPostConfig, trackNimbusAwb } from '@/lib/nimbuspost'
+import { estimateCommission } from '@/lib/commissions'
 import { shippingCost } from '@/lib/utils'
 import {
   creditCashback,
@@ -262,7 +263,7 @@ export async function POST(req: Request) {
 
     if (creatorMatch && data) {
       const commPct = creatorMatch.commission_pct || 10
-      const commissionAmt = Math.round((body.subtotal * commPct) / 100)
+      const commissionAmt = estimateCommission(body.subtotal, commPct)
 
       await supabaseAdmin.from('commissions').insert({
         creator_id: creatorMatch.id,
@@ -516,11 +517,42 @@ export async function PUT(req: Request) {
     }
 
     if (nextStatus === 'cancelled' && existing.status !== 'cancelled') {
-      await supabaseAdmin
+      // Void both pending and confirmed rows. Only voiding `pending` left a
+      // delivered-then-cancelled order with a live commission attached to a
+      // dead sale, which then counted towards the creator's earnings and the
+      // coupon report. `paid` rows are deliberately left alone — that money has
+      // already gone out, so clawing it back is a manual decision.
+      const { data: voided } = await supabaseAdmin
         .from('commissions')
-        .update({ status: 'cancelled' })
+        .select('id, creator_id, commission_amount, status')
         .eq('order_id', latestOrder.id)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'confirmed'])
+
+      if (voided && voided.length > 0) {
+        await supabaseAdmin
+          .from('commissions')
+          .update({ status: 'cancelled' })
+          .in('id', voided.map(row => row.id))
+
+        // `total_earned` was incremented when the commission was confirmed on
+        // delivery, so confirmed rows have to be subtracted back out.
+        for (const row of voided.filter(r => r.status === 'confirmed')) {
+          const { data: creator } = await supabaseAdmin
+            .from('creators')
+            .select('total_earned')
+            .eq('id', row.creator_id)
+            .single()
+
+          if (creator) {
+            await supabaseAdmin
+              .from('creators')
+              .update({
+                total_earned: Math.max(0, (creator.total_earned || 0) - (row.commission_amount || 0)),
+              })
+              .eq('id', row.creator_id)
+          }
+        }
+      }
     }
 
     return NextResponse.json(latestOrder)

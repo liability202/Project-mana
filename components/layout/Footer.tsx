@@ -18,7 +18,6 @@ const SERVICE_LINKS = [
 
 const COMPANY_LINKS = [
   { label: 'About Mana', href: '/about' },
-  { label: 'Refer & Earn', href: '/referral' },
   { label: 'FAQ', href: '/faq' },
   { label: 'Terms & Conditions', href: '/terms' },
   { label: 'Privacy Policy', href: '/privacy' },
@@ -32,8 +31,8 @@ export function Footer() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
         <div>
           <div className="font-serif text-[1.7rem] text-ivory tracking-wide font-normal">MANA</div>
-          <div className="text-[.44rem] tracking-[.38em] uppercase text-green-4 mt-1 mb-4">The Essence of Nature</div>
-          <p className="text-[.76rem] text-green-5/50 leading-[1.8] mb-4">
+          <div className="text-[.5rem] tracking-[.34em] uppercase text-green-4 mt-1 mb-4">The Essence of Nature</div>
+          <p className="text-[.82rem] text-green-5/70 leading-[1.8] mb-4">
             Premium dry fruits, Ayurvedic herbs, spices and pansari items - sourced ethically from India's finest origins. MK and Sons, Delhi-ncr.
           </p>
           <div className="flex gap-2.5">
@@ -50,11 +49,11 @@ export function Footer() {
         </div>
 
         <div>
-          <div className="text-[.56rem] tracking-[.25em] uppercase text-green-4 mb-3.5 font-normal">Shop</div>
+          <div className="text-[.62rem] tracking-[.22em] uppercase text-green-4 mb-3.5 font-normal">Shop</div>
           <ul className="list-none flex flex-col gap-2">
             {SHOP_LINKS.map(l => (
               <li key={l.href}>
-                <Link href={l.href} className="text-[.76rem] text-green-5/40 hover:text-ivory transition-colors no-underline">
+                <Link href={l.href} className="text-[.82rem] text-green-5/80 hover:text-ivory transition-colors no-underline">
                   {l.label}
                 </Link>
               </li>
@@ -63,7 +62,7 @@ export function Footer() {
         </div>
 
         <div>
-          <div className="text-[.56rem] tracking-[.25em] uppercase text-green-4 mb-3.5 font-normal">Services</div>
+          <div className="text-[.62rem] tracking-[.22em] uppercase text-green-4 mb-3.5 font-normal">Services</div>
           <ul className="list-none flex flex-col gap-2">
             {SERVICE_LINKS.map(l => {
               const external = l.href.startsWith('http')
@@ -73,7 +72,7 @@ export function Footer() {
                     href={l.href}
                     target={external ? '_blank' : undefined}
                     rel={external ? 'noopener noreferrer' : undefined}
-                    className="text-[.76rem] text-green-5/40 hover:text-ivory transition-colors no-underline"
+                    className="text-[.82rem] text-green-5/80 hover:text-ivory transition-colors no-underline"
                   >
                     {l.label}
                   </a>
@@ -84,11 +83,11 @@ export function Footer() {
         </div>
 
         <div>
-          <div className="text-[.56rem] tracking-[.25em] uppercase text-green-4 mb-3.5 font-normal">Company</div>
+          <div className="text-[.62rem] tracking-[.22em] uppercase text-green-4 mb-3.5 font-normal">Company</div>
           <ul className="list-none flex flex-col gap-2">
             {COMPANY_LINKS.map(l => (
               <li key={l.href}>
-                <Link href={l.href} className="text-[.76rem] text-green-5/40 hover:text-ivory transition-colors no-underline">
+                <Link href={l.href} className="text-[.82rem] text-green-5/80 hover:text-ivory transition-colors no-underline">
                   {l.label}
                 </Link>
               </li>
@@ -98,12 +97,12 @@ export function Footer() {
       </div>
 
       <div className="flex justify-between items-center pt-5 border-t border-white/5 flex-wrap gap-2">
-        <span className="text-[.63rem] text-green-5/25">
+        <span className="text-[.68rem] text-green-5/65">
           © {new Date().getFullYear()} Mana - MK and Sons, Delhi-ncr
         </span>
         <div className="flex gap-2.5">
           {['FSSAI', 'Lab Tested', 'Secure Pay'].map(b => (
-            <span key={b} className="text-[.54rem] px-2 py-0.5 border border-green-5/18 text-green-5/35 uppercase tracking-widest rounded-sm">
+            <span key={b} className="text-[.58rem] px-2 py-0.5 border border-green-5/35 text-green-5/70 uppercase tracking-widest rounded-sm">
               {b}
             </span>
           ))}

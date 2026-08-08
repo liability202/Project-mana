@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import {
+  summariseCommissions,
+  type CommissionRow,
+  type CommissionableOrder,
+} from '@/lib/commissions'
 
 export async function GET(req: Request) {
   const auth = req.headers.get('authorization')
@@ -68,53 +73,70 @@ export async function GET(req: Request) {
     }
   }
 
-  // ── Enrich with real order stats ──────────────────────────────────────────
-  // Use subtotal (product value only) for revenue — matches what the creator
-  // portal uses when calculating commissions. final_amount includes shipping
-  // and fees which creators don't earn on.
-  // Exclude cancelled orders — only count real fulfilled/active orders.
-  const { data: orderRows } = await supabaseAdmin
-    .from('orders')
-    .select('coupon_code, subtotal, discount_amount, discount, status')
-    .not('coupon_code', 'is', null)
-    .neq('status', 'cancelled')
+  // ── Enrich with real order + commission stats ─────────────────────────────
+  // These numbers have to agree with what the creator sees in their portal, so
+  // both sides run the same rules from lib/commissions.ts.
+  const [{ data: orderRows }, { data: commissionRows }] = await Promise.all([
+    supabaseAdmin
+      .from('orders')
+      .select('id, coupon_code, subtotal, total, final_amount, discount_amount, discount, status')
+      .not('coupon_code', 'is', null),
+    supabaseAdmin
+      .from('commissions')
+      .select('order_id, creator_id, commission_amount, order_total, status'),
+  ])
 
-  // Build a map: UPPER(coupon_code) → aggregated stats from orders table
-  const orderStats = new Map<string, { total_orders: number; total_revenue: number; total_discount_given: number }>()
-  for (const row of (orderRows || [])) {
+  // UPPER(coupon_code) → the orders placed with it.
+  const ordersByCode = new Map<string, CommissionableOrder[]>()
+  // order id → UPPER(coupon_code), used to attribute commission rows below.
+  const codeByOrderId = new Map<string, string>()
+
+  for (const row of orderRows || []) {
     const code = String(row.coupon_code || '').toUpperCase()
     if (!code) continue
-    const existing = orderStats.get(code) || { total_orders: 0, total_revenue: 0, total_discount_given: 0 }
-    existing.total_orders += 1
-    existing.total_revenue += row.subtotal || 0
-    existing.total_discount_given += row.discount_amount || row.discount || 0
-    orderStats.set(code, existing)
+    if (row.id) codeByOrderId.set(String(row.id), code)
+    const bucket = ordersByCode.get(code)
+    if (bucket) bucket.push(row)
+    else ordersByCode.set(code, [row])
   }
 
-  // Merge live order stats into every coupon entry.
-  // Commission is ONLY calculated for coupons explicitly linked to a creator/influencer.
-  // General discount coupons never show a commission — never default to 10%.
+  // Commission rows are keyed by creator, but a creator can own more than one
+  // code — so attribute each row through its order's coupon code. Grouping by
+  // creator instead would double-count their totals across every code they own.
+  const commissionsByCode = new Map<string, CommissionRow[]>()
+  for (const row of commissionRows || []) {
+    const code = row.order_id ? codeByOrderId.get(String(row.order_id)) : undefined
+    if (!code) continue
+    const bucket = commissionsByCode.get(code)
+    if (bucket) bucket.push(row)
+    else commissionsByCode.set(code, [row])
+  }
+
   const final = enriched.map((c: any) => {
     const code = String(c.code || '').toUpperCase()
-    const real = orderStats.get(code)
-    const liveOrders = real?.total_orders ?? 0
-    const liveRevenue = real?.total_revenue ?? 0
-    const liveDiscount = real?.total_discount_given ?? 0
+    const hasCreator = Boolean(c.creator_id || c.influencer_name || c.influencer_phone)
+    // A plain discount coupon with no influencer attached earns nobody a cut.
+    const commPct = hasCreator ? Number(c.commission_rate ?? 10) : 0
 
-    const isCreatorCoupon = c.commission_rate != null &&
-      (c.creator_id || c.influencer_name || c.influencer_phone)
-    const commPct = isCreatorCoupon ? Number(c.commission_rate) : null
-    const totalCommission = isCreatorCoupon && commPct != null
-      ? Math.round((liveRevenue * commPct) / 100)
-      : null
+    const summary = summariseCommissions({
+      commissions: commissionsByCode.get(code) || [],
+      orders: ordersByCode.get(code) || [],
+      commissionPct: commPct,
+    })
 
     return {
       ...c,
-      total_orders: liveOrders,
-      usage_count: liveOrders,
-      total_revenue: liveRevenue,
-      total_discount_given: liveDiscount,
-      total_commission: totalCommission,  // null for general coupons
+      // Live data is the single source of truth; the denormalised counters on
+      // the coupons row drift as soon as an order is cancelled or edited.
+      total_orders: summary.totalOrders,
+      usage_count: summary.totalOrders,
+      total_revenue: summary.totalRevenue,
+      total_discount_given: summary.totalDiscount,
+      total_commission: summary.totalCommission,
+      commission_pending: summary.commissionPending,
+      commission_confirmed: summary.commissionConfirmed,
+      commission_paid: summary.commissionPaid,
+      commission_source: summary.source,
     }
   })
 

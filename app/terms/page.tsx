@@ -1,4 +1,11 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'Terms & Conditions',
+  description: 'Terms and conditions for shopping with Mana Dry Fruits, including orders, shipping, returns and payments.',
+  alternates: { canonical: '/terms' },
+}
 
 const LAST_UPDATED = 'April 14, 2026'
 
