@@ -45,6 +45,7 @@ export type CommissionRow = {
 }
 
 export type CommissionableOrder = {
+  id?: string | null
   subtotal?: number | null
   total?: number | null
   final_amount?: number | null
@@ -86,7 +87,22 @@ export function summariseCommissions({
     0
   )
 
-  const liveCommissions = commissions.filter(row => isLiveCommissionStatus(row.status))
+  // A commission row is only as live as the order behind it. The two can
+  // disagree: an order that was delivered (commission → confirmed) and then
+  // cancelled leaves a confirmed row attached to a dead order. Counting it
+  // would report orders and revenue for a sale that no longer exists, while
+  // the discount total — read from the orders — correctly showed zero.
+  const cancelledOrderIds = new Set(
+    orders
+      .filter(order => !isLiveCommissionStatus(order.status) && order.id)
+      .map(order => String(order.id))
+  )
+
+  const liveCommissions = commissions.filter(
+    row =>
+      isLiveCommissionStatus(row.status) &&
+      !(row.order_id && cancelledOrderIds.has(String(row.order_id)))
+  )
 
   if (liveCommissions.length > 0) {
     const sumBy = (predicate: (row: CommissionRow) => boolean) =>

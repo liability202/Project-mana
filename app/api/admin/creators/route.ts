@@ -8,6 +8,21 @@ export async function GET(req: Request) {
   }
 
   try {
+    // ?id= returns the single creator object, for the insights page.
+    const id = new URL(req.url).searchParams.get('id')
+
+    if (id) {
+      const { data: creator, error: oneError } = await supabaseAdmin
+        .from('creators')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
+
+      if (oneError) throw oneError
+      if (!creator) return NextResponse.json({ error: 'Creator not found.' }, { status: 404 })
+      return NextResponse.json(creator)
+    }
+
     const { data: creators, error } = await supabaseAdmin
       .from('creators')
       .select('*')

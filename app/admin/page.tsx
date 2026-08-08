@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/utils'
+import { LoyaltyPanel } from '@/components/admin/LoyaltyPanel'
 import type { Coupon, Order, Product, Review } from '@/lib/supabase'
 
 type AdminTab = 'orders' | 'products' | 'kits' | 'coupons' | 'customers' | 'reviews' | 'creators' | 'settings'
@@ -57,8 +59,12 @@ function isOverdue(order: Order) {
 }
 
 export default function AdminPage() {
+  const router = useRouter()
   const [auth, setAuth] = useState(false)
   const [password, setPassword] = useState('')
+  // Mirrors localStorage `mana_admin`; child panels need it during render, and
+  // reading localStorage there would break server rendering.
+  const [adminSecret, setAdminSecret] = useState('')
   const [tab, setTab] = useState<AdminTab>('orders')
   const [orders, setOrders] = useState<Order[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -139,6 +145,7 @@ export default function AdminPage() {
     if (res.ok) {
       localStorage.setItem('mana_admin', password)
       setAuth(true)
+      setAdminSecret(password)
       loadData(password)
     } else {
       alert('Wrong password')
@@ -181,6 +188,7 @@ export default function AdminPage() {
           return
         }
         setAuth(true)
+        setAdminSecret(saved)
         loadData(saved)
       })
     }
@@ -886,6 +894,7 @@ export default function AdminPage() {
             </div>
           </div>
         ) : tab === 'coupons' ? (
+          <div className="space-y-6">
           <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
             <form onSubmit={createCoupon} className="bg-white border border-ivory-3 rounded-xl p-5">
               <h2 className="font-serif text-xl text-ink mb-4">Create Coupon</h2>
@@ -1141,11 +1150,17 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
+
+          {/* LOYAL12 lives in code, not in the coupons table — its analytics
+              get their own panel so they aren't invisible. */}
+          <LoyaltyPanel adminSecret={adminSecret} />
+          </div>
         ) : tab === 'creators' ? (
           <div className="space-y-8">
             <div className="flex items-start justify-between gap-6 flex-wrap">
                <div className="flex-1 min-w-[300px]">
-                  <h2 className="font-serif text-xl text-ink mb-4">Manage Creators</h2>
+                  <h2 className="font-serif text-xl text-ink mb-1">Manage Creators</h2>
+                  <p className="text-xs text-ink-4 mb-4">Click any creator to open their full dashboard and payout requests.</p>
                   <div className="bg-white border border-ivory-3 rounded-xl overflow-hidden shadow-soft">
                     <table className="w-full text-left text-sm">
                       <thead className="bg-ivory-2 border-b border-ivory-3 font-serif">
@@ -1157,7 +1172,12 @@ export default function AdminPage() {
                       </thead>
                       <tbody className="divide-y divide-ivory-3">
                         {creators.map(c => (
-                          <tr key={c.id}>
+                          <tr
+                            key={c.id}
+                            onClick={() => router.push(`/admin/creator/${c.id}`)}
+                            title={`Open ${c.name}'s full dashboard`}
+                            className="cursor-pointer hover:bg-ivory-2/60 transition-colors"
+                          >
                             <td className="px-4 py-3">
                               <div className="font-medium text-ink">{c.name}</div>
                               <div className="text-[.68rem] text-green-3 font-bold uppercase tracking-widest mt-0.5">{c.code} · {c.phone}</div>
@@ -1166,10 +1186,11 @@ export default function AdminPage() {
                               <div className="text-[.75rem] font-medium"><span className="text-ink-4 uppercase text-[.6rem] font-bold tracking-tighter">Earned</span> {formatPrice(c.total_earned)}</div>
                               <div className="text-[.75rem] font-medium"><span className="text-ink-4 uppercase text-[.6rem] font-bold tracking-tighter">Paid</span> {formatPrice(c.total_paid)}</div>
                             </td>
-                            <td className="px-4 py-3 text-right">
+                            <td className="px-4 py-3 text-right whitespace-nowrap">
                                <span className={`px-2 py-0.5 rounded text-[.6rem] font-bold uppercase tracking-widest ${c.active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
                                  {c.active ? 'Active' : 'Inactive'}
                                </span>
+                               <span className="text-ink-4 ml-2 text-xs">›</span>
                             </td>
                           </tr>
                         ))}
@@ -1243,8 +1264,14 @@ export default function AdminPage() {
                         payouts.map(p => (
                           <tr key={p.id} className={`hover:bg-ivory-2/20 transition-colors ${p.status === 'pending' ? 'bg-amber-50/20' : ''}`}>
                             <td className="px-4 py-4">
-                              <div className="font-medium text-ink">{p.creators?.name}</div>
-                              <div className="text-[.68rem] text-green-3 font-bold uppercase mt-0.5 tracking-widest">{p.creators?.code}</div>
+                              <button
+                                onClick={() => p.creator_id && router.push(`/admin/creator/${p.creator_id}`)}
+                                title="Open this creator's dashboard"
+                                className="text-left bg-transparent border-none cursor-pointer p-0 group"
+                              >
+                                <div className="font-medium text-ink group-hover:text-green transition-colors">{p.creators?.name}</div>
+                                <div className="text-[.68rem] text-green-3 font-bold uppercase mt-0.5 tracking-widest">{p.creators?.code} ›</div>
+                              </button>
                             </td>
                             <td className="px-4 py-4">
                                <div className="font-serif font-bold text-lg text-ink">{formatPrice(p.amount)}</div>
