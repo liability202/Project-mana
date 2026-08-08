@@ -72,10 +72,12 @@ export async function GET(req: Request) {
   // Use subtotal (product value only) for revenue — matches what the creator
   // portal uses when calculating commissions. final_amount includes shipping
   // and fees which creators don't earn on.
+  // Exclude cancelled orders — only count real fulfilled/active orders.
   const { data: orderRows } = await supabaseAdmin
     .from('orders')
-    .select('coupon_code, subtotal, discount_amount, discount')
+    .select('coupon_code, subtotal, discount_amount, discount, status')
     .not('coupon_code', 'is', null)
+    .neq('status', 'cancelled')
 
   // Build a map: UPPER(coupon_code) → aggregated stats from orders table
   const orderStats = new Map<string, { total_orders: number; total_revenue: number; total_discount_given: number }>()
@@ -90,25 +92,29 @@ export async function GET(req: Request) {
   }
 
   // Merge live order stats into every coupon entry.
-  // Always use the live aggregated value — it is always accurate and up-to-date.
-  // For commission, estimate using the coupon's commission_rate (or creator's pct).
+  // Commission is ONLY calculated for coupons explicitly linked to a creator/influencer.
+  // General discount coupons never show a commission — never default to 10%.
   const final = enriched.map((c: any) => {
     const code = String(c.code || '').toUpperCase()
     const real = orderStats.get(code)
     const liveOrders = real?.total_orders ?? 0
     const liveRevenue = real?.total_revenue ?? 0
     const liveDiscount = real?.total_discount_given ?? 0
-    const commPct = c.commission_rate ?? 10
-    const totalCommission = Math.round((liveRevenue * commPct) / 100)
+
+    const isCreatorCoupon = c.commission_rate != null &&
+      (c.creator_id || c.influencer_name || c.influencer_phone)
+    const commPct = isCreatorCoupon ? Number(c.commission_rate) : null
+    const totalCommission = isCreatorCoupon && commPct != null
+      ? Math.round((liveRevenue * commPct) / 100)
+      : null
+
     return {
       ...c,
-      // Always use live order data — single source of truth
       total_orders: liveOrders,
       usage_count: liveOrders,
       total_revenue: liveRevenue,
       total_discount_given: liveDiscount,
-      // Extra field: estimated commission earned by the creator/influencer
-      total_commission: totalCommission,
+      total_commission: totalCommission,  // null for general coupons
     }
   })
 
