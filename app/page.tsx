@@ -212,18 +212,18 @@ export default async function HomePage() {
       <section className="section fade-in bg-green dark:bg-[#0A1810]">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
-            <div className="eyebrow" style={{ color: 'var(--green4)' }}>Our Promise</div>
-            <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-light leading-tight tracking-tight text-ivory mb-4">
-              Ground and packed <em className="not-italic" style={{ color: 'var(--green4)' }}>after your order.</em>
+            <div className="eyebrow" style={{ color: '#C2E0CE' }}>Our Promise</div>
+            <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-light leading-tight tracking-tight text-white mb-4">
+              Ground and packed <em className="not-italic" style={{ color: '#C2E0CE' }}>after your order.</em>
             </h2>
-            <p className="text-[.92rem] leading-[1.88] mb-5" style={{ color: 'rgba(var(--c-green5), 0.7)' }}>
+            <p className="text-[.92rem] leading-[1.88] mb-5" style={{ color: 'rgba(234, 244, 238, 0.75)' }}>
               For all powders, churnas and ground spices — we do not pre-grind in bulk. Your order triggers the grinding. The difference in freshness and potency is immediate.
             </p>
             <div className="flex flex-col gap-3">
               {['Ashwagandha powder — ground after order', 'Triphala churna — blended to order', 'Ground spices — never pre-ground in bulk', 'All powders sealed immediately after grinding'].map(item => (
                 <div key={item} className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs flex-shrink-0" style={{ border: '1px solid rgba(var(--c-green5), 0.25)', background: 'rgba(var(--c-green5), 0.1)', color: 'var(--green4)' }}>✓</div>
-                  <span className="text-[.84rem]" style={{ color: 'var(--green4)' }}>{item}</span>
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs flex-shrink-0" style={{ border: '1px solid rgba(194, 224, 206, 0.3)', background: 'rgba(194, 224, 206, 0.1)', color: '#C2E0CE' }}>✓</div>
+                  <span className="text-[.84rem]" style={{ color: '#EAF4EE' }}>{item}</span>
                 </div>
               ))}
             </div>
@@ -235,10 +235,10 @@ export default async function HomePage() {
               { icon: '📦', title: 'Packed Fresh', desc: 'Ground and packed to order, not to stock.' },
               { icon: '🤝', title: 'Direct Sourcing', desc: 'Straight from farmers to your home.' },
             ].map(card => (
-              <div key={card.title} className="rounded-xl p-5" style={{ background: 'rgba(var(--c-green5), 0.1)', border: '1px solid rgba(var(--c-green5), 0.15)' }}>
+              <div key={card.title} className="rounded-xl p-5" style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(194, 224, 206, 0.15)' }}>
                 <div className="text-2xl mb-2">{card.icon}</div>
-                <div className="font-serif text-ivory text-base mb-1">{card.title}</div>
-                <div className="text-[.78rem] leading-relaxed" style={{ color: 'rgba(var(--c-green5), 0.6)' }}>{card.desc}</div>
+                <div className="font-serif text-white text-base mb-1">{card.title}</div>
+                <div className="text-[.78rem] leading-relaxed" style={{ color: 'rgba(234, 244, 238, 0.75)' }}>{card.desc}</div>
               </div>
             ))}
           </div>
