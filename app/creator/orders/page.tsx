@@ -1,24 +1,27 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { formatPrice } from '@/lib/utils'
+import { RangeFilter } from '@/components/ui/RangeFilter'
+import { DATE_RANGE_LABELS, type DateRange } from '@/lib/date-ranges'
 
 export default function CreatorOrdersPage() {
   const [commissions, setCommissions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [range, setRange] = useState<DateRange>('all')
 
   useEffect(() => {
     const creatorStr = sessionStorage.getItem('mana_creator')
     if (creatorStr) {
       const creator = JSON.parse(creatorStr)
-      fetchOrders(creator.id, filter)
+      fetchOrders(creator.id, filter, range)
     }
-  }, [filter])
+  }, [filter, range])
 
-  const fetchOrders = async (creatorId: string, status: string) => {
+  const fetchOrders = async (creatorId: string, status: string, period: DateRange) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/creator/orders?creatorId=${creatorId}&status=${status}`)
+      const res = await fetch(`/api/creator/orders?creatorId=${creatorId}&status=${status}&range=${period}`)
       const data = await res.json()
       if (res.ok) {
         setCommissions(data)
@@ -47,20 +50,24 @@ export default function CreatorOrdersPage() {
         <p className="text-sm text-ink-3">A transparent log of every order placed using your code and its current settlement status.</p>
       </header>
 
-      <div className="flex gap-2.5 overflow-x-auto pb-4 scrollbar-none">
-        {['all', 'pending', 'confirmed', 'paid', 'cancelled'].map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-5 py-2.5 rounded-xl text-[.68rem] font-bold uppercase tracking-wider border transition-all whitespace-nowrap shadow-sm ${
-              filter === f 
-                ? 'bg-green text-ivory border-green shadow-soft' 
-                : 'bg-white text-ink-3 border-ivory-3 hover:border-green-4 hover:text-green'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 pb-4">
+        <div className="flex gap-2.5 overflow-x-auto scrollbar-none flex-1 min-w-0 py-0.5">
+          {['all', 'pending', 'confirmed', 'paid', 'cancelled'].map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-5 py-2.5 rounded-xl text-[.68rem] font-bold uppercase tracking-wider border transition-all whitespace-nowrap shadow-sm ${
+                filter === f
+                  ? 'bg-green text-ivory border-green shadow-soft'
+                  : 'bg-white text-ink-3 border-ivory-3 hover:border-green-4 hover:text-green'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+
+        <RangeFilter value={range} onChange={setRange} />
       </div>
 
       <div className="bg-white border border-ivory-3 rounded-2xl overflow-hidden shadow-soft">
@@ -90,7 +97,8 @@ export default function CreatorOrdersPage() {
                 <tr>
                   <td colSpan={6} className="px-6 py-20 text-center text-ink-4 italic font-serif">
                      <div className="text-2xl mb-2">📦</div>
-                     No orders found in this category yet.
+                     No {filter === 'all' ? '' : `${filter} `}orders
+                     {range === 'all' ? ' yet' : ` for ${DATE_RANGE_LABELS[range].toLowerCase()}`}.
                   </td>
                 </tr>
               ) : (
