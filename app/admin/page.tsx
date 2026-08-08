@@ -951,8 +951,8 @@ export default function AdminPage() {
                         <td className="px-4 py-3 text-ink-3">{coupon.total_orders || 0}</td>
                         <td className="px-4 py-3 text-ink-3">
                           <div>{formatPrice(coupon.total_revenue || 0)}</div>
-                          {coupon.commission_rate != null && (coupon.total_commission || 0) > 0 && (
-                            <div className="text-xs text-green-3 mt-0.5">↳ Commission: {formatPrice(coupon.total_commission || 0)}</div>
+                          {coupon.total_commission != null && (
+                            <div className="text-xs text-green-3 mt-0.5">↳ Commission: {formatPrice(coupon.total_commission)}</div>
                           )}
                         </td>
                         <td className="px-4 py-3 text-ink-3">{formatPrice(coupon.total_discount_given || 0)}</td>
