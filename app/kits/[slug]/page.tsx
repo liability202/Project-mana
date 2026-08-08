@@ -422,19 +422,21 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
 
           {(availableForms.powder && availableForms.whole) && (
             <div>
-              <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-2">Choose form</div>
+              <div className="text-[.62rem] tracking-[.2em] uppercase mb-2" style={{ color: 'var(--ink4)' }}>Choose form</div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setForm('powder')}
-                  className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'powder' ? 'border-green bg-green text-white' : 'border-green-4 bg-white text-green hover:bg-green-6'}`}
+                  className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'powder' ? 'border-green bg-green text-white' : 'border-green-4 hover:bg-green-6'}`}
+                  style={form !== 'powder' ? { background: 'rgb(var(--c-ivory2))', color: 'var(--green)' } : {}}
                 >
                   Powder
                 </button>
                 <button
                   type="button"
                   onClick={() => setForm('whole')}
-                  className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'whole' ? 'border-green bg-green text-white' : 'border-green-4 bg-white text-green hover:bg-green-6'}`}
+                  className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'whole' ? 'border-green bg-green text-white' : 'border-green-4 hover:bg-green-6'}`}
+                  style={form !== 'whole' ? { background: 'rgb(var(--c-ivory2))', color: 'var(--green)' } : {}}
                 >
                   Whole
                 </button>
@@ -443,7 +445,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
           )}
 
           {isCustomizing && (
-              <div className="rounded-2xl border border-ivory-3 bg-ivory/70 p-4">
+              <div className="rounded-2xl p-4" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgba(var(--c-ivory), 0.7)' }}>
                 <div className="flex items-center justify-between gap-3 mb-3">
               <div className="text-[.62rem] tracking-[.2em] uppercase" style={{ color: 'var(--ink4)' }}>Adjust individual products</div>
                   <div className="text-[.68rem]" style={{ color: 'var(--ink3)' }}>{selectedItems.length}/{activeItems.length} selected</div>
@@ -521,7 +523,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
             </div>
           )}
 
-          <div className="rounded-2xl border border-green-5 bg-green-6/60 p-4">
+          <div className="rounded-2xl p-4" style={{ border: '1px solid rgba(var(--c-green5), 0.4)', background: 'rgba(var(--c-green6), 0.6)' }}>
             <div className="space-y-1.5 pb-3 mb-3" style={{ borderBottom: '1px solid rgba(var(--c-green5), 0.3)' }}>
               {selectedItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between gap-3 text-[.78rem]" style={{ color: 'var(--ink3)' }}>
@@ -530,8 +532,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
                 </div>
               ))}
             </div>
-            <div className="flex items-baseline gap-2 mb-1">
-              <div className="font-serif text-3xl mb-1" style={{ color: 'var(--green)' }}>{formatPrice(price)}</div>
+            <div className="font-serif text-3xl mb-1" style={{ color: 'var(--green)' }}>{formatPrice(price)}</div>
             <div className="text-[.72rem] mb-4" style={{ color: 'var(--ink3)' }}>{totalWeightLabel} total - {form === 'powder' ? 'powder form' : 'whole form'}</div>
             <div className="flex gap-2.5 flex-wrap">
               <button onClick={handleAddToCart} className="btn-primary flex-1 justify-center min-w-[140px]">
@@ -549,7 +550,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
           </div>
 
           <div>
-            <div className="flex border-b border-ivory-3 mb-3">
+            <div className="flex mb-3" style={{ borderBottom: '1px solid rgb(var(--c-ivory3))' }}>
               {(['benefits', 'howto'] as const).map(currentTab => (
                 <button
                   key={currentTab}

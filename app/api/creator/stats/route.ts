@@ -14,17 +14,33 @@ export async function GET(req: Request) {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const eightWeeksAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
 
-    // Fetch creator profile first — we need the code for fallback queries
+    // Fetch creator profile — need code and commission_pct
     const { data: creatorData } = await supabaseAdmin
       .from('creators')
-      .select('total_earned, total_paid, code, commission_pct')
+      .select('total_earned, total_paid, code, commission_pct, name')
       .eq('id', creatorId)
       .maybeSingle()
 
     const creatorCode = creatorData?.code || ''
     const commissionPct = creatorData?.commission_pct || 10
 
-    // Fetch commissions + visits in parallel
+    // ── Resolve ALL coupon codes linked to this creator ──────────────────────
+    // A creator may have multiple coupons assigned by admin via creator_id,
+    // or their code may differ from what's stored in the coupons table.
+    const { data: linkedCoupons } = await supabaseAdmin
+      .from('coupons')
+      .select('code, discount_value, commission_rate')
+      .eq('creator_id', creatorId)
+
+    // Build a de-duplicated set of all codes to match against orders
+    const allCodesSet = new Set<string>()
+    if (creatorCode) allCodesSet.add(String(creatorCode).toUpperCase())
+    for (const c of (linkedCoupons || [])) {
+      if (c.code) allCodesSet.add(String(c.code).toUpperCase())
+    }
+    const codesArray = Array.from(allCodesSet)
+
+    // ── Fetch commissions + visits + orders in parallel ───────────────────────
     const [statsRes, monthlyRes, chartRes, visitsRes, ordersRes] = await Promise.all([
       supabaseAdmin
         .from('commissions')
@@ -45,20 +61,20 @@ export async function GET(req: Request) {
         .gte('created_at', eightWeeksAgo.toISOString())
         .order('created_at', { ascending: true }),
 
-      // Visits count from referral_visits (may not exist — handled below)
-      creatorCode
+      // Visits — match any of the creator's codes
+      codesArray.length > 0
         ? supabaseAdmin
             .from('referral_visits')
             .select('*', { count: 'exact', head: true })
-            .eq('creator_code', creatorCode)
+            .in('creator_code', codesArray)
         : Promise.resolve({ count: 0, error: null }),
 
-      // Fallback: orders placed using creator's coupon code
-      creatorCode
+      // Orders — match any of the creator's coupon codes
+      codesArray.length > 0
         ? supabaseAdmin
             .from('orders')
-            .select('id, subtotal, total, final_amount, created_at, status')
-            .eq('coupon_code', creatorCode)
+            .select('id, subtotal, total, final_amount, created_at, status, coupon_code')
+            .in('coupon_code', codesArray)
             .order('created_at', { ascending: true })
         : Promise.resolve({ data: [], error: null }),
     ])
@@ -86,15 +102,25 @@ export async function GET(req: Request) {
           .reduce((sum, c) => sum + (c.commission_amount || 0), 0)
       chartSourceData = chartRes.data || []
     } else {
-      // Fallback: derive stats from orders table by coupon_code
+      // Fallback: derive stats from orders table using all linked coupon codes
       const fallbackOrders = (ordersRes as any).data || []
       const activeOrders = fallbackOrders.filter((o: any) => o.status !== 'cancelled')
 
       totalOrders = activeOrders.length
 
-      // Estimate commission from order subtotals
-      const estimateCommission = (o: any) =>
-        Math.round(((o.subtotal || o.total || o.final_amount || 0) * commissionPct) / 100)
+      // Use the commission_rate stored on the specific coupon that was used,
+      // falling back to the creator's default commission_pct
+      const getCommissionRate = (usedCode: string) => {
+        const matched = (linkedCoupons || []).find(
+          c => String(c.code || '').toUpperCase() === String(usedCode || '').toUpperCase()
+        )
+        return matched?.commission_rate ?? commissionPct
+      }
+
+      const estimateCommission = (o: any) => {
+        const rate = getCommissionRate(o.coupon_code)
+        return Math.round(((o.subtotal || o.total || o.final_amount || 0) * rate) / 100)
+      }
 
       pendingPayout = activeOrders.reduce((sum: number, o: any) => sum + estimateCommission(o), 0)
       thisMonthEarnings = activeOrders
@@ -138,6 +164,7 @@ export async function GET(req: Request) {
       totalEarnedLifetime,
       totalVisits,
       chartData,
+      codesTracked: codesArray,  // useful for debugging from creator portal
       dataSource: useCommissions ? 'commissions' : 'orders_fallback',
     })
   } catch (err: any) {
