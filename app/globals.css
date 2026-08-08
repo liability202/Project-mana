@@ -117,8 +117,8 @@
 .dark .bg-white\/80      { background-color: rgb(var(--c-surface) / 0.8); }
 .dark .bg-white\/40      { background-color: rgb(var(--c-surface) / 0.4); }
 
-/* nav links + icon buttons are lighter in dark mode */
-.dark .text-ink-2        { color: var(--ink2); }
+/* nav links + icon buttons: force light colour in dark mode */
+.dark .text-ink-2        { color: rgb(var(--c-ink2)) !important; }
 
 .dark .bg-green          { background-color: #1E4433; }
 .dark .bg-green-2        { background-color: #27563F; }
@@ -359,9 +359,13 @@ input[type=range]::-webkit-slider-thumb {
   .input {
     @apply w-full px-4 py-3 rounded-md font-sans text-base sm:text-sm outline-none transition-colors duration-200;
     border: 1px solid rgb(var(--c-ivory3));
-    background: rgb(var(--c-ivory2));
-    color: var(--ink);
   }
-  .input::placeholder { color: var(--ink4); opacity: 1; }
-  .input:focus { border-color: var(--green3); }
 }
+
+/* Input colours live OUTSIDE @layer so they beat every named layer */
+.input {
+  background: rgb(var(--c-surface));
+  color: rgb(var(--c-ink));
+}
+.input::placeholder { color: rgb(var(--c-ink4)); opacity: 1; }
+.input:focus { border-color: rgb(var(--c-green3)); }

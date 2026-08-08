@@ -71,7 +71,7 @@ export function Navbar() {
         <ul className="hidden list-none items-center gap-7 lg:flex">
           {NAV_LINKS.map((link) => (
             <li key={link.href}>
-              <Link href={link.href} className="text-[.76rem] font-normal tracking-wide text-ink-2 dark:text-ivory-3 transition-colors hover:text-green dark:hover:text-green no-underline">
+              <Link href={link.href} className="text-[.76rem] font-normal tracking-wide text-ink-2 dark:text-ink transition-colors hover:text-green dark:hover:text-green no-underline">
                 {link.label}
               </Link>
             </li>
@@ -81,7 +81,7 @@ export function Navbar() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSearchOpen(true)}
-            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ivory-3 transition-colors hover:text-green dark:hover:text-green"
+            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ink transition-colors hover:text-green dark:hover:text-green"
             aria-label="Search"
           >
             <Search size={19} />
@@ -91,7 +91,7 @@ export function Navbar() {
           <button
             id="theme-toggle"
             onClick={handleThemeToggle}
-            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ivory-3 transition-colors hover:text-green dark:hover:text-green"
+            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ink transition-colors hover:text-green dark:hover:text-green"
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {theme === 'dark'
@@ -108,7 +108,7 @@ export function Navbar() {
             Chat & Buy
           </a>
 
-          <Link href="/profile" className="flex items-center justify-center p-1.5 text-ink-2 transition-colors hover:text-green" aria-label="My Account">
+          <Link href="/profile" className="flex items-center justify-center p-1.5 text-ink-2 dark:text-ink transition-colors hover:text-green dark:hover:text-green" aria-label="My Account">
             <User size={19} />
           </Link>
 
@@ -162,7 +162,7 @@ function CartButton({ count }: { count: number }) {
   return (
     <button
       onClick={handleClick}
-      className="relative cursor-pointer border-none bg-transparent p-1.5 text-ink-2 transition-colors hover:text-green"
+      className="relative cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ink transition-colors hover:text-green dark:hover:text-green"
       aria-label={`Cart (${count} items)`}
     >
       <ShoppingBag size={20} />
