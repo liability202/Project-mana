@@ -53,7 +53,6 @@ const TESTIMONIALS = [
   { stars: 5, text: 'The Triphala kit is my holy grail. Consistent quality every single month.', name: 'Deepa Krishnan', city: 'Delhi' },
   { stars: 5, text: 'Beautiful packaging, excellent quality. Ordered 3 times already!', name: 'Aryan Gupta', city: 'Delhi' },
   { stars: 5, text: 'Saffron quality is outstanding. You can tell it is real the moment you open the pack.', name: 'Priya Mehta', city: 'Bangalore' },
-
 ]
 
 const MARQUEE_ITEMS = [
@@ -91,7 +90,6 @@ export default async function HomePage() {
             className="object-cover object-center opacity-80 animate-kenburns"
             priority
           />
-          {/* Elegant Dark Overlay ensuring text readability on all devices */}
           <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/40" />
         </div>
@@ -138,7 +136,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── MARQUEE ── */}
-      <div className="bg-green py-2.5 overflow-hidden">
+      <div className="bg-green dark:bg-[#0E2018] py-2.5 overflow-hidden">
         <div className="flex w-max animate-marquee">
           {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((item, i) => (
             <span key={i} className="text-[.68rem] tracking-[.18em] uppercase text-green-4 whitespace-nowrap px-7 flex items-center gap-2.5 font-light after:content-['✦'] after:text-[.52rem] after:text-green-3">
@@ -149,23 +147,23 @@ export default async function HomePage() {
       </div>
 
       {/* ── CATEGORIES ── */}
-      <section className="section fade-in">
+      <section className="section fade-in dark:bg-[rgb(var(--c-ivory))]">
         <div className="text-center mb-12">
           <div className="eyebrow justify-center">Shop by Category</div>
-          <h2 className="section-title">The <em className="not-italic text-green">essence</em> of nature</h2>
-          <p className="text-[.92rem] text-ink-3 mt-2 max-w-md mx-auto">Four pillars of natural goodness, curated for your home.</p>
+          <h2 className="section-title">The <em className="not-italic text-green dark:text-green">essence</em> of nature</h2>
+          <p className="text-[.92rem] text-ink-3 dark:text-ink-3 mt-2 max-w-md mx-auto">Four pillars of natural goodness, curated for your home.</p>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {CATEGORIES.map(cat => (
-            <Link key={cat.slug} href={`/products?category=${cat.slug}`} className="card no-underline group">
+            <Link key={cat.slug} href={`/products?category=${cat.slug}`} className="card dark:bg-[rgb(var(--c-ivory2))] dark:border-green-5/20 no-underline group">
               <div className="aspect-[3/4] overflow-hidden">
                 <Image src={cat.img} alt={cat.name} width={500} height={650} className="object-cover w-full h-full group-hover:scale-[1.06] transition-transform duration-500" />
               </div>
               <div className="p-4">
-                <div className="text-[.55rem] tracking-[.14em] uppercase bg-green-6 text-green-2 px-1.5 py-0.5 rounded-sm inline-block mb-1.5 font-medium">{cat.pill}</div>
-                <div className="font-serif text-[1.18rem] text-ink font-normal">{cat.name}</div>
-                <div className="text-[.66rem] text-ink-3 mt-0.5">{cat.count}</div>
-                <div className="text-[.64rem] text-green-3 tracking-wide uppercase mt-2 opacity-0 group-hover:opacity-100 transition-opacity font-medium">Shop Now →</div>
+                <div className="text-[.55rem] tracking-[.14em] uppercase bg-green-6 dark:bg-green-6/20 text-green-2 dark:text-green px-1.5 py-0.5 rounded-sm inline-block mb-1.5 font-medium">{cat.pill}</div>
+                <div className="font-serif text-[1.18rem] text-ink dark:text-ink font-normal">{cat.name}</div>
+                <div className="text-[.66rem] text-ink-3 dark:text-ink-3 mt-0.5">{cat.count}</div>
+                <div className="text-[.64rem] text-green-3 dark:text-green tracking-wide uppercase mt-2 opacity-0 group-hover:opacity-100 transition-opacity font-medium">Shop Now →</div>
               </div>
             </Link>
           ))}
@@ -173,15 +171,15 @@ export default async function HomePage() {
       </section>
 
       {/* ── KITS ── */}
-      <section className="section bg-terra-4 fade-in">
+      <section className="section bg-terra-4 dark:bg-[rgb(var(--c-ivory2))] fade-in">
         <div className="text-center mb-10">
           <div className="eyebrow justify-center">Pre-made Kits</div>
-          <h2 className="section-title">Everything <em className="not-italic text-green">together,</em><br />perfectly curated</h2>
+          <h2 className="section-title">Everything <em className="not-italic text-green dark:text-green">together,</em><br />perfectly curated</h2>
         </div>
         {kits.length === 0 ? (
-          <div className="text-center py-12 text-ink-3 bg-white/40 border border-ivory-3 rounded-2xl">
-            <p className="font-serif text-lg text-ink">No kits available at the moment.</p>
-            <p className="text-xs text-ink-4 mt-1">Please check back later or customize your order via WhatsApp!</p>
+          <div className="text-center py-12 text-ink-3 bg-white/40 dark:bg-green-5/5 border border-ivory-3 dark:border-green-5/15 rounded-2xl">
+            <p className="font-serif text-lg text-ink dark:text-ink">No kits available at the moment.</p>
+            <p className="text-xs text-ink-4 dark:text-ink-4 mt-1">Please check back later or customize your order via WhatsApp!</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -196,21 +194,21 @@ export default async function HomePage() {
               const tag = kit.tags?.filter(t => t !== 'kit')[0] || 'Wellness Kit'
 
               return (
-                <Link key={kit.id} href="/kits" className="card no-underline group flex flex-col">
+                <Link key={kit.id} href="/kits" className="card dark:bg-[rgb(var(--c-ivory3))] dark:border-green-5/20 no-underline group flex flex-col">
                   <div className="aspect-[4/3] overflow-hidden relative">
                     <Image src={image} alt={kit.name} fill sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
                   </div>
                   <div className="p-4 flex flex-col flex-1">
-                    <div className="text-[.56rem] tracking-wide uppercase bg-green-6 text-green-2 px-1.5 py-0.5 rounded-sm inline-block mb-2 font-medium w-fit">{tag}</div>
-                    <div className="font-serif text-[1.1rem] text-ink mb-1 leading-tight">{kit.name}</div>
-                    <div className="text-[.74rem] text-ink-3 mb-3 line-clamp-2">{kit.description}</div>
-                    <div className="mt-auto flex items-center justify-between pt-3 border-t border-ivory-3">
+                    <div className="text-[.56rem] tracking-wide uppercase bg-green-6 dark:bg-green-6/20 text-green-2 dark:text-green px-1.5 py-0.5 rounded-sm inline-block mb-2 font-medium w-fit">{tag}</div>
+                    <div className="font-serif text-[1.1rem] text-ink dark:text-ink mb-1 leading-tight">{kit.name}</div>
+                    <div className="text-[.74rem] text-ink-3 dark:text-ink-3 mb-3 line-clamp-2">{kit.description}</div>
+                    <div className="mt-auto flex items-center justify-between pt-3 border-t border-ivory-3 dark:border-green-5/15">
                       <div>
-                        <div className="font-serif text-[1.2rem] text-green leading-none">{formatPrice(price)}</div>
-                        <div className="text-[.58rem] text-ink-4 mt-0.5">{kit.price_per_unit || 'per kit'}</div>
+                        <div className="font-serif text-[1.2rem] text-green dark:text-green leading-none">{formatPrice(price)}</div>
+                        <div className="text-[.58rem] text-ink-4 dark:text-ink-4 mt-0.5">{kit.price_per_unit || 'per kit'}</div>
                       </div>
                       {savePct > 0 && (
-                        <span className="text-[.58rem] bg-terra-4 text-terra border border-terra-3 px-2 py-0.5 rounded-sm font-medium">Save {savePct}%</span>
+                        <span className="text-[.58rem] bg-terra-4 dark:bg-terra/20 text-terra dark:text-terra border border-terra-3 dark:border-terra/30 px-2 py-0.5 rounded-sm font-medium">Save {savePct}%</span>
                       )}
                     </div>
                   </div>
@@ -227,7 +225,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── QUALITY PROMISE ── */}
-      <section className="section bg-green fade-in">
+      <section className="section bg-green dark:bg-[#0E2018] fade-in">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <div className="eyebrow" style={{ color: 'var(--green4)' }}>Our Promise</div>
@@ -264,23 +262,23 @@ export default async function HomePage() {
       </section>
 
       {/* ── BESTSELLERS ── */}
-      <section className="section bg-white fade-in">
+      <section className="section bg-white dark:bg-[rgb(var(--c-ivory))] fade-in">
         <div className="flex justify-between items-end mb-10 flex-wrap gap-4">
           <div>
-            <div className="eyebrow">Bestsellers</div>
-            <h2 className="section-title">Curated <em className="not-italic text-green">favourites</em></h2>
+            <div className="eyebrow">Featured selections</div>
+            <h2 className="section-title">Curated <em className="not-italic text-green dark:text-green">favourites</em></h2>
           </div>
-          <Link href="/products" className="btn-outline text-sm py-2 px-5 no-underline">View All →</Link>
+          <Link href="/products" className="btn-outline dark:border-green/40 dark:text-green dark:hover:bg-green/10 text-sm py-2 px-5 no-underline">View All →</Link>
         </div>
         {featuredProducts.length > 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {featuredProducts.map(p => <ProductCard key={p.id} product={p} />)}
           </div>
         ) : (
-          <div className="text-center py-16 border-2 border-dashed border-ivory-3 rounded-2xl bg-ivory-2">
+          <div className="text-center py-16 border-2 border-dashed border-ivory-3 dark:border-green-5/20 rounded-2xl bg-ivory-2 dark:bg-[rgb(var(--c-ivory2))]">
             <div className="text-5xl mb-4">🌿</div>
-            <h3 className="font-serif text-xl text-ink mb-2">Products coming soon</h3>
-            <p className="text-[.84rem] text-ink-3 mb-6 max-w-xs mx-auto">
+            <h3 className="font-serif text-xl text-ink dark:text-ink mb-2">Products coming soon</h3>
+            <p className="text-[.84rem] text-ink-3 dark:text-ink-3 mb-6 max-w-xs mx-auto">
               Add your first products in Supabase to see them appear here automatically.
             </p>
             <Link href="/products" className="btn-primary no-underline inline-flex">
@@ -291,24 +289,24 @@ export default async function HomePage() {
       </section>
 
       {/* ── TESTIMONIALS ── */}
-      <section className="section bg-ivory-2 overflow-hidden fade-in">
+      <section className="section bg-ivory-2 dark:bg-[rgb(var(--c-ivory2))] overflow-hidden fade-in">
         <div className="text-center mb-10">
           <div className="eyebrow justify-center">Testimonials</div>
-          <h2 className="section-title">Loved by <em className="not-italic text-green">thousands</em></h2>
+          <h2 className="section-title">What our <em className="not-italic text-green dark:text-green">customers say</em></h2>
         </div>
         <div className="overflow-hidden">
           <div className="flex gap-4 w-max" style={{ animation: 'scroll-left 28s linear infinite' }}>
             {[...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
-              <div key={i} className="w-[290px] flex-shrink-0 bg-white border border-ivory-3 rounded-xl p-5 shadow-soft">
-                <div className="text-terra text-[.78rem] mb-2.5">{'★'.repeat(t.stars)}</div>
-                <p className="text-[.8rem] text-ink-3 leading-[1.7] mb-3.5 italic">"{t.text}"</p>
+              <div key={i} className="w-[290px] flex-shrink-0 bg-white dark:bg-[rgb(var(--c-ivory3))] border border-ivory-3 dark:border-green-5/15 rounded-xl p-5 shadow-soft">
+                <div className="text-terra dark:text-terra text-[.78rem] mb-2.5">{'★'.repeat(t.stars)}</div>
+                <p className="text-[.8rem] text-ink-3 dark:text-ink-3 leading-[1.7] mb-3.5 italic">"{t.text}"</p>
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-green-6 border border-green-5 flex items-center justify-center text-[.7rem] font-medium text-green flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-green-6 dark:bg-green-6/20 border border-green-5 dark:border-green-5/30 flex items-center justify-center text-[.7rem] font-medium text-green dark:text-green flex-shrink-0">
                     {t.name[0]}
                   </div>
                   <div>
-                    <div className="text-[.74rem] text-ink font-medium">{t.name}</div>
-                    <div className="text-[.6rem] text-ink-4">{t.city} · Verified</div>
+                    <div className="text-[.74rem] text-ink dark:text-ink font-medium">{t.name}</div>
+                    <div className="text-[.6rem] text-ink-4 dark:text-ink-4">{t.city} · Verified</div>
                   </div>
                 </div>
               </div>
@@ -318,43 +316,43 @@ export default async function HomePage() {
       </section>
 
       {/* ── CHAT & BUY ── */}
-      <section className="section bg-green-6 fade-in">
+      <section className="section bg-green-6 dark:bg-[rgb(var(--c-ivory))] fade-in">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div className="bg-white border border-ivory-3 rounded-2xl p-5 shadow-soft max-w-md mx-auto w-full">
-            <div className="flex items-center gap-2.5 pb-3.5 border-b border-ivory-3 mb-3.5">
-              <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-green-5">
+          <div className="bg-white dark:bg-[rgb(var(--c-ivory2))] border border-ivory-3 dark:border-green-5/20 rounded-2xl p-5 shadow-soft max-w-md mx-auto w-full">
+            <div className="flex items-center gap-2.5 pb-3.5 border-b border-ivory-3 dark:border-green-5/15 mb-3.5">
+              <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-green-5 dark:border-green/30">
                 <Image src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&q=80" alt="assistant" width={36} height={36} className="object-cover" />
               </div>
               <div>
-                <div className="text-sm font-medium text-ink">Mana Assistant</div>
-                <div className="text-[.6rem] text-green-3 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-3 inline-block" />Online · Instant Reply</div>
+                <div className="text-sm font-medium text-ink dark:text-ink">Mana Assistant</div>
+                <div className="text-[.6rem] text-green-3 dark:text-green flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-3 dark:bg-green inline-block" />Online · Instant Reply</div>
               </div>
             </div>
             <div className="flex flex-col gap-3 mb-3.5">
-              <div className="bg-ivory-2 rounded-[10px_10px_10px_3px] px-3.5 py-2.5 max-w-[85%] text-[.78rem] text-ink leading-relaxed">
+              <div className="bg-ivory-2 dark:bg-[rgb(var(--c-ivory3))] rounded-[10px_10px_10px_3px] px-3.5 py-2.5 max-w-[85%] text-[.78rem] text-ink dark:text-ink leading-relaxed">
                 Namaste! 🙏 Share your list or tell me what you need.
               </div>
-              <div className="bg-green text-ivory rounded-[10px_10px_3px_10px] px-3.5 py-2.5 max-w-[85%] text-[.78rem] self-end leading-relaxed">
+              <div className="bg-green dark:bg-green-2 text-ivory rounded-[10px_10px_3px_10px] px-3.5 py-2.5 max-w-[85%] text-[.78rem] self-end leading-relaxed">
                 Almonds, ashwagandha and tulsi for this month
               </div>
-              <div className="bg-ivory-2 rounded-[10px_10px_10px_3px] px-3.5 py-2.5 max-w-[90%] text-[.78rem] text-ink leading-relaxed">
+              <div className="bg-ivory-2 dark:bg-[rgb(var(--c-ivory3))] rounded-[10px_10px_10px_3px] px-3.5 py-2.5 max-w-[90%] text-[.78rem] text-ink dark:text-ink leading-relaxed">
                 How should I pick them?
                 <div className="flex flex-wrap gap-2 mt-2">
                   {['⭐ Highest Quality', '🔥 Most Selling', '💰 Best Price'].map(c => (
-                    <span key={c} className="px-2.5 py-1 rounded-full text-[.62rem] bg-green-6 border border-green-5 text-green-2 cursor-pointer">{c}</span>
+                    <span key={c} className="px-2.5 py-1 rounded-full text-[.62rem] bg-green-6 dark:bg-green/20 border border-green-5 dark:border-green/30 text-green-2 dark:text-green cursor-pointer">{c}</span>
                   ))}
                 </div>
               </div>
             </div>
-            <div className="flex gap-2 items-center bg-ivory-2 border border-ivory-3 rounded-lg px-3 py-2">
-              <span className="text-[.76rem] text-ink-4 flex-1">Type or upload your list…</span>
-              <div className="w-7 h-7 rounded-md bg-green flex items-center justify-center text-ivory text-sm cursor-pointer">↑</div>
+            <div className="flex gap-2 items-center bg-ivory-2 dark:bg-[rgb(var(--c-ivory3))] border border-ivory-3 dark:border-green-5/15 rounded-lg px-3 py-2">
+              <span className="text-[.76rem] text-ink-4 dark:text-ink-4 flex-1">Type or upload your list…</span>
+              <div className="w-7 h-7 rounded-md bg-green dark:bg-green flex items-center justify-center text-ivory text-sm cursor-pointer">↑</div>
             </div>
           </div>
           <div>
             <div className="eyebrow">Chat & Buy</div>
-            <h3 className="font-serif text-[clamp(1.7rem,2.6vw,2.5rem)] font-light text-ink mb-3 leading-tight">
-              Tell us what you need,<br /><em className="not-italic text-green">we do the rest.</em>
+            <h3 className="font-serif text-[clamp(1.7rem,2.6vw,2.5rem)] font-light text-ink dark:text-ink mb-3 leading-tight">
+              Tell us what you need,<br /><em className="not-italic text-green dark:text-green">we do the rest.</em>
             </h3>
             <div className="flex flex-col gap-4 mb-7">
               {[
@@ -364,10 +362,10 @@ export default async function HomePage() {
                 ['4', 'Remaining at dispatch', 'Or pay in full anytime before delivery'],
               ].map(([n, t, d]) => (
                 <div key={n} className="flex gap-4">
-                  <div className="w-7 h-7 rounded-full bg-green-6 border border-green-4 flex items-center justify-center text-[.66rem] text-green font-medium flex-shrink-0 mt-0.5">{n}</div>
+                  <div className="w-7 h-7 rounded-full bg-green-6 dark:bg-green/20 border border-green-4 dark:border-green/40 flex items-center justify-center text-[.66rem] text-green dark:text-green font-medium flex-shrink-0 mt-0.5">{n}</div>
                   <div>
-                    <div className="text-sm font-medium text-ink">{t}</div>
-                    <div className="text-[.8rem] text-ink-3 mt-0.5">{d}</div>
+                    <div className="text-sm font-medium text-ink dark:text-ink">{t}</div>
+                    <div className="text-[.8rem] text-ink-3 dark:text-ink-3 mt-0.5">{d}</div>
                   </div>
                 </div>
               ))}
@@ -385,12 +383,12 @@ export default async function HomePage() {
       </section>
 
       {/* ── NEWSLETTER ── */}
-      <section className="section text-center bg-white relative overflow-hidden fade-in">
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full bg-green-6/40 pointer-events-none" />
+      <section className="section text-center bg-white dark:bg-[rgb(var(--c-ivory2))] relative overflow-hidden fade-in">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full bg-green-6/40 dark:bg-green/10 pointer-events-none" />
         <div className="relative">
           <div className="eyebrow justify-center">Stay Connected</div>
-          <h2 className="section-title mb-2">Nature's finest, <em className="not-italic text-green">in your inbox.</em></h2>
-          <p className="text-[.88rem] text-ink-3 mb-6">Early access, seasonal drops and wellness tips — no spam, ever.</p>
+          <h2 className="section-title mb-2">Get <em className="not-italic text-green dark:text-green">10% off</em> your first order</h2>
+          <p className="text-[.88rem] text-ink-3 dark:text-ink-3 mb-6">Early access, seasonal drops and wellness tips — no spam, ever.</p>
           <NewsletterForm />
         </div>
       </section>

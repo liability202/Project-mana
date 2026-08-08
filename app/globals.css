@@ -241,7 +241,7 @@ input[type=range]::-webkit-slider-thumb {
   from { transform: translate3d(0, 0, 0); }
   to   { transform: translate3d(-100%, 0, 0); }
 }
-@keyframes scroll-left { to { transform: translate3d(-50%, 0, 0); } }
+@keyframes scroll-left { from { transform: translate3d(0,0,0); } to { transform: translate3d(-50%, 0, 0); } }
 @keyframes bob {
   0%, 100% { transform: translate(-50%,-50%) translateY(0); }
   50%       { transform: translate(-50%,-50%) translateY(-10px); }
@@ -330,30 +330,30 @@ input[type=range]::-webkit-slider-thumb {
   }
 
   .card {
-    @apply bg-white border border-ivory-3 rounded-mana overflow-hidden;
+    @apply bg-white dark:bg-[rgb(var(--c-ivory2))] border border-ivory-3 dark:border-[rgba(111,183,141,0.15)] rounded-mana overflow-hidden;
     transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
   }
-  .card:hover { @apply -translate-y-1 shadow-medium border-green-5; }
+  .card:hover { @apply -translate-y-1 shadow-medium border-green-5 dark:border-[rgba(111,183,141,0.35)]; }
 
   .section {
     @apply py-20 px-[5%];
   }
 
   .eyebrow {
-    @apply inline-flex items-center gap-2.5 text-sm sm:text-xs tracking-widest uppercase text-green-3 font-normal mb-2.5;
+    @apply inline-flex items-center gap-2.5 text-sm sm:text-xs tracking-widest uppercase text-green-3 dark:text-green font-normal mb-2.5;
   }
   .eyebrow::before {
     content: '';
-    @apply w-5 h-px bg-green-3 block;
+    @apply w-5 h-px bg-green-3 dark:bg-green block;
   }
 
   .section-title {
-    @apply font-serif text-2xl sm:text-3xl md:text-4xl font-light text-ink leading-tight tracking-tight;
+    @apply font-serif text-2xl sm:text-3xl md:text-4xl font-light text-ink dark:text-ink leading-tight tracking-tight;
   }
 
   .input {
-    @apply w-full px-4 py-3 border border-ivory-3 rounded-md font-sans text-base sm:text-sm text-ink
-           bg-white outline-none transition-colors duration-200;
+    @apply w-full px-4 py-3 border border-ivory-3 dark:border-green-5/20 rounded-md font-sans text-base sm:text-sm text-ink dark:text-ink
+           bg-white dark:bg-[rgb(var(--c-ivory2))] outline-none transition-colors duration-200;
   }
-  .input:focus { @apply border-green-3; }
+  .input:focus { @apply border-green-3 dark:border-green; }
 }
