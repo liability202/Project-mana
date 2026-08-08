@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Wellness Kits – Curated Dry Fruit, Herb & Spice Boxes',
-  description: 'Shop curated Mana wellness kits — ready-made boxes of premium dry fruits, Ayurvedic herbs and spices. Lab tested, FSSAI certified and packed fresh to order.',
-  alternates: { canonical: '/kits' },
+  title: 'Custom Wellness Kits',
+  description: 'Build your customized health and wellness kit with premium dry fruits, natural churnas, and single-origin spices. Pick your own ingredients and quantities.',
+  alternates: {
+    canonical: 'https://manadryfruits.com/kits',
+  },
 }
 
 export default function KitsLayout({ children }: { children: React.ReactNode }) {

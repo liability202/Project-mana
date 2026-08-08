@@ -30,6 +30,7 @@ export default function CreatorDashboard() {
   const [creator, setCreator] = useState<any>(null)
   const [chartRange, setChartRange] = useState<DateRange>('month')
   const [chartLoading, setChartLoading] = useState(false)
+  const [linkedCodes, setLinkedCodes] = useState<string[]>([])
 
   useEffect(() => {
     const creatorStr = sessionStorage.getItem('mana_creator')
@@ -48,6 +49,14 @@ export default function CreatorDashboard() {
         }
       })
       .catch(() => {/* keep cached */})
+
+    // Fetch all coupon codes linked to this creator via admin panel
+    fetch(`/api/creator/codes?creatorId=${c.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (Array.isArray(data)) setLinkedCodes(data)
+      })
+      .catch(() => {})
   }, [])
 
   // Keyed on the id rather than the creator object so the profile refresh above
@@ -110,13 +119,23 @@ export default function CreatorDashboard() {
           <h1 className="font-serif text-3xl text-ink mb-1.5 font-light">Welcome back, {creator?.name}</h1>
           <p className="text-sm text-ink-3 leading-relaxed max-w-md">Here's a snapshot of your referral impact and reward milestones for this month.</p>
         </div>
-        <div className="flex gap-2.5">
+        <div className="flex gap-2.5 flex-wrap">
            <button 
               onClick={() => copyToClipboard(creator?.code || '')}
               className="bg-white border border-ivory-3 px-4 py-2.5 rounded-xl text-xs font-bold text-ink-2 flex items-center gap-2 hover:bg-ivory-2 transition-colors shadow-soft"
            >
              <Copy size={15} className="text-green-3" /> {creator?.code}
            </button>
+           {linkedCodes.filter(c => c !== creator?.code).map(code => (
+             <button
+               key={code}
+               onClick={() => copyToClipboard(code)}
+               className="bg-white border border-ivory-3 px-4 py-2.5 rounded-xl text-xs font-bold text-ink-3 flex items-center gap-2 hover:bg-ivory-2 transition-colors shadow-soft"
+               title={`Copy code: ${code}`}
+             >
+               <Copy size={13} className="text-green-4" /> {code}
+             </button>
+           ))}
            <a 
               href={`https://wa.me/?text=Check%20out%20Mana%20for%20premium%20dry%20fruits%20%26%20herbs.%20Get%20your%20exclusive%20discount%20here%3A%20https%3A%2F%2Fmanadryfruits.com%2Fref%2F${creator?.code}`}
               target="_blank"

@@ -13,12 +13,6 @@ export function ProductCard({ product }: { product: Product }) {
   const basePrice = firstVariant?.price || product.price
   const baseWeight = parseBaseWeightGrams(product.price_per_unit)
 
-  // Kits are shot in landscape (1.25–1.5) because they line up five packets in
-  // a row; single products are shot portrait (mostly 4:5). Forcing both into
-  // one frame either letterboxes the kits or beheads the products, so the
-  // image area follows the category.
-  const isKit = product.category === 'kits'
-
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault()
     addItem({
@@ -40,40 +34,18 @@ export function ProductCard({ product }: { product: Product }) {
       href={`/products/${product.slug}`}
       className="card flex flex-col no-underline group"
     >
-      {/* Image
-          Both frames fill edge-to-edge with `object-cover` — no letterboxing.
-          The frame ratio is picked per category to match how each set was shot,
-          so the crop stays on backdrop rather than on product:
-
-          • Products → 4:5. 29 of 53 product shots are already exactly 4:5 and
-            crop by nothing at all. The 2:3 shots lose 17% split across top and
-            bottom, and the square ones 20% across the sides — in both cases
-            that is the empty backdrop around a centred packet.
-          • Kits → 9:8. They are shot landscape (~3:2) to fit five packets in a
-            row, so a portrait frame left half the card empty. 9:8 gives the
-            card a bit more height (0.89x the width rather than 0.8x) at the
-            cost of trimming ~25% off the sides — the point where the crop
-            starts approaching the outer packets, so don't push it squarer.
-
-          `photo-well` stays as the backdrop: it matches the measured average
-          photo background (#140A04), so it covers the frame cleanly while an
-          image is still loading instead of flashing a pale box. */}
-      <div className={`photo-well overflow-hidden relative ${isKit ? 'aspect-[9/8]' : 'aspect-[4/5]'}`}>
+      {/* Image */}
+      <div className="aspect-[4/5] overflow-hidden relative" style={{ background: 'rgb(var(--c-ivory2))' }}>
         {product.images?.[0] ? (
           <Image
             src={product.images[0]}
             alt={product.name}
             fill
-            // Framed slightly above centre. These packets are shot standing on
-            // a slab with the product filling the upper two thirds, so a dead-
-            // centre crop clipped the top of the pouch on the tighter shots.
-            // Only affects the portrait sources — the square and landscape ones
-            // crop horizontally, where this has no effect.
-            className="object-cover object-[50%_35%] group-hover:scale-105 transition-transform duration-500"
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-ink-4 text-xs">No image</div>
+          <div className="w-full h-full flex items-center justify-center text-xs" style={{ background: 'rgb(var(--c-ivory2))', color: 'var(--ink4)' }}>No image</div>
         )}
 
         {/* Badges */}
@@ -82,13 +54,13 @@ export function ProductCard({ product }: { product: Product }) {
             <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 bg-terra text-white font-medium rounded-sm">Bestseller</span>
           )}
           {product.tags?.includes('organic') && (
-            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 bg-green text-ivory font-medium rounded-sm">Organic</span>
+            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 font-medium rounded-sm text-ivory" style={{ background: 'var(--green)' }}>Organic</span>
           )}
           {product.tags?.includes('premium') && (
-            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 bg-ivory text-green-2 border border-green-5 font-medium rounded-sm">Premium</span>
+            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 font-medium rounded-sm border" style={{ background: 'rgb(var(--c-ivory))', color: 'var(--green2)', borderColor: 'rgba(var(--c-green5), 0.5)' }}>Premium</span>
           )}
           {product.compare_price && product.compare_price > product.price && (
-            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 bg-ivory text-green-2 border border-green-5 font-medium rounded-sm">
+            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 font-medium rounded-sm border" style={{ background: 'rgb(var(--c-ivory))', color: 'var(--green2)', borderColor: 'rgba(var(--c-green5), 0.5)' }}>
               Save {Math.round((product.compare_price - product.price) / product.compare_price * 100)}%
             </span>
           )}
@@ -97,28 +69,29 @@ export function ProductCard({ product }: { product: Product }) {
         {/* Wishlist */}
         <button
           onClick={e => { e.preventDefault(); showToast('Saved ♡') }}
-          className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 border border-ivory-3 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:border-green-4 z-10"
+          className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10"
+          style={{ background: 'rgba(var(--c-ivory), 0.9)', border: '1px solid rgba(var(--c-ivory3), 1)' }}
           aria-label="Save"
         >
-          <Heart size={14} className="text-ink-3" />
+          <Heart size={14} style={{ color: 'var(--ink3)' }} />
         </button>
       </div>
 
       {/* Info */}
       <div className="p-4 flex-1 flex flex-col">
         {product.vendor && (
-          <div className="text-[.6rem] tracking-[.15em] uppercase text-ink-4 mb-1">{product.vendor}</div>
+          <div className="text-[.6rem] tracking-[.15em] uppercase mb-1" style={{ color: 'var(--ink4)' }}>{product.vendor}</div>
         )}
-        <div className="text-[.68rem] text-terra mb-1">★★★★★</div>
-        <div className="font-serif text-[1.12rem] text-ink mb-1 leading-tight">{product.name}</div>
+        <div className="text-[.68rem] mb-1" style={{ color: 'var(--terra)' }}>★★★★★</div>
+        <div className="font-serif text-[1.12rem] mb-1 leading-tight" style={{ color: 'var(--ink)' }}>{product.name}</div>
         {product.variants && product.variants.length > 1 && (
-          <div className="text-[.66rem] text-ink-3 mb-3">{product.variants.length} varieties</div>
+          <div className="text-[.66rem] mb-3" style={{ color: 'var(--ink3)' }}>{product.variants.length} varieties</div>
         )}
         <div className="mt-auto flex items-center justify-between gap-2 flex-wrap">
           <div>
-            <div className="font-serif text-[1.18rem] text-green leading-none">{formatPrice(basePrice)}</div>
+            <div className="font-serif text-[1.18rem] leading-none" style={{ color: 'var(--green)' }}>{formatPrice(basePrice)}</div>
             {product.price_per_unit && (
-              <div className="text-[.6rem] text-ink-4 mt-0.5">{product.price_per_unit}</div>
+              <div className="text-[.6rem] mt-0.5" style={{ color: 'var(--ink4)' }}>{product.price_per_unit}</div>
             )}
           </div>
           <button

@@ -105,23 +105,25 @@ export default function KitsPage() {
 
   return (
     <>
-      <div className="bg-green px-[5%] py-12">
+      {/* Hero header — always stays deep green */}
+      <div className="bg-green dark:bg-[#0A1810] px-[5%] py-12">
         <div className="eyebrow" style={{ color: 'var(--green4)' }}>Curated Kits</div>
         <h1 className="font-serif text-[clamp(2rem,4vw,3.2rem)] text-ivory font-light">
-          Everything you need, <em className="not-italic text-green-4">in one kit.</em>
+          Everything you need, <em className="not-italic" style={{ color: 'var(--green4)' }}>in one kit.</em>
         </h1>
-        <p className="text-[.88rem] text-green-4 mt-2 max-w-xl">
+        <p className="text-[.88rem] mt-2 max-w-xl" style={{ color: 'var(--green4)' }}>
           Browse Mana wellness kits first. Open any kit to choose size, form, and exact item weights.
         </p>
       </div>
 
-      <div className="px-[5%] py-10 flex flex-col gap-10 max-w-[1320px] mx-auto">
+      {/* Kit grid */}
+      <div className="px-[5%] py-10 flex flex-col gap-10 max-w-[1320px] mx-auto" style={{ background: 'rgb(var(--c-ivory))' }}>
         {loading ? (
-          <div className="text-ink-3">Loading kits...</div>
+          <div style={{ color: 'var(--ink3)' }}>Loading kits...</div>
         ) : kits.length === 0 ? (
-          <div className="bg-white border border-ivory-3 rounded-2xl p-8 text-center">
-            <div className="font-serif text-2xl text-ink mb-2">No kits yet</div>
-            <div className="text-sm text-ink-3 mb-4">Create your first kit from the admin panel and it will appear here automatically.</div>
+          <div className="rounded-2xl p-8 text-center" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
+            <div className="font-serif text-2xl mb-2" style={{ color: 'var(--ink)' }}>No kits yet</div>
+            <div className="text-sm mb-4" style={{ color: 'var(--ink3)' }}>Create your first kit from the admin panel and it will appear here automatically.</div>
             <Link href="/admin/kit/new" className="btn-primary no-underline">Create Kit</Link>
           </div>
         ) : (
@@ -131,7 +133,6 @@ export default function KitsPage() {
             ))}
           </div>
         )}
-
       </div>
     </>
   )
@@ -147,23 +148,33 @@ function KitOverviewCard({ kit, selected, onSelect }: { kit: KitProduct; selecte
   return (
     <Link
       href={`/kits/${kit.slug}`}
-      className={`group block text-left rounded-[24px] border bg-white p-3 shadow-soft transition-all hover:-translate-y-1 hover:border-green-4 hover:shadow-lg ${selected ? 'border-green ring-2 ring-green-5' : 'border-ivory-3'} no-underline`}
+      className={`group block text-left rounded-[24px] p-3 transition-all hover:-translate-y-1 hover:shadow-lg no-underline`}
+      style={{
+        background: 'rgb(var(--c-ivory2))',
+        border: selected
+          ? '1px solid var(--green)'
+          : '1px solid rgb(var(--c-ivory3))',
+        boxShadow: 'var(--shadow-soft)',
+      }}
     >
-      <div className="relative overflow-hidden rounded-[20px] border border-ivory-3 bg-ivory2 aspect-[4/3]">
+      <div
+        className="relative overflow-hidden rounded-[20px] aspect-[4/3]"
+        style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory3))' }}
+      >
         {image ? (
           <Image src={image} alt={kit.name} fill sizes="(min-width: 1280px) 30vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
-          <div className="h-full w-full flex items-center justify-center text-ink-4">No image</div>
+          <div className="h-full w-full flex items-center justify-center" style={{ color: 'var(--ink4)' }}>No image</div>
         )}
       </div>
       <div className="p-3">
-        <div className="text-[.62rem] tracking-[.2em] uppercase text-terra mb-2">Mana wellness kit</div>
-        <h2 className="font-serif text-2xl leading-tight text-ink font-light">{kit.name}</h2>
-        <p className="mt-2 text-sm text-ink-3 leading-[1.65] line-clamp-2">{kit.description}</p>
+        <div className="text-[.62rem] tracking-[.2em] uppercase mb-2" style={{ color: 'var(--terra)' }}>Mana wellness kit</div>
+        <h2 className="font-serif text-2xl leading-tight font-light" style={{ color: 'var(--ink)' }}>{kit.name}</h2>
+        <p className="mt-2 text-sm leading-[1.65] line-clamp-2" style={{ color: 'var(--ink3)' }}>{kit.description}</p>
         <div className="mt-4 flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs text-ink-4">{items.length || 'Custom'} items · {sizeCount} ritual size{sizeCount === 1 ? '' : 's'}</div>
-            <div className="font-serif text-2xl text-green mt-1">{formatPrice(firstVariant?.price || kit.price)}</div>
+            <div className="text-xs" style={{ color: 'var(--ink4)' }}>{items.length || 'Custom'} items · {sizeCount} ritual size{sizeCount === 1 ? '' : 's'}</div>
+            <div className="font-serif text-2xl mt-1" style={{ color: 'var(--green)' }}>{formatPrice(firstVariant?.price || kit.price)}</div>
           </div>
           <span className="rounded-full bg-green px-4 py-2 text-xs font-medium text-white transition-colors group-hover:bg-terra">
             View Kit

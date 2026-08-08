@@ -108,8 +108,8 @@ export default function KitSlugPage({ params }: { params: { slug: string } }) {
     return () => { active = false }
   }, [params.slug])
 
-  if (loading) return <div className="p-12 text-center text-ink-3">Loading kit...</div>
-  if (!kit) return <div className="p-12 text-center text-ink-3">Kit not found</div>
+  if (loading) return <div className="p-12 text-center" style={{ color: 'var(--ink3)' }}>Loading kit...</div>
+  if (!kit) return <div className="p-12 text-center" style={{ color: 'var(--ink3)' }}>Kit not found</div>
 
   const kitVariants = normalizeVariants(kit)
   const kitOfferPrice = kitVariants.reduce((lowest, variant) => {
@@ -145,8 +145,8 @@ export default function KitSlugPage({ params }: { params: { slug: string } }) {
           ])),
         }}
       />
-      <div className="bg-ivory2 min-h-screen pb-12">
-      <div className="bg-green px-[5%] py-8 mb-6">
+      <div style={{ background: 'rgb(var(--c-ivory))' }} className="min-h-screen pb-12">
+      <div className="bg-green dark:bg-[#0A1810] px-[5%] py-8 mb-6">
         <Link href="/kits" className="text-sm text-green-3 hover:text-white transition-colors flex items-center gap-1 mb-4">
           ← Back to Kits
         </Link>
@@ -303,45 +303,46 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
   }
 
   return (
-    <div className="bg-white border border-ivory-3 rounded-[18px] sm:rounded-[24px] overflow-hidden shadow-soft">
-      <div className="flex items-center justify-between gap-3 border-b border-ivory-3 bg-ivory px-4 py-4 sm:px-7">
+    <div className="rounded-[18px] sm:rounded-[24px] overflow-hidden" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))', boxShadow: 'var(--shadow-soft)' }}>
+      <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-7" style={{ borderBottom: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory))' }}>
         <div>
-          <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4">Kit details</div>
-          <div className="font-serif text-xl text-ink mt-1">{kit.name}</div>
+          <div className="text-[.62rem] tracking-[.2em] uppercase" style={{ color: 'var(--ink4)' }}>Kit details</div>
+          <div className="font-serif text-xl mt-1" style={{ color: 'var(--ink)' }}>{kit.name}</div>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full border border-ivory-3 bg-white px-4 py-2 text-sm text-ink transition-colors hover:border-terra hover:text-terra"
+          className="rounded-full px-4 py-2 text-sm transition-colors hover:border-terra hover:text-terra"
+          style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory2))', color: 'var(--ink)' }}
         >
           Back
         </button>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-[0.92fr_1.08fr]">
-        <div className="p-5 sm:p-7 lg:p-8 border-b lg:border-b-0 lg:border-r border-ivory-3">
-          <div className="relative overflow-hidden rounded-[24px] border border-ivory-3 bg-ivory2 aspect-[4/3]">
+        <div className="p-5 sm:p-7 lg:p-8" style={{ borderBottom: '1px solid rgb(var(--c-ivory3))' }} >
+          <div className="relative overflow-hidden rounded-[24px] aspect-[4/3]" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory3))' }}>
             {image ? (
               <Image src={image} alt={kit.name} fill sizes="(min-width: 1024px) 45vw, 100vw" className="object-cover" />
             ) : (
-              <div className="h-full w-full flex items-center justify-center text-ink-4">No image</div>
+              <div className="h-full w-full flex items-center justify-center" style={{ color: 'var(--ink4)' }}>No image</div>
             )}
           </div>
-          <div className="mt-5 rounded-[20px] border border-green-5 bg-green-6/50 p-5">
-            <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-2">Description</div>
-            <p className="text-[.9rem] text-ink-3 leading-[1.8]">{kit.description}</p>
+          <div className="mt-5 rounded-[20px] p-5" style={{ border: '1px solid rgba(var(--c-green5), 0.4)', background: 'rgba(var(--c-green6), 0.5)' }}>
+            <div className="text-[.62rem] tracking-[.2em] uppercase mb-2" style={{ color: 'var(--ink4)' }}>Description</div>
+            <p className="text-[.9rem] leading-[1.8]" style={{ color: 'var(--ink3)' }}>{kit.description}</p>
           </div>
         </div>
 
         <div className="p-5 sm:p-7 lg:p-8 flex flex-col gap-5">
           <div>
-            <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-2">Mana wellness kit</div>
-            <h2 className="font-serif text-[clamp(2rem,4vw,3rem)] leading-none text-ink font-light">{kit.name}</h2>
-            {kit.vendor && <div className="text-sm text-ink-4 mt-2">{kit.vendor}</div>}
+            <div className="text-[.62rem] tracking-[.2em] uppercase mb-2" style={{ color: 'var(--ink4)' }}>Mana wellness kit</div>
+            <h2 className="font-serif text-[clamp(2rem,4vw,3rem)] leading-none font-light" style={{ color: 'var(--ink)' }}>{kit.name}</h2>
+            {kit.vendor && <div className="text-sm mt-2" style={{ color: 'var(--ink4)' }}>{kit.vendor}</div>}
           </div>
 
           {tiers.length > 1 && (
             <div>
-              <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-2">Select Kit Version</div>
+              <div className="text-[.62rem] tracking-[.2em] uppercase mb-2" style={{ color: 'var(--ink4)' }}>Select Kit Version</div>
               <div className="flex flex-wrap gap-2">
                 {tiers.map((tierVariants, index) => {
                   const tierName = tierVariants[0]?.tier_name || `Version ${index + 1}`
@@ -357,8 +358,9 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
                       className={`rounded-xl border px-5 py-3 text-sm font-medium transition-all ${
                         isActive 
                           ? 'border-green bg-green-6 text-green shadow-soft' 
-                          : 'border-ivory-3 bg-white hover:border-green-4 text-ink-2'
+                          : 'border-ivory-3 hover:border-green-4'
                       }`}
+                      style={{ background: isActive ? undefined : 'rgb(var(--c-ivory2))', color: isActive ? undefined : 'var(--ink2)' }}
                     >
                       {tierName}
                     </button>
@@ -369,34 +371,36 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
           )}
 
           <div>
-            <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-2">Select size</div>
+            <div className="text-[.62rem] tracking-[.2em] uppercase mb-2" style={{ color: 'var(--ink4)' }}>Select size</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {activeTierVariants.map((variant, index) => (
                 <button
                   key={variant.id || variant.name}
                   type="button"
                   onClick={() => setSizeIdx(index)}
-                  className={`rounded-xl border p-3 text-left transition-all ${sizeIdx === index ? 'border-green bg-green-6 shadow-soft' : 'border-ivory-3 bg-white hover:border-green-4'}`}
+                  className={`rounded-xl border p-3 text-left transition-all ${sizeIdx === index ? 'border-green bg-green-6 shadow-soft' : 'border-ivory-3 hover:border-green-4'}`}
+                  style={{ background: sizeIdx === index ? undefined : 'rgb(var(--c-ivory2))' }}
                 >
-                  <div className="text-sm font-medium text-ink">{getSizeDisplayName(variant.name, index)}</div>
-                  <div className="text-[.66rem] text-ink-4 mt-1">{variant.grams_each || variant.items?.[0]?.grams || 100}g each recommended</div>
-                  <div className="text-[.82rem] text-green font-medium mt-1">{formatPrice(variant.price || kit.price)}</div>
+                  <div className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{getSizeDisplayName(variant.name, index)}</div>
+                  <div className="text-[.66rem] mt-1" style={{ color: 'var(--ink4)' }}>{variant.grams_each || variant.items?.[0]?.grams || 100}g each recommended</div>
+                  <div className="text-[.82rem] font-medium mt-1" style={{ color: 'var(--green)' }}>{formatPrice(variant.price || kit.price)}</div>
                 </button>
               ))}
             </div>
-            {activeVar?.size_desc && <div className="text-[.72rem] text-ink-3 mt-2">{activeVar.size_desc}</div>}
+            {activeVar?.size_desc && <div className="text-[.72rem] mt-2" style={{ color: 'var(--ink3)' }}>{activeVar.size_desc}</div>}
           </div>
 
-          <div className="rounded-2xl border border-ivory-3 bg-ivory/70 p-4">
+          <div className="rounded-2xl p-4" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgba(var(--c-ivory), 0.7)' }}>
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
-                <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4">Selected configuration</div>
-                <div className="text-sm text-ink mt-1">{sizeLabel} · {form === 'powder' ? 'Powder' : 'Whole'} · {selectedItems.length} products · {totalWeightLabel}</div>
+                <div className="text-[.62rem] tracking-[.2em] uppercase" style={{ color: 'var(--ink4)' }}>Selected configuration</div>
+                <div className="text-sm mt-1" style={{ color: 'var(--ink)' }}>{sizeLabel} · {form === 'powder' ? 'Powder' : 'Whole'} · {selectedItems.length} products · {totalWeightLabel}</div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCustomizing(current => !current)}
-                className="rounded-full border border-green-4 bg-white px-4 py-2 text-xs font-medium text-green transition-colors hover:bg-green-6"
+                className="rounded-full border border-green-4 px-4 py-2 text-xs font-medium transition-colors hover:bg-green-6"
+                style={{ background: 'rgb(var(--c-ivory2))', color: 'var(--green)' }}
               >
                 {isCustomizing ? 'Done' : 'Edit / Customize'}
               </button>
@@ -407,7 +411,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
                 <div className="text-sm text-ink-3">No linked products were saved inside this kit yet.</div>
               ) : (
                 selectedItems.map(item => (
-                  <div key={item.id} className="flex items-center justify-between gap-3 text-[.82rem] text-ink-3">
+                  <div key={item.id} className="flex items-center justify-between gap-3 text-[.82rem]" style={{ color: 'var(--ink3)' }}>
                     <span>{item.name}</span>
                     <span>{item.grams}g</span>
                   </div>
@@ -418,19 +422,21 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
 
           {(availableForms.powder && availableForms.whole) && (
             <div>
-              <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-2">Choose form</div>
+              <div className="text-[.62rem] tracking-[.2em] uppercase mb-2" style={{ color: 'var(--ink4)' }}>Choose form</div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setForm('powder')}
-                  className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'powder' ? 'border-green bg-green text-white' : 'border-green-4 bg-white text-green hover:bg-green-6'}`}
+                  className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'powder' ? 'border-green bg-green text-white' : 'border-green-4 hover:bg-green-6'}`}
+                  style={form !== 'powder' ? { background: 'rgb(var(--c-ivory2))', color: 'var(--green)' } : {}}
                 >
                   Powder
                 </button>
                 <button
                   type="button"
                   onClick={() => setForm('whole')}
-                  className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'whole' ? 'border-green bg-green text-white' : 'border-green-4 bg-white text-green hover:bg-green-6'}`}
+                  className={`min-w-[140px] rounded-xl border px-5 py-3 text-sm font-medium transition-all ${form === 'whole' ? 'border-green bg-green text-white' : 'border-green-4 hover:bg-green-6'}`}
+                  style={form !== 'whole' ? { background: 'rgb(var(--c-ivory2))', color: 'var(--green)' } : {}}
                 >
                   Whole
                 </button>
@@ -439,15 +445,15 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
           )}
 
           {isCustomizing && (
-              <div className="rounded-2xl border border-ivory-3 bg-ivory/70 p-4">
+              <div className="rounded-2xl p-4" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgba(var(--c-ivory), 0.7)' }}>
                 <div className="flex items-center justify-between gap-3 mb-3">
-                  <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4">Adjust individual products</div>
-                  <div className="text-[.68rem] text-ink-3">{selectedItems.length}/{activeItems.length} selected</div>
+              <div className="text-[.62rem] tracking-[.2em] uppercase" style={{ color: 'var(--ink4)' }}>Adjust individual products</div>
+                  <div className="text-[.68rem]" style={{ color: 'var(--ink3)' }}>{selectedItems.length}/{activeItems.length} selected</div>
                 </div>
 
                 <div className="flex flex-col gap-3">
                   {activeItems.length === 0 ? (
-                    <div className="text-sm text-ink-3">No linked products were saved inside this kit yet.</div>
+                    <div className="text-sm" style={{ color: 'var(--ink3)' }}>No linked products were saved inside this kit yet.</div>
                   ) : (
                     activeItems.map((item, index) => {
                       const state = itemStates[index] || { id: item.id, selected: true, grams: item.grams || 100, ratio: 1 }
@@ -457,7 +463,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
                       const linePrice = Math.round(getBasePrice(item, state.grams) * kitFactor)
 
                       return (
-                        <div key={item.id} className="rounded-xl border border-ivory-3 bg-white p-3">
+                        <div key={item.id} className="rounded-xl p-3" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory2))' }}>
                           <div className="flex items-center justify-between gap-3">
                             <label className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer">
                               <input
@@ -469,17 +475,17 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
                                 }, recommended)}
                                 className="h-4 w-4 accent-[var(--green)]"
                               />
-                              <div className="relative h-10 w-10 overflow-hidden rounded-full border border-ivory-3 bg-ivory2 flex items-center justify-center text-[.58rem] uppercase tracking-[.12em] text-ink-4">
+                              <div className="relative h-10 w-10 overflow-hidden rounded-full flex items-center justify-center text-[.58rem] uppercase tracking-[.12em]" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory3))', color: 'var(--ink4)' }}>
                                 {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <span>Img</span>}
                               </div>
-                              <div className="min-w-0">
-                                <div className="text-[.9rem] font-medium text-ink">{item.name}</div>
-                                <div className="text-[.68rem] text-ink-3 leading-tight">{item.benefit || item.category || 'Kit item'}</div>
+                              <div>
+                                <div className="text-[.9rem] font-medium" style={{ color: 'var(--ink)' }}>{item.name}</div>
+                                <div className="text-[.68rem] leading-tight" style={{ color: 'var(--ink3)' }}>{item.benefit || item.category || 'Kit item'}</div>
                               </div>
                             </label>
                             <div className="text-right">
-                              <div className="text-[.9rem] font-medium text-ink">{state.grams}g</div>
-                              <div className="text-[.68rem] text-ink-4">{formatPrice(linePrice)}</div>
+                              <div className="text-[.9rem] font-medium" style={{ color: 'var(--ink)' }}>{state.grams}g</div>
+                              <div className="text-[.68rem]" style={{ color: 'var(--ink4)' }}>{formatPrice(linePrice)}</div>
                             </div>
                           </div>
 
@@ -494,7 +500,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
                               onChange={event => updateItem(index, { grams: parseInt(event.target.value, 10) }, recommended)}
                               className={state.selected ? 'opacity-100' : 'opacity-40'}
                             />
-                            <div className="mt-1 flex items-center justify-between text-[.64rem] text-ink-4">
+                            <div className="mt-1 flex items-center justify-between text-[.64rem]" style={{ color: 'var(--ink4)' }}>
                               <span>{minWeight}g</span>
                               <span>{recommended}g</span>
                               <span>{maxWeight}g</span>
@@ -510,26 +516,24 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
 
           {refCode && (
             <div className="bg-white border-2 border-dashed border-green-4 rounded-lg p-4 text-center shadow-sm">
-              <div className="text-sm font-bold text-green tracking-wide">
+              <div className="text-xs font-bold tracking-wide" style={{ color: 'var(--green)' }}>
                 Get it as low as {formatPrice(Math.round(price * (1 - refPct / 100)))}
               </div>
-              <div className="text-xs text-ink-3 mt-1.5 font-medium">Your discount code <strong>{refCode}</strong> will be securely applied at checkout!</div>
+              <div className="text-xs mt-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Your discount code <strong>{refCode}</strong> will be securely applied at checkout!</div>
             </div>
           )}
 
-          <div className="rounded-2xl border border-green-5 bg-green-6/60 p-4">
-            <div className="space-y-1.5 border-b border-green-5 pb-3 mb-3">
+          <div className="rounded-2xl p-4" style={{ border: '1px solid rgba(var(--c-green5), 0.4)', background: 'rgba(var(--c-green6), 0.6)' }}>
+            <div className="space-y-1.5 pb-3 mb-3" style={{ borderBottom: '1px solid rgba(var(--c-green5), 0.3)' }}>
               {selectedItems.map(item => (
-                <div key={item.id} className="flex items-center justify-between gap-3 text-[.78rem] text-ink-3">
+                <div key={item.id} className="flex items-center justify-between gap-3 text-[.78rem]" style={{ color: 'var(--ink3)' }}>
                   <span>{item.name} ({item.grams}g)</span>
                   <span>{formatPrice(Math.round(getBasePrice(item, item.grams) * kitFactor))}</span>
                 </div>
               ))}
             </div>
-            <div className="flex items-baseline gap-2 mb-1">
-              <div className="font-serif text-3xl text-green">{formatPrice(price)}</div>
-            </div>
-            <div className="text-[.72rem] text-ink-3 mb-4">{totalWeightLabel} total - {form === 'powder' ? 'powder form' : 'whole form'}</div>
+            <div className="font-serif text-3xl mb-1" style={{ color: 'var(--green)' }}>{formatPrice(price)}</div>
+            <div className="text-[.72rem] mb-4" style={{ color: 'var(--ink3)' }}>{totalWeightLabel} total - {form === 'powder' ? 'powder form' : 'whole form'}</div>
             <div className="flex gap-2.5 flex-wrap">
               <button onClick={handleAddToCart} className="btn-primary flex-1 justify-center min-w-[140px]">
                 <span>Add to Cart</span>
@@ -546,13 +550,14 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
           </div>
 
           <div>
-            <div className="flex border-b border-ivory-3 mb-3">
+            <div className="flex mb-3" style={{ borderBottom: '1px solid rgb(var(--c-ivory3))' }}>
               {(['benefits', 'howto'] as const).map(currentTab => (
                 <button
                   key={currentTab}
                   type="button"
                   onClick={() => setTab(currentTab)}
-                  className={`px-4 py-2 text-xs font-medium border-none bg-transparent cursor-pointer transition-all ${tab === currentTab ? 'text-green border-b-2 border-green -mb-px' : 'text-ink-3 hover:text-ink'}`}
+                  className={`px-4 py-2 text-xs font-medium border-none bg-transparent cursor-pointer transition-all ${tab === currentTab ? 'text-green border-b-2 border-green -mb-px' : 'hover:text-ink'}`}
+                  style={{ color: tab === currentTab ? undefined : 'var(--ink3)' }}
                 >
                   {currentTab === 'benefits' ? 'Benefits' : 'How to Use'}
                 </button>
@@ -562,7 +567,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
             {tab === 'benefits' && (
               <div className="grid grid-cols-1 gap-1.5">
                 {(benefits.length ? benefits : ['Customizable quantities', 'Freshly packed', 'Flexible powder or whole form']).map(benefit => (
-                  <div key={benefit} className="flex items-center gap-2 text-[.78rem] text-ink-3">
+                  <div key={benefit} className="flex items-center gap-2 text-[.78rem]" style={{ color: 'var(--ink3)' }}>
                     <span className="text-green-3 flex-shrink-0">✓</span>
                     {benefit}
                   </div>
@@ -571,7 +576,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
             )}
 
             {tab === 'howto' && (
-              <div className="text-[.78rem] text-ink-3 leading-[1.8]">
+              <div className="text-[.78rem] leading-[1.8]" style={{ color: 'var(--ink3)' }}>
                 {howToUse || 'Use as recommended by Mana. For personalized usage, contact us on WhatsApp before ordering.'}
               </div>
             )}

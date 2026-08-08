@@ -2,10 +2,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Menu, Search, ShoppingBag, X, User } from 'lucide-react'
+import { Menu, Moon, Search, ShoppingBag, Sun, X, User } from 'lucide-react'
 import { useCart } from '@/lib/store'
 import { SearchOverlay } from '@/components/ui/SearchOverlay'
-import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { useTheme } from '@/components/ThemeProvider'
 
 const NAV_LINKS = [
   { label: 'Dry Fruits', href: '/products?category=dry-fruits' },
@@ -19,9 +19,17 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [spinning, setSpinning] = useState(false)
   const hydrated = useCart((s) => s.hydrated)
   const count = useCart((s) => s.count())
   const safeCount = hydrated ? count : 0
+  const { theme, toggle } = useTheme()
+
+  const handleThemeToggle = () => {
+    setSpinning(true)
+    toggle()
+    setTimeout(() => setSpinning(false), 500)
+  }
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 60)
@@ -43,7 +51,7 @@ export function Navbar() {
 
   return (
     <>
-      <nav className={`sticky top-0 z-50 flex h-[62px] items-center justify-between border-b border-ivory-3 bg-white/95 px-[5%] backdrop-blur-md transition-all duration-300 ${scrolled ? 'shadow-soft' : ''}`}>
+      <nav className={`sticky top-0 z-50 flex h-[62px] items-center justify-between border-b border-ivory-3 dark:border-green-5/20 bg-white/95 dark:bg-[rgb(var(--c-surface)/0.95)] px-[5%] backdrop-blur-md transition-all duration-300 ${scrolled ? 'shadow-soft' : ''}`}>
         <Link href="/" className="flex items-center gap-3 no-underline">
           <div className="h-9 w-9 flex-shrink-0">
             <Image
@@ -55,15 +63,15 @@ export function Navbar() {
             />
           </div>
           <div>
-            <div className="font-serif text-2xl font-normal leading-none tracking-wide text-green">MANA</div>
-            <div className="mt-0.5 hidden text-[.42rem] uppercase tracking-[.4em] text-ink-3 sm:block">The Essence of Nature</div>
+            <div className="font-serif text-2xl font-normal leading-none tracking-wide text-green dark:text-green">MANA</div>
+            <div className="mt-0.5 hidden text-[.42rem] uppercase tracking-[.4em] text-ink-3 dark:text-ivory-3 sm:block">The Essence of Nature</div>
           </div>
         </Link>
 
         <ul className="hidden list-none items-center gap-7 lg:flex">
           {NAV_LINKS.map((link) => (
             <li key={link.href}>
-              <Link href={link.href} className="text-[.76rem] font-normal tracking-wide text-ink-2 transition-colors hover:text-green no-underline">
+              <Link href={link.href} className="text-[.76rem] font-normal tracking-wide text-ink-2 dark:text-ivory-3 transition-colors hover:text-green dark:hover:text-green no-underline">
                 {link.label}
               </Link>
             </li>
@@ -73,13 +81,32 @@ export function Navbar() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSearchOpen(true)}
-            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 transition-colors hover:text-green"
+            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ivory-3 transition-colors hover:text-green dark:hover:text-green"
             aria-label="Search"
           >
             <Search size={19} />
           </button>
 
-          <ThemeToggle />
+          {/* ── Dark / Light toggle ── */}
+          <button
+            id="theme-toggle"
+            onClick={handleThemeToggle}
+            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ivory-3 transition-colors hover:text-green dark:hover:text-green"
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark'
+              ? <Sun size={19} className={spinning ? 'animate-theme-spin' : ''} />
+              : <Moon size={19} className={spinning ? 'animate-theme-spin' : ''} />}
+          </button>
+
+          <a
+            href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=Hi%20Mana!%20I%20need%20help.`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden rounded-md border border-green-3 dark:border-green/40 px-4 py-1.5 text-[.72rem] tracking-wide text-green dark:text-green transition-colors hover:bg-green-6 dark:hover:bg-green-6/20 no-underline sm:block"
+          >
+            Chat & Buy
+          </a>
 
           <Link href="/profile" className="flex items-center justify-center p-1.5 text-ink-2 transition-colors hover:text-green" aria-label="My Account">
             <User size={19} />
@@ -98,14 +125,14 @@ export function Navbar() {
       </nav>
 
       {mobileOpen && (
-        <div className="fixed left-0 right-0 top-[62px] z-40 border-b border-ivory-3 bg-ivory shadow-soft lg:hidden">
+        <div className="fixed left-0 right-0 top-[62px] z-40 border-b border-ivory-3 dark:border-green-5/20 bg-ivory dark:bg-[rgb(var(--c-ivory2))] shadow-soft lg:hidden">
           <div className="flex flex-col">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className="border-b border-ivory-3 px-[5%] py-4 text-sm text-ink-2 transition-colors hover:bg-ivory-2 hover:text-green no-underline"
+                className="border-b border-ivory-3 dark:border-green-5/10 px-[5%] py-4 text-sm text-ink-2 dark:text-ivory-3 transition-colors hover:bg-ivory-2 dark:hover:bg-green-6/10 hover:text-green no-underline"
               >
                 {link.label}
               </Link>
