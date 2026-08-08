@@ -5,6 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/cart/CartDrawer'
 import { Toaster } from '@/components/ui/Toaster'
 import { ScrollObserver } from '@/components/ScrollObserver'
+import { ThemeProvider } from '@/components/ThemeProvider'
 
 const siteUrl = 'https://manadryfruits.com'
 
@@ -110,7 +111,7 @@ const websiteSchema = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
@@ -122,14 +123,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <ScrollObserver />
-        <Navbar />
-        <CartDrawer />
-        <main id="main-content">
-          {children}
-        </main>
-        <Footer />
-        <Toaster />
+        <ThemeProvider>
+          <ScrollObserver />
+          <Navbar />
+          <CartDrawer />
+          <main id="main-content">
+            {children}
+          </main>
+          <Footer />
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   )
