@@ -32,10 +32,10 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="card dark:bg-[rgb(var(--c-ivory2))] dark:border-green-5/20 flex flex-col no-underline group"
+      className="card flex flex-col no-underline group"
     >
       {/* Image */}
-      <div className="aspect-[4/5] overflow-hidden relative bg-ivory-2 dark:bg-[rgb(var(--c-ivory3))]">
+      <div className="aspect-[4/5] overflow-hidden relative" style={{ background: 'rgb(var(--c-ivory2))' }}>
         {product.images?.[0] ? (
           <Image
             src={product.images[0]}
@@ -45,7 +45,7 @@ export function ProductCard({ product }: { product: Product }) {
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
         ) : (
-          <div className="w-full h-full bg-ivory-2 dark:bg-[rgb(var(--c-ivory3))] flex items-center justify-center text-ink-4 dark:text-ink-4 text-xs">No image</div>
+          <div className="w-full h-full flex items-center justify-center text-xs" style={{ background: 'rgb(var(--c-ivory2))', color: 'var(--ink4)' }}>No image</div>
         )}
 
         {/* Badges */}
@@ -54,13 +54,13 @@ export function ProductCard({ product }: { product: Product }) {
             <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 bg-terra text-white font-medium rounded-sm">Bestseller</span>
           )}
           {product.tags?.includes('organic') && (
-            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 bg-green text-ivory font-medium rounded-sm">Organic</span>
+            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 font-medium rounded-sm text-ivory" style={{ background: 'var(--green)' }}>Organic</span>
           )}
           {product.tags?.includes('premium') && (
-            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 bg-ivory dark:bg-[rgb(var(--c-ivory3))] text-green-2 dark:text-green border border-green-5 dark:border-green/30 font-medium rounded-sm">Premium</span>
+            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 font-medium rounded-sm border" style={{ background: 'rgb(var(--c-ivory))', color: 'var(--green2)', borderColor: 'rgba(var(--c-green5), 0.5)' }}>Premium</span>
           )}
           {product.compare_price && product.compare_price > product.price && (
-            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 bg-ivory dark:bg-[rgb(var(--c-ivory3))] text-green-2 dark:text-green border border-green-5 dark:border-green/30 font-medium rounded-sm">
+            <span className="text-[.52rem] tracking-wide uppercase px-1.5 py-0.5 font-medium rounded-sm border" style={{ background: 'rgb(var(--c-ivory))', color: 'var(--green2)', borderColor: 'rgba(var(--c-green5), 0.5)' }}>
               Save {Math.round((product.compare_price - product.price) / product.compare_price * 100)}%
             </span>
           )}
@@ -69,28 +69,29 @@ export function ProductCard({ product }: { product: Product }) {
         {/* Wishlist */}
         <button
           onClick={e => { e.preventDefault(); showToast('Saved ♡') }}
-          className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 dark:bg-[rgb(var(--c-ivory3)/0.9)] border border-ivory-3 dark:border-green-5/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:border-green-4 z-10"
+          className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10"
+          style={{ background: 'rgba(var(--c-ivory), 0.9)', border: '1px solid rgba(var(--c-ivory3), 1)' }}
           aria-label="Save"
         >
-          <Heart size={14} className="text-ink-3 dark:text-ink-3" />
+          <Heart size={14} style={{ color: 'var(--ink3)' }} />
         </button>
       </div>
 
       {/* Info */}
       <div className="p-4 flex-1 flex flex-col">
         {product.vendor && (
-          <div className="text-[.6rem] tracking-[.15em] uppercase text-ink-4 dark:text-ink-4 mb-1">{product.vendor}</div>
+          <div className="text-[.6rem] tracking-[.15em] uppercase mb-1" style={{ color: 'var(--ink4)' }}>{product.vendor}</div>
         )}
-        <div className="text-[.68rem] text-terra dark:text-terra mb-1">★★★★★</div>
-        <div className="font-serif text-[1.12rem] text-ink dark:text-ink mb-1 leading-tight">{product.name}</div>
+        <div className="text-[.68rem] mb-1" style={{ color: 'var(--terra)' }}>★★★★★</div>
+        <div className="font-serif text-[1.12rem] mb-1 leading-tight" style={{ color: 'var(--ink)' }}>{product.name}</div>
         {product.variants && product.variants.length > 1 && (
-          <div className="text-[.66rem] text-ink-3 dark:text-ink-3 mb-3">{product.variants.length} varieties</div>
+          <div className="text-[.66rem] mb-3" style={{ color: 'var(--ink3)' }}>{product.variants.length} varieties</div>
         )}
         <div className="mt-auto flex items-center justify-between gap-2 flex-wrap">
           <div>
-            <div className="font-serif text-[1.18rem] text-green dark:text-green leading-none">{formatPrice(basePrice)}</div>
+            <div className="font-serif text-[1.18rem] leading-none" style={{ color: 'var(--green)' }}>{formatPrice(basePrice)}</div>
             {product.price_per_unit && (
-              <div className="text-[.6rem] text-ink-4 dark:text-ink-4 mt-0.5">{product.price_per_unit}</div>
+              <div className="text-[.6rem] mt-0.5" style={{ color: 'var(--ink4)' }}>{product.price_per_unit}</div>
             )}
           </div>
           <button

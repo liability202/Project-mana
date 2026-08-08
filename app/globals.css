@@ -47,7 +47,6 @@
   --c-ink2:   74 60 40;
   --c-ink3:   138 120 96;
   --c-ink4:   191 180 154;
-
   --c-gold:   193 149 63;
   --c-surface: 255 255 255;
 
@@ -340,20 +339,25 @@ input[type=range]::-webkit-slider-thumb {
   }
 
   .eyebrow {
-    @apply inline-flex items-center gap-2.5 text-sm sm:text-xs tracking-widest uppercase text-green-3 dark:text-green font-normal mb-2.5;
+    @apply inline-flex items-center gap-2.5 text-sm sm:text-xs tracking-widest uppercase font-normal mb-2.5;
+    color: var(--green3);
   }
   .eyebrow::before {
     content: '';
-    @apply w-5 h-px bg-green-3 dark:bg-green block;
+    @apply w-5 h-px block;
+    background: var(--green3);
   }
 
   .section-title {
-    @apply font-serif text-2xl sm:text-3xl md:text-4xl font-light text-ink dark:text-ivory leading-tight tracking-tight;
+    @apply font-serif text-2xl sm:text-3xl md:text-4xl font-light leading-tight tracking-tight;
+    color: var(--ink);
   }
 
   .input {
-    @apply w-full px-4 py-3 border border-ivory-3 dark:border-green-5/20 rounded-md font-sans text-base sm:text-sm text-ink dark:text-ivory
-           bg-white dark:bg-[rgb(var(--c-ivory2))] outline-none transition-colors duration-200;
+    @apply w-full px-4 py-3 rounded-md font-sans text-base sm:text-sm outline-none transition-colors duration-200;
+    border: 1px solid rgb(var(--c-ivory3));
+    background: rgb(var(--c-ivory2));
+    color: var(--ink);
   }
-  .input:focus { @apply border-green-3 dark:border-green; }
+  .input:focus { border-color: var(--green3); }
 }
