@@ -461,7 +461,7 @@ export default function ProfilePage() {
                           </div>
 
                           {/* Order Items */}
-                          <div className="px-5 py-4 divide-y" style={{ divideColor: 'rgb(var(--c-ivory3))' }}>
+                          <div className="px-5 py-4 divide-y divide-ivory-3 dark:divide-green-5/20">
                             {order.items?.map((item: any, i: number) => (
                               <div key={i} className="py-3 flex justify-between items-start gap-4 first:pt-0 last:pb-0">
                                 <div className="min-w-0 flex-1">
