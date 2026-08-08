@@ -318,7 +318,7 @@ export default function CheckoutPage() {
         rememberAccountPhone(normalizedPhone)
         
         const autoCoupon = 'LOYAL12'
-        const cpRes = await fetch(`/api/coupons/apply`, {
+        const cpRes = await fetch(`/api/coupons/validate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: autoCoupon, subtotal, phone: normalizedPhone, isReturning: true })
@@ -327,7 +327,7 @@ export default function CheckoutPage() {
         if (cpRes.ok && cpData.valid) {
           setCouponState({
             code: autoCoupon,
-            discountAmount: cpData.discountAmount,
+            discountAmount: cpData.discount_amount,
             valid: true,
             free_shipping: cpData.free_shipping,
             free_cod: cpData.free_cod,
@@ -355,7 +355,7 @@ export default function CheckoutPage() {
     }
     setCouponLoading(true)
     try {
-      const res = await fetch(`/api/coupons/apply`, {
+      const res = await fetch(`/api/coupons/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, subtotal, phone: normalizedPhone, isReturning: customerType === 'returning' })
@@ -366,7 +366,7 @@ export default function CheckoutPage() {
       }
       setCouponState({
         code,
-        discountAmount: data.discountAmount,
+        discountAmount: data.discount_amount,
         valid: true,
         free_shipping: data.free_shipping,
         free_cod: data.free_cod,
