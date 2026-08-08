@@ -48,7 +48,7 @@ function getStatusIndex(status: string) {
 function TrackingTimeline({ status }: { status: string }) {
   if (status === 'cancelled') {
     return (
-      <div className="mt-4 rounded-lg border border-terra/30 bg-terra/10 px-3 py-2 text-sm text-terra">
+      <div className="mt-4 rounded-lg px-3 py-2 text-sm" style={{ border: '1px solid rgba(var(--c-terra), 0.3)', background: 'rgba(var(--c-terra), 0.1)', color: 'var(--terra)' }}>
         This order has been cancelled.
       </div>
     )
@@ -62,8 +62,8 @@ function TrackingTimeline({ status }: { status: string }) {
         const done = index <= activeIndex
         return (
           <div key={step.key} className="flex flex-col items-center text-center gap-1">
-            <div className={`h-2 w-full rounded-full ${done ? 'bg-green' : 'bg-ivory-4'}`} />
-            <span className={done ? 'text-green-3 font-medium' : 'text-ink-4'}>{step.label}</span>
+            <div className="h-2 w-full rounded-full" style={{ background: done ? 'var(--green)' : 'var(--ink4)' }} />
+            <span style={{ color: done ? 'var(--green)' : 'var(--ink4)', fontWeight: done ? 500 : 300 }}>{step.label}</span>
           </div>
         )
       })}
@@ -76,21 +76,21 @@ function TrackingDetails({ order, formatDate }: { order: any; formatDate: (value
 
   return (
     <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2 min-w-0 overflow-hidden">
-        <div className="text-[.62rem] tracking-widest uppercase text-ink-4">Courier</div>
-        <div className="text-sm text-ink mt-1 truncate" title={order.courier_name || ''}>
+      <div className="rounded-lg px-3 py-2 min-w-0 overflow-hidden" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory2))' }}>
+        <div className="text-[.62rem] tracking-widest uppercase" style={{ color: 'var(--ink4)' }}>Courier</div>
+        <div className="text-sm mt-1 truncate" style={{ color: 'var(--ink)' }} title={order.courier_name || ''}>
           {order.courier_name || (order.status === 'shipped' ? 'Assigned soon' : 'After dispatch')}
         </div>
       </div>
-      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2 min-w-0 overflow-hidden">
-        <div className="text-[.62rem] tracking-widest uppercase text-ink-4">Tracking No.</div>
-        <div className="text-sm font-mono text-ink mt-1 truncate select-all" title={order.tracking_number || ''}>
+      <div className="rounded-lg px-3 py-2 min-w-0 overflow-hidden" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory2))' }}>
+        <div className="text-[.62rem] tracking-widest uppercase" style={{ color: 'var(--ink4)' }}>Tracking No.</div>
+        <div className="text-sm font-mono mt-1 truncate select-all" style={{ color: 'var(--ink)' }} title={order.tracking_number || ''}>
           {order.tracking_number || 'Not available yet'}
         </div>
       </div>
-      <div className="rounded-lg border border-ivory-3 bg-white px-3 py-2 min-w-0 overflow-hidden">
-        <div className="text-[.62rem] tracking-widest uppercase text-ink-4">Expected Delivery</div>
-        <div className="text-sm text-ink mt-1 truncate">{expectedDelivery}</div>
+      <div className="rounded-lg px-3 py-2 min-w-0 overflow-hidden" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory2))' }}>
+        <div className="text-[.62rem] tracking-widest uppercase" style={{ color: 'var(--ink4)' }}>Expected Delivery</div>
+        <div className="text-sm mt-1 truncate" style={{ color: 'var(--ink)' }}>{expectedDelivery}</div>
       </div>
       {order.tracking_link && (
         <a href={order.tracking_link} target="_blank" rel="noopener noreferrer" className="sm:col-span-3 btn-outline text-center no-underline justify-center">
@@ -261,10 +261,10 @@ export default function ProfilePage() {
 
   const getStatusColor = (status: string) => {
     switch(status?.toLowerCase()) {
-      case 'delivered': return 'text-green bg-green-6 border-green-5'
+      case 'delivered': return 'text-green bg-green-6 border-green-5 dark:border-green/20'
       case 'cancelled': return 'text-terra bg-terra/10 border-terra/20'
-      case 'shipped': return 'text-blue-600 bg-blue-50 border-blue-200'
-      default: return 'text-ink-2 bg-ivory-3 border-ivory-4'
+      case 'shipped': return 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/30'
+      default: return 'text-ink-2 bg-ivory-3 border-ivory-4 dark:text-ivory dark:bg-green-5/10 dark:border-green-5/20'
     }
   }
 
@@ -281,11 +281,11 @@ export default function ProfilePage() {
 
   if (initializing) {
     return (
-      <div className="min-h-[70vh] bg-ivory pt-12 pb-24">
+      <div className="min-h-[70vh] pt-12 pb-24" style={{ background: 'rgb(var(--c-ivory))' }}>
         <div className="max-w-4xl mx-auto px-[5%]">
-          <div className="max-w-md mx-auto bg-white border border-ivory-3 rounded-2xl p-8 shadow-soft">
-            <h1 className="font-serif text-2xl text-ink mb-2">Opening your profile...</h1>
-            <p className="text-sm text-ink-3">Loading your saved account and latest orders.</p>
+          <div className="max-w-md mx-auto rounded-2xl p-8 shadow-soft" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
+            <h1 className="font-serif text-2xl mb-2" style={{ color: 'var(--ink)' }}>Opening your profile...</h1>
+            <p className="text-sm" style={{ color: 'var(--ink3)' }}>Loading your saved account and latest orders.</p>
           </div>
         </div>
       </div>
@@ -293,29 +293,30 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-[70vh] bg-ivory pt-12 pb-24 overflow-x-hidden">
+    <div className="min-h-[70vh] pt-12 pb-24 overflow-x-hidden" style={{ background: 'rgb(var(--c-ivory))' }}>
       <div className="max-w-4xl mx-auto px-4 sm:px-[5%]">
         
         {step !== 'dashboard' && (
-          <div className="max-w-md mx-auto bg-white border border-ivory-3 rounded-2xl p-8 shadow-soft">
+          <div className="max-w-md mx-auto rounded-2xl p-8 shadow-soft" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
             <div className="text-center mb-8">
-              <h1 className="font-serif text-3xl text-ink mb-2">My Account</h1>
-              <p className="text-sm text-ink-3">Sign in securely with your WhatsApp number</p>
+              <h1 className="font-serif text-3xl mb-2" style={{ color: 'var(--ink)' }}>My Account</h1>
+              <p className="text-sm" style={{ color: 'var(--ink3)' }}>Sign in securely with your WhatsApp number</p>
             </div>
 
             {step === 'login' && (
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-medium text-ink-3 uppercase tracking-wider block mb-2">WhatsApp Number</label>
+                  <label className="text-xs font-medium uppercase tracking-wider block mb-2" style={{ color: 'var(--ink3)' }}>WhatsApp Number</label>
                   <div className="flex">
-                    <span className="inline-flex items-center px-4 border border-r-0 border-ivory-3 rounded-l-lg bg-ivory-2 text-ink-3 font-medium">
+                    <span className="inline-flex items-center px-4 border border-r-0 rounded-l-lg font-medium" style={{ background: 'rgb(var(--c-ivory3))', borderColor: 'rgb(var(--c-ivory3))', color: 'var(--ink3)' }}>
                       +91
                     </span>
                     <input 
                       type="tel" 
                       value={phone}
                       onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                      className="flex-1 min-w-0 px-4 py-3 border border-ivory-3 rounded-r-lg text-ink font-medium focus:border-green-3 outline-none" 
+                      className="flex-1 min-w-0 px-4 py-3 rounded-r-lg font-medium outline-none" 
+                      style={{ background: 'rgb(var(--c-ivory2))', color: 'var(--ink)', border: '1px solid rgb(var(--c-ivory3))' }}
                       placeholder="98765 43210" 
                       maxLength={10} 
                     />
@@ -334,16 +335,17 @@ export default function ProfilePage() {
             {step === 'verify' && (
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-medium text-ink-3 uppercase tracking-wider block mb-2">Enter Verification Code</label>
+                  <label className="text-xs font-medium uppercase tracking-wider block mb-2" style={{ color: 'var(--ink3)' }}>Enter Verification Code</label>
                   <input 
                     type="text" 
                     value={otpCode}
                     onChange={e => setOtpCode(e.target.value.replace(/\s/g, ''))}
-                    className="w-full px-4 py-3 border border-ivory-3 rounded-lg text-ink font-medium focus:border-green-3 text-center tracking-[0.5em] text-xl outline-none" 
+                    className="w-full px-4 py-3 rounded-lg font-medium text-center tracking-[0.5em] text-xl outline-none" 
+                    style={{ background: 'rgb(var(--c-ivory2))', color: 'var(--ink)', border: '1px solid rgb(var(--c-ivory3))' }}
                     placeholder="XXXXXX" 
                     maxLength={6} 
                   />
-                  {otpHint && <div className="text-xs text-ink-4 mt-2 text-center">{otpHint}</div>}
+                  {otpHint && <div className="text-xs mt-2 text-center" style={{ color: 'var(--ink4)' }}>{otpHint}</div>}
                 </div>
                 <button 
                   onClick={verifyOtp} 
@@ -353,7 +355,7 @@ export default function ProfilePage() {
                   {loading ? 'Verifying...' : 'Verify & Login'}
                 </button>
                 <div className="text-center mt-4">
-                  <button onClick={() => setStep('login')} className="text-xs text-ink-4 underline hover:text-green">Use a different number</button>
+                  <button onClick={() => setStep('login')} className="text-xs underline hover:text-green bg-transparent border-none cursor-pointer" style={{ color: 'var(--ink4)' }}>Use a different number</button>
                 </div>
               </div>
             )}
@@ -364,12 +366,13 @@ export default function ProfilePage() {
           <div className="space-y-8 animate-fade-in">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="font-serif text-3xl text-ink">Welcome back</h1>
-                <p className="text-ink-4 text-sm mt-1">+91 {verifiedPhone.replace(/(\d{5})(\d{5})/, '$1 $2')}</p>
+                <h1 className="font-serif text-3xl" style={{ color: 'var(--ink)' }}>Welcome back</h1>
+                <p className="text-sm mt-1" style={{ color: 'var(--ink4)' }}>+91 {verifiedPhone.replace(/(\d{5})(\d{5})/, '$1 $2')}</p>
               </div>
               <button 
                 onClick={logout}
-                className="text-sm font-medium text-ink-3 hover:text-terra transition-colors px-4 py-2 border border-ivory-3 rounded-lg bg-white"
+                className="text-sm font-medium transition-colors px-4 py-2 border rounded-lg"
+                style={{ background: 'rgb(var(--c-ivory2))', borderColor: 'rgb(var(--c-ivory3))', color: 'var(--ink3)' }}
               >
                 Log out
               </button>
@@ -377,7 +380,7 @@ export default function ProfilePage() {
 
             {dataLoading ? (
               <div className="flex justify-center items-center h-48">
-                <div className="w-8 h-8 border-4 border-ivory-3 border-t-green rounded-full animate-spin" />
+                <div className="w-8 h-8 border-4 border-t-green rounded-full animate-spin" style={{ borderColor: 'rgb(var(--c-ivory3))' }} />
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
@@ -386,16 +389,16 @@ export default function ProfilePage() {
                 <div className="space-y-6">
                   {/* Wallet Card */}
                   {siteSettings.enable_cashback_spending && (
-                  <div className="bg-green-6 border-2 border-green-5 rounded-2xl p-6 relative overflow-hidden shadow-sm">
-                    <div className="absolute -right-6 -top-6 text-green-5 opacity-50">
+                  <div className="rounded-2xl p-6 relative overflow-hidden shadow-sm border" style={{ background: 'rgba(var(--c-green5), 0.1)', borderColor: 'rgba(var(--c-green5), 0.3)' }}>
+                    <div className="absolute -right-6 -top-6 opacity-30" style={{ color: 'var(--green)' }}>
                       <Wallet size={120} strokeWidth={1} />
                     </div>
                     <div className="relative z-10">
-                      <div className="text-sm font-semibold text-green mb-1 flex items-center gap-2">
+                      <div className="text-sm font-semibold mb-1 flex items-center gap-2" style={{ color: 'var(--green)' }}>
                         <Wallet size={16} /> Mana Cashback Wallet
                       </div>
-                      <div className="font-serif text-4xl text-green mb-2">{formatPrice(walletBalance)}</div>
-                      <p className="text-xs text-green-2 leading-relaxed max-w-[200px]">
+                      <div className="font-serif text-4xl mb-2" style={{ color: 'var(--green)' }}>{formatPrice(walletBalance)}</div>
+                      <p className="text-xs leading-relaxed max-w-[200px]" style={{ color: 'var(--green2)' }}>
                         Available balance to use on your next purchase. {siteSettings.enable_cashback_earning ? 'Earn 5% cashback on every order!' : ''}
                       </p>
                     </div>
@@ -403,8 +406,8 @@ export default function ProfilePage() {
                   )}
 
                   {/* Need Help Box */}
-                  <div className="bg-white border border-ivory-3 rounded-2xl p-6 text-center shadow-sm relative overflow-hidden">
-                    <p className="text-sm font-medium text-ink mb-3">Need help with an order?</p>
+                  <div className="rounded-2xl p-6 text-center shadow-sm relative overflow-hidden" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
+                    <p className="text-sm font-medium mb-3" style={{ color: 'var(--ink)' }}>Need help with an order?</p>
                     <a
                       href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=Hi%20Mana!%20I%20have%20a%20question%20regarding%20my%20recent%20order.`}
                       target="_blank"
@@ -417,16 +420,16 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Right Column: Order History */}
-                <div className="bg-white border border-ivory-3 rounded-2xl p-6 sm:p-8 shadow-sm">
-                  <h2 className="font-serif text-2xl text-ink mb-6 flex items-center gap-2">
-                    <Package className="text-green" /> Order History
+                <div className="rounded-2xl p-6 sm:p-8 shadow-sm" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
+                  <h2 className="font-serif text-2xl mb-6 flex items-center gap-2" style={{ color: 'var(--ink)' }}>
+                    <Package style={{ color: 'var(--green)' }} /> Order History
                   </h2>
 
                   {orders.length === 0 ? (
-                    <div className="text-center py-12 bg-ivory-2 rounded-xl border border-dashed border-ivory-3">
-                      <Clock className="mx-auto text-ink-4 mb-3" size={32} />
-                      <h3 className="text-ink font-medium mb-1">No orders yet</h3>
-                      <p className="text-sm text-ink-4 mb-4">When you place an order, it will appear here.</p>
+                    <div className="text-center py-12 rounded-xl border border-dashed" style={{ background: 'rgb(var(--c-ivory))', borderColor: 'rgb(var(--c-ivory3))' }}>
+                      <Clock className="mx-auto mb-3" style={{ color: 'var(--ink4)' }} size={32} />
+                      <h3 className="font-medium mb-1" style={{ color: 'var(--ink)' }}>No orders yet</h3>
+                      <p className="text-sm mb-4" style={{ color: 'var(--ink4)' }}>When you place an order, it will appear here.</p>
                       <button onClick={() => router.push('/products')} className="btn-outline">
                         Start Shopping
                       </button>
@@ -434,17 +437,17 @@ export default function ProfilePage() {
                   ) : (
                     <div className="space-y-6">
                       {orders.map((order) => (
-                        <div key={order.id} className="border border-ivory-3 rounded-xl overflow-hidden transition-all hover:border-green-4">
+                        <div key={order.id} className="rounded-xl overflow-hidden transition-all" style={{ border: '1px solid rgb(var(--c-ivory3))' }}>
                           {/* Order Header */}
-                          <div className="bg-ivory-2 px-5 py-4 border-b border-ivory-3 flex flex-wrap justify-between items-center gap-4">
+                          <div className="px-5 py-4 flex flex-wrap justify-between items-center gap-4" style={{ background: 'rgb(var(--c-ivory3))', borderBottom: '1px solid rgb(var(--c-ivory3))' }}>
                             <div>
-                              <div className="text-xs font-mono text-ink-4 mb-1">#{order.order_ref || order.id.slice(0, 8)}</div>
-                              <div className="text-sm font-medium text-ink">{formatDate(order.created_at)}</div>
+                              <div className="text-xs font-mono mb-1" style={{ color: 'var(--ink4)' }}>#{order.order_ref || order.id.slice(0, 8)}</div>
+                              <div className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{formatDate(order.created_at)}</div>
                             </div>
                             <div className="flex items-center gap-4">
                               <div className="text-right">
-                                <div className="text-sm font-serif text-green">{formatPrice(order.final_amount || order.total)}</div>
-                                <div className="text-[.65rem] text-ink-4 uppercase tracking-wider">{order.items?.length || 0} Items</div>
+                                <div className="text-sm font-serif" style={{ color: 'var(--green)' }}>{formatPrice(order.final_amount || order.total)}</div>
+                                <div className="text-[.65rem] uppercase tracking-wider" style={{ color: 'var(--ink4)' }}>{order.items?.length || 0} Items</div>
                               </div>
                               <span className={`text-xs px-2.5 py-1 rounded-full border border-solid capitalize font-medium ${getStatusColor(order.status)}`}>
                                 {(order.status || 'Processing').replace('_', ' ')}
@@ -458,26 +461,27 @@ export default function ProfilePage() {
                           </div>
 
                           {/* Order Items */}
-                          <div className="px-5 py-4 divide-y divide-ivory-3">
+                          <div className="px-5 py-4 divide-y" style={{ divideColor: 'rgb(var(--c-ivory3))' }}>
                             {order.items?.map((item: any, i: number) => (
                               <div key={i} className="py-3 flex justify-between items-start gap-4 first:pt-0 last:pb-0">
                                 <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-medium text-ink line-clamp-1">{item.product_name}</div>
-                                  <div className="text-xs text-ink-3 mt-0.5">
+                                  <div className="text-sm font-medium line-clamp-1" style={{ color: 'var(--ink)' }}>{item.product_name}</div>
+                                  <div className="text-xs mt-0.5" style={{ color: 'var(--ink3)' }}>
                                     {item.quantity} × {item.weight_grams >= 1000 ? (item.weight_grams / 1000).toFixed(1) + 'kg' : item.weight_grams + 'g'}
                                     {item.variant_name ? ` • ${item.variant_name}` : ''}
                                   </div>
                                   {order.status === 'delivered' && item.product_slug && (
                                     <Link
                                       href={`/products/${item.product_slug}#reviews`}
-                                      className="inline-flex items-center gap-1 mt-2 text-[0.7rem] font-medium text-amber-600 hover:text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full transition-colors no-underline"
+                                      className="inline-flex items-center gap-1 mt-2 text-[0.7rem] font-medium bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full transition-colors no-underline dark:bg-amber-900/10 dark:border-amber-800/30"
+                                      style={{ color: 'var(--terra)' }}
                                     >
                                       <Star size={10} fill="currentColor" />
                                       Leave a Review
                                     </Link>
                                   )}
                                 </div>
-                                <div className="text-sm font-serif text-ink-2 whitespace-nowrap">
+                                <div className="text-sm font-serif whitespace-nowrap" style={{ color: 'var(--ink2)' }}>
                                   {formatPrice(item.price * item.quantity)}
                                 </div>
                               </div>
@@ -485,10 +489,11 @@ export default function ProfilePage() {
                           </div>
 
                           {/* Order Action */}
-                          <div className="px-5 py-3 bg-ivory/50 border-t border-ivory-3">
+                          <div className="px-5 py-3 border-t" style={{ background: 'rgba(var(--c-ivory), 0.3)', borderColor: 'rgb(var(--c-ivory3))' }}>
                             <button 
                               onClick={() => handleReorder(order)} 
-                              className="text-sm font-medium text-green flex items-center gap-1 hover:text-green-2 transition-colors ml-auto"
+                              className="text-sm font-medium flex items-center gap-1 hover:text-green-2 transition-colors ml-auto bg-transparent border-none cursor-pointer"
+                              style={{ color: 'var(--green)' }}
                             >
                               1-Click Reorder <ChevronRight size={16} />
                             </button>

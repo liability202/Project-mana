@@ -256,91 +256,26 @@ export default function CheckoutPage() {
     return () => {
       active = false
     }
-  }, [form.pincode, totalWeightGrams])
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
-  }
-
-  const applyCouponCode = async (code: string, options: { silent?: boolean } = {}) => {
-    const normalizedCode = code.trim().toUpperCase()
-    if (!normalizedCode) {
-      showToast('Enter a coupon code')
-      return false
-    }
-
-    setCouponLoading(true)
-    try {
-      const res = await fetch('/api/coupons/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: normalizedCode, subtotal, phone: normalizedPhone }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Invalid coupon')
-
-      setCouponInput(data.coupon.code)
-      setCouponState({
-        code: data.coupon.code,
-        discountAmount: data.discount_amount || 0,
-        valid: true,
-        free_shipping: Boolean(data.free_shipping || data.coupon?.free_shipping),
-        free_cod: Boolean(data.free_cod || data.coupon?.free_cod),
-        free_handling: Boolean(data.free_handling || data.coupon?.free_handling),
-      })
-      if (data.customer_type) setCustomerType(data.customer_type)
-      if (!options.silent) showToast(`Coupon ${data.coupon.code} applied`)
-      return true
-    } catch (err: any) {
-      setCouponState({ code: '', discountAmount: 0, valid: false, free_shipping: false, free_cod: false, free_handling: false })
-      if (!options.silent) showToast(err.message || 'Invalid coupon')
-      return false
-    } finally {
-      setCouponLoading(false)
-    }
-  }
-
-  const loyaltyAppliedRef = useRef(false)
-  useEffect(() => {
-    if (customerType === 'returning' && otpStatus === 'verified' && subtotal > 0 && !loyaltyAppliedRef.current && !couponState.code) {
-      loyaltyAppliedRef.current = true
-      applyCouponCode('LOYAL12', { silent: true }).catch(() => {})
-    }
-  }, [customerType, otpStatus, subtotal, couponState.code])
-
-  const fetchCustomerType = async () => {
-    const res = await fetch(`/api/orders?phone=${normalizedPhone}`)
-    const data = await res.json()
-    if (!res.ok) throw new Error(data?.error || 'Could not check order history')
-    const hasPreviousOrders = Array.isArray(data) && data.length > 0
-    return hasPreviousOrders ? 'returning' : 'new'
-  }
+  }, [form.pincode, totalWeightGrams, form.city, form.state])
 
   const sendOtp = async () => {
     if (normalizedPhone.length !== 10) {
-      showToast('Enter a valid 10-digit phone number')
+      showToast('Enter a valid 10-digit number')
       return
     }
-
     setOtpLoading(true)
+    setOtpCode('')
     try {
       const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: normalizedPhone,
-          name: form.name,
-          email: form.email,
-        }),
+        body: JSON.stringify({ phone: normalizedPhone }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Could not send OTP')
-
+      if (!res.ok) throw new Error(data?.error || 'Failed to send OTP')
       setOtpStatus('code-sent')
-      setOtpCode('')
-      const hint = `OTP sent via WhatsApp`
-      setOtpHint(hint)
-      showToast(hint)
+      setOtpHint('OTP sent via WhatsApp')
+      showToast('OTP sent successfully')
     } catch (err: any) {
       showToast(err.message || 'Could not send OTP')
     } finally {
@@ -349,60 +284,61 @@ export default function CheckoutPage() {
   }
 
   const verifyOtp = async () => {
-    if (normalizedPhone.length !== 10) {
-      showToast('Enter a valid 10-digit phone number')
-      return
-    }
     if (otpCode.trim().length < 4) {
-      showToast('Enter the OTP you received')
+      showToast('Enter the OTP received')
       return
     }
-
     setOtpLoading(true)
     try {
       const res = await fetch('/api/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: normalizedPhone,
-          otp: otpCode.trim(),
-          name: form.name,
-          email: form.email,
-        }),
+        body: JSON.stringify({ phone: normalizedPhone, otp: otpCode.trim() }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'OTP verification failed')
-
+      if (!res.ok) throw new Error(data?.error || 'Invalid OTP')
       setOtpStatus('verified')
       setVerifiedPhone(normalizedPhone)
       setVerifiedUserId(data.user_id || null)
-      setOtpHint('')
-      rememberAccountPhone(normalizedPhone)
-
-      if (data.latest_order) {
+      showToast('Phone number verified successfully!')
+      
+      const ordersRes = await fetch(`/api/orders?phone=${normalizedPhone}`).then(r => r.json())
+      if (Array.isArray(ordersRes) && ordersRes.length > 0) {
+        const latest = ordersRes[0]
         setForm(prev => ({
           ...prev,
-          name: prev.name || data.latest_order.customer_name || '',
-          email: prev.email || data.latest_order.customer_email || '',
-          address: prev.address || data.latest_order.address || '',
-          city: prev.city || data.latest_order.city || '',
-          state: prev.state || data.latest_order.state || '',
-          pincode: prev.pincode || data.latest_order.pincode || '',
+          name: prev.name || latest.customer_name || '',
+          email: prev.email || latest.customer_email || '',
+          address: prev.address || latest.address || '',
+          city: prev.city || latest.city || '',
+          state: prev.state || latest.state || '',
+          pincode: prev.pincode || latest.pincode || '',
         }))
-      }
-
-      const nextCustomerType = data.customer_type || await fetchCustomerType()
-      setCustomerType(nextCustomerType)
-
-      if (nextCustomerType === 'returning') {
-        await applyCouponCode('LOYAL12', { silent: true })
+        setCustomerType('returning')
+        rememberAccountPhone(normalizedPhone)
+        
+        const autoCoupon = 'LOYAL12'
+        const cpRes = await fetch(`/api/coupons/apply`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: autoCoupon, subtotal, phone: normalizedPhone, isReturning: true })
+        })
+        const cpData = await cpRes.json()
+        if (cpRes.ok && cpData.valid) {
+          setCouponState({
+            code: autoCoupon,
+            discountAmount: cpData.discountAmount,
+            valid: true,
+            free_shipping: cpData.free_shipping,
+            free_cod: cpData.free_cod,
+            free_handling: cpData.free_handling,
+          })
+          showToast('LOYAL12 coupon applied automatically!')
+        }
       } else {
-        const refCookie = document.cookie.split('; ').find((row) => row.startsWith('mana_ref='))?.split('=')[1]
-        setCouponInput(refCookie || '')
-        setCouponState({ code: '', discountAmount: 0, valid: false })
+        setCustomerType('new')
+        rememberAccountPhone(normalizedPhone)
       }
-
-      showToast(nextCustomerType === 'returning' ? 'Phone verified. Welcome back! Your details are auto-filled.' : 'Phone verified. You can now add your influencer code.')
     } catch (err: any) {
       showToast(err.message || 'OTP verification failed')
     } finally {
@@ -410,38 +346,69 @@ export default function CheckoutPage() {
     }
   }
 
-  const validate = () => {
-    if (!form.name.trim()) { showToast('Please enter your name'); return false }
-    if (!normalizedPhone || normalizedPhone.length < 10) { showToast('Please enter a valid phone number'); return false }
-    if (!isPhoneVerified) { showToast('Please verify your phone with OTP before checkout'); return false }
-    if (!form.address.trim()) { showToast('Please enter your address'); return false }
-    if (!form.city.trim()) { showToast('Please enter your city'); return false }
-    if (!form.pincode.trim() || form.pincode.length < 6) { showToast('Please enter a valid pincode'); return false }
-    if (shippingCheck?.serviceable === false) { showToast('Delivery is not available on this pincode yet'); return false }
-    return true
-  }
-
   const applyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase()
+    if (!code) return
     if (!isPhoneVerified) {
-      showToast('Verify your phone number to use Discount Codes')
+      showToast('Please verify your phone number first')
       return
     }
-    await applyCouponCode(couponInput)
+    setCouponLoading(true)
+    try {
+      const res = await fetch(`/api/coupons/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, subtotal, phone: normalizedPhone, isReturning: customerType === 'returning' })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.valid) {
+        throw new Error(data.error || 'Invalid coupon code')
+      }
+      setCouponState({
+        code,
+        discountAmount: data.discountAmount,
+        valid: true,
+        free_shipping: data.free_shipping,
+        free_cod: data.free_cod,
+        free_handling: data.free_handling,
+      })
+      showToast('Coupon code applied!')
+    } catch (err: any) {
+      showToast(err.message || 'Could not apply coupon')
+      setCouponState({ code: '', discountAmount: 0, valid: false })
+    } finally {
+      setCouponLoading(false)
+    }
   }
 
   const clearCoupon = () => {
+    setCouponState({ code: '', discountAmount: 0, valid: false })
     setCouponInput('')
-    setCouponState({ code: '', discountAmount: 0, valid: false, free_shipping: false, free_cod: false, free_handling: false })
+    showToast('Coupon removed')
   }
 
-  const loadRazorpay = () => new Promise<boolean>(resolve => {
-    if (window.Razorpay) { resolve(true); return }
-    const script = document.createElement('script')
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-    script.onload = () => resolve(true)
-    script.onerror = () => resolve(false)
-    document.body.appendChild(script)
-  })
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setForm(prev => ({
+      ...prev,
+      [name]: name === 'phone' ? value.replace(/\D/g, '').slice(0, 10) : value,
+    }))
+  }
+
+  const validate = () => {
+    if (!form.name.trim()) { showToast('Name is required'); return false }
+    if (normalizedPhone.length !== 10) { showToast('Valid 10-digit number is required'); return false }
+    if (!isPhoneVerified) { showToast('Please verify your phone number'); return false }
+    if (!form.address.trim()) { showToast('Address is required'); return false }
+    if (!form.city.trim()) { showToast('City is required'); return false }
+    if (!form.state.trim()) { showToast('State is required'); return false }
+    if (!/^\d{6}$/.test(form.pincode)) { showToast('6-digit pincode is required'); return false }
+    if (shippingCheck && shippingCheck.serviceable === false) {
+      showToast('This pincode is currently not serviceable for delivery');
+      return false
+    }
+    return true
+  }
 
   const handlePayment = async () => {
     if (!validate()) return
@@ -449,55 +416,29 @@ export default function CheckoutPage() {
     setLoading(true)
 
     try {
-      const gatewayOrderId = `mana_${Date.now()}`
-      const res = await fetch('/api/razorpay/create-order', {
+      const orderRes = await fetch('/api/razorpay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: orderTotal,
-          receipt: gatewayOrderId,
-          notes: {
-            name: form.name,
-            email: form.email,
-            phone: normalizedPhone,
-            customerId: verifiedUserId || normalizedPhone,
-          },
-        }),
+        body: JSON.stringify({ amount: orderTotal }),
       })
-      const { orderId: razorpayOrderId, amount: rpAmount, error } = await res.json()
-      if (error) throw new Error(error)
-
-      const loaded = await loadRazorpay()
-      if (!loaded) throw new Error('Failed to load payment gateway')
+      const rzpOrder = await orderRes.json()
+      if (!orderRes.ok) throw new Error(rzpOrder?.error || 'Could not create payment session')
 
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: rpAmount,
+        amount: rzpOrder.amount,
         currency: 'INR',
-        name: 'MANA',
+        name: 'Mana Dry Fruits',
         description: 'Order Payment',
-        order_id: razorpayOrderId,
+        order_id: rzpOrder.id,
         prefill: {
           name: form.name,
-          email: form.email,
-          contact: normalizedPhone,
+          email: form.email || undefined,
+          contact: '+91' + normalizedPhone,
         },
+        theme: { color: '#1C3D2E' },
         handler: async function (response: any) {
           try {
-            const verificationRes = await fetch('/api/razorpay/verify-order', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              }),
-            })
-
-            const verification = await verificationRes.json()
-            if (!verificationRes.ok) throw new Error(verification?.error || 'Could not verify payment')
-            if (!verification.isPaid) throw new Error('Payment was not completed')
-
             const saveRes = await fetch('/api/orders', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -520,15 +461,13 @@ export default function CheckoutPage() {
                 })),
                 subtotal,
                 shipping,
-                coupon_code: couponState.code || null,
-                wallet_amount: walletApplied,
                 cod_charge: 0,
                 small_order_fee: smallOrderFee,
-                payment_id: verification.paymentId,
-                razorpay_order_id: verification.orderId,
+                coupon_code: couponState.code || null,
+                wallet_amount: walletApplied,
+                payment_id: response.razorpay_payment_id,
                 payment_status: 'paid',
-                status: 'confirmed',
-                notes: `Razorpay order ${verification.orderId}`,
+                status: 'pending',
               }),
             })
 
@@ -541,12 +480,8 @@ export default function CheckoutPage() {
             setUseCashback(false)
             setStep('success')
           } catch (err: any) {
-            showToast('Order saving failed: ' + (err.message || 'Please contact support'))
-            setLoading(false)
-          }
-        },
-        modal: {
-          ondismiss: function () {
+            showToast('Order saved with error: ' + (err.message || 'Please contact support'))
+          } finally {
             setLoading(false)
           }
         }
@@ -620,13 +555,13 @@ export default function CheckoutPage() {
 
   if (step === 'success') {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-[5%] py-16">
+      <div className="min-h-[60vh] flex items-center justify-center px-[5%] py-16" style={{ background: 'rgb(var(--c-ivory))' }}>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 rounded-full bg-green-6 border-2 border-green-4 flex items-center justify-center text-2xl text-green mx-auto mb-4">✓</div>
-          <h1 className="font-serif text-2xl font-light text-ink mb-2">Order Placed!</h1>
-          <p className="text-sm text-ink-3 mb-1">Order ID: <strong className="text-ink">{orderId.slice(0, 8).toUpperCase()}</strong></p>
-          <p className="text-sm text-ink-3 mb-2">Thank you for shopping with us.</p>
-          {siteSettings.enable_cashback_earning && cashbackPreview > 0 && <p className="text-sm text-green-3 mb-6">You will earn {formatPrice(cashbackPreview)} cashback to your wallet after delivery.</p>}
+          <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto mb-4" style={{ background: 'rgba(var(--c-green5), 0.1)', border: '2px solid var(--green)', color: 'var(--green)' }}>✓</div>
+          <h1 className="font-serif text-2xl font-light mb-2" style={{ color: 'var(--ink)' }}>Order Placed!</h1>
+          <p className="text-sm mb-1" style={{ color: 'var(--ink3)' }}>Order ID: <strong style={{ color: 'var(--ink)' }}>{orderId.slice(0, 8).toUpperCase()}</strong></p>
+          <p className="text-sm mb-2" style={{ color: 'var(--ink3)' }}>Thank you for shopping with us.</p>
+          {siteSettings.enable_cashback_earning && cashbackPreview > 0 && <p className="text-sm mb-6" style={{ color: 'var(--green)' }}>You will earn {formatPrice(cashbackPreview)} cashback to your wallet after delivery.</p>}
           <a
             href="/profile"
             className="btn-primary no-underline inline-flex mb-3"
@@ -641,21 +576,21 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="px-[5%] py-10 max-w-[1200px] mx-auto">
-      <h1 className="font-serif text-2xl font-light text-ink mb-8">Checkout</h1>
+    <div className="px-[5%] py-10 max-w-[1200px] mx-auto min-h-screen" style={{ background: 'rgb(var(--c-ivory))' }}>
+      <h1 className="font-serif text-2xl font-light mb-8" style={{ color: 'var(--ink)' }}>Checkout</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-10 items-start">
-        <div className="bg-white border border-ivory-3 rounded-xl p-6 shadow-soft">
-          <h2 className="font-serif text-lg font-normal text-ink mb-5">Delivery Details</h2>
+        <div className="rounded-xl p-6 shadow-soft" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
+          <h2 className="font-serif text-lg font-normal mb-5" style={{ color: 'var(--ink)' }}>Delivery Details</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-ink-3 block mb-1.5">Full Name *</label>
+              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Full Name *</label>
               <input name="name" value={form.name} onChange={handleChange} placeholder="Your full name" className="input" />
             </div>
             <div>
-              <label className="text-xs text-ink-3 block mb-1.5">WhatsApp Number *</label>
+              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>WhatsApp Number *</label>
               <div className="flex">
-                <span className="inline-flex items-center px-3 border border-r-0 border-ivory-3 rounded-l-lg bg-ivory-2 text-ink-3 sm:text-sm font-medium">
+                <span className="inline-flex items-center px-3 border border-r-0 rounded-l-lg text-sm font-medium" style={{ background: 'rgb(var(--c-ivory3))', borderColor: 'rgb(var(--c-ivory3))', color: 'var(--ink3)' }}>
                   +91
                 </span>
                 <input 
@@ -668,10 +603,10 @@ export default function CheckoutPage() {
                   className="input rounded-l-none" 
                 />
               </div>
-              <div className="mt-2 rounded-lg border border-ivory-3 bg-ivory-2 p-3">
+              <div className="mt-2 rounded-lg p-3" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory3))' }}>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   {otpStatus === 'verified' ? (
-                    <div className="flex items-center gap-2 px-4 py-2.5 bg-green-6 border border-green-5 rounded-lg text-green-2 w-full font-medium">
+                    <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg w-full font-medium" style={{ background: 'rgba(var(--c-green5), 0.1)', border: '1px solid var(--green)', color: 'var(--green)' }}>
                       <span className="text-lg leading-none">✓</span> Verified
                     </div>
                   ) : (
@@ -685,7 +620,7 @@ export default function CheckoutPage() {
                     </button>
                   )}
                 </div>
-                <p className="mt-2 text-xs text-ink-4">
+                <p className="mt-2 text-xs" style={{ color: 'var(--ink4)' }}>
                   {isPhoneVerified
                     ? customerType === 'returning'
                       ? 'Verified returning customer. Your LOYAL12 discount is auto-applied.'
@@ -693,20 +628,20 @@ export default function CheckoutPage() {
                     : 'Verify your phone first. We will create your account automatically after OTP verification.'}
                 </p>
                 {otpHint && !isPhoneVerified && (
-                  <p className="mt-1 text-xs text-green-3">{otpHint}</p>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--green)' }}>{otpHint}</p>
                 )}
               </div>
             </div>
             <div className="sm:col-span-2">
-              <label className="text-xs text-ink-3 block mb-1.5">Email (optional)</label>
+              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Email (optional)</label>
               <input name="email" value={form.email} onChange={handleChange} placeholder="your@email.com" type="email" className="input" />
             </div>
             <div className="sm:col-span-2">
-              <label className="text-xs text-ink-3 block mb-1.5">Full Address *</label>
+              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Full Address *</label>
               <input name="address" value={form.address} onChange={handleChange} placeholder="House/Flat no., Street, Area" className="input" />
             </div>
             <div>
-              <label className="text-xs text-ink-3 block mb-1.5">City *</label>
+              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>City *</label>
               <div className="relative">
                 <input
                   name="city"
@@ -717,12 +652,12 @@ export default function CheckoutPage() {
                   readOnly={pincodeLoading}
                 />
                 {pincodeLoading && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.65rem] text-ink-4 font-medium animate-pulse">Fetching...</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.65rem] font-medium animate-pulse" style={{ color: 'var(--ink4)' }}>Fetching...</span>
                 )}
               </div>
             </div>
             <div>
-              <label className="text-xs text-ink-3 block mb-1.5">State</label>
+              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>State</label>
               <div className="relative">
                 <input
                   name="state"
@@ -733,22 +668,26 @@ export default function CheckoutPage() {
                   readOnly={pincodeLoading}
                 />
                 {pincodeLoading && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.65rem] text-ink-4 font-medium animate-pulse">Fetching...</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.65rem] font-medium animate-pulse" style={{ color: 'var(--ink4)' }}>Fetching...</span>
                 )}
               </div>
             </div>
             <div>
-              <label className="text-xs text-ink-3 block mb-1.5">Pincode *</label>
+              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Pincode *</label>
               <input name="pincode" value={form.pincode} onChange={handleChange} placeholder="110001" className="input" maxLength={6} />
               {shippingCheckLoading ? (
-                <div className="mt-2 text-xs text-ink-4">Checking delivery availability...</div>
+                <div className="mt-2 text-xs" style={{ color: 'var(--ink4)' }}>Checking delivery availability...</div>
               ) : shippingCheck ? (
-                <div className={`mt-2 rounded-lg border px-3 py-2 text-xs ${shippingCheck.serviceable ? 'border-green-5 bg-green-6 text-green-2' : 'border-terra/30 bg-[#fff1eb] text-terra'}`}>
+                <div className="mt-2 rounded-lg border px-3 py-2 text-xs" style={{
+                  borderColor: shippingCheck.serviceable ? 'rgba(var(--c-green5), 0.4)' : 'rgba(var(--c-terra3), 0.4)',
+                  background: shippingCheck.serviceable ? 'rgba(var(--c-green6), 0.2)' : 'rgba(var(--c-terra4), 0.2)',
+                  color: shippingCheck.serviceable ? 'var(--green)' : 'var(--terra)'
+                }}>
                   <div className="font-medium">
                     {shippingCheck.serviceable ? 'Delivery available' : shippingCheck.configured ? 'Delivery unavailable' : 'NimbusPost check not configured'}
                   </div>
                   {shippingCheck.serviceable && (
-                    <div className="mt-1">
+                    <div className="mt-1" style={{ color: 'var(--ink3)' }}>
                       Expected by {shippingCheck.estimatedDeliveryDate
                         ? new Date(shippingCheck.estimatedDeliveryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
                         : 'soon'}
@@ -760,10 +699,10 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          <div className="mt-6 pt-5 border-t border-ivory-3 space-y-5">
+          <div className="mt-6 pt-5 space-y-5" style={{ borderTop: '1px solid rgb(var(--c-ivory3))' }}>
             <div>
-              <h3 className="font-sans text-sm font-medium text-ink mb-3">Discounts</h3>
-              <p className="text-xs text-ink-4 mb-2">
+              <h3 className="font-sans text-sm font-medium mb-3" style={{ color: 'var(--ink)' }}>Discounts</h3>
+              <p className="text-xs mb-2" style={{ color: 'var(--ink4)' }}>
                 {isPhoneVerified
                   ? (customerType === 'returning' ? 'Welcome back! Your LOYAL12 discount is auto-applied if eligible, but you can use another code.' : 'Enter your discount or influencer code to apply your savings.')
                   : 'You can enter a discount code now. Phone verification is required to apply it.'}
@@ -776,19 +715,19 @@ export default function CheckoutPage() {
                   </button>
                 </div>
               ) : (
-                <div className="mt-2 flex flex-col gap-1 rounded-lg border border-green-5 bg-green-6 px-3 py-2 text-sm text-green-2">
+                <div className="mt-2 flex flex-col gap-1 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'rgba(var(--c-green5), 0.4)', background: 'rgba(var(--c-green5), 0.1)', color: 'var(--green)' }}>
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="font-medium">{couponState.code} applied.</span>
                       {discount > 0 && <span className="ml-1">You saved {formatPrice(couponState.discountAmount)}.</span>}
                     </div>
-                    <button type="button" onClick={clearCoupon} className="text-xs underline bg-transparent border-none cursor-pointer text-green-3 hover:text-green">Remove</button>
+                    <button type="button" onClick={clearCoupon} className="text-xs underline bg-transparent border-none cursor-pointer hover:text-terra" style={{ color: 'var(--green)' }}>Remove</button>
                   </div>
                   {(couponState.free_shipping || couponState.free_cod || couponState.free_handling) && (
                     <div className="flex gap-1.5 flex-wrap mt-1">
-                      {couponState.free_shipping && <span className="text-xs bg-green text-ivory px-2 py-0.5 rounded-full font-medium">Free Delivery</span>}
-                      {couponState.free_cod && <span className="text-xs bg-green text-ivory px-2 py-0.5 rounded-full font-medium">Free COD</span>}
-                      {couponState.free_handling && <span className="text-xs bg-green text-ivory px-2 py-0.5 rounded-full font-medium">Free Handling</span>}
+                      {couponState.free_shipping && <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: 'var(--green)' }}>Free Delivery</span>}
+                      {couponState.free_cod && <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: 'var(--green)' }}>Free COD</span>}
+                      {couponState.free_handling && <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: 'var(--green)' }}>Free Handling</span>}
                     </div>
                   )}
                 </div>
@@ -797,19 +736,19 @@ export default function CheckoutPage() {
 
             {siteSettings.enable_cashback_spending && (
             <div>
-              <h3 className="font-sans text-sm font-medium text-ink mb-3">Cashback Wallet</h3>
-              <div className="rounded-xl border border-ivory-3 bg-ivory-2 p-4">
+              <h3 className="font-sans text-sm font-medium mb-3" style={{ color: 'var(--ink)' }}>Cashback Wallet</h3>
+              <div className="rounded-xl p-4" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory3))' }}>
                 {normalizedPhone.length < 10 ? (
-                  <p className="text-sm text-ink-3">Enter your WhatsApp number to check wallet balance and cashback eligibility.</p>
+                  <p className="text-sm" style={{ color: 'var(--ink3)' }}>Enter your WhatsApp number to check wallet balance and cashback eligibility.</p>
                 ) : walletLoading ? (
-                  <p className="text-sm text-ink-3">Loading wallet...</p>
+                  <p className="text-sm" style={{ color: 'var(--ink3)' }}>Loading wallet...</p>
                 ) : (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-ink-3">Wallet Balance</span>
-                      <span className="font-serif text-lg text-green">{formatPrice(walletBalance)}</span>
+                      <span className="text-sm" style={{ color: 'var(--ink3)' }}>Wallet Balance</span>
+                      <span className="font-serif text-lg" style={{ color: 'var(--green)' }}>{formatPrice(walletBalance)}</span>
                     </div>
-                    <label className="flex items-center gap-3 text-sm text-ink cursor-pointer">
+                    <label className="flex items-center gap-3 text-sm cursor-pointer" style={{ color: 'var(--ink)' }}>
                       <input
                         type="checkbox"
                         checked={useCashback}
@@ -820,10 +759,10 @@ export default function CheckoutPage() {
                       Use cashback on this order
                     </label>
                     {useCashback && walletApplied > 0 && (
-                      <div className="text-sm text-green-3">Using {formatPrice(walletApplied)} from wallet.</div>
+                      <div className="text-sm" style={{ color: 'var(--green)' }}>Using {formatPrice(walletApplied)} from wallet.</div>
                     )}
                     {siteSettings.enable_cashback_earning && (
-                      <div className="text-xs text-ink-4">
+                      <div className="text-xs" style={{ color: 'var(--ink4)' }}>
                         You earn 5% cashback on every order.
                         <br/>You will get {formatPrice(cashbackPreview)} credited to your wallet once this order is delivered.
                       </div>
@@ -836,55 +775,57 @@ export default function CheckoutPage() {
 
 
             <div>
-              <h3 className="font-sans text-sm font-medium text-ink mb-3">Payment Method</h3>
+              <h3 className="font-sans text-sm font-medium mb-3" style={{ color: 'var(--ink)' }}>Payment Method</h3>
               <div className="flex gap-3 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('online')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border cursor-pointer transition-all ${
-                    paymentMethod === 'online'
-                      ? 'bg-green-6 border-green-4 text-green shadow-sm'
-                      : 'bg-ivory-2 border-ivory-3 text-ink-3 hover:border-green-5'
-                  }`}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border cursor-pointer transition-all"
+                  style={{
+                    background: paymentMethod === 'online' ? 'rgba(var(--c-green5), 0.1)' : 'rgb(var(--c-ivory3))',
+                    borderColor: paymentMethod === 'online' ? 'var(--green)' : 'rgb(var(--c-ivory3))',
+                    color: paymentMethod === 'online' ? 'var(--green)' : 'var(--ink3)'
+                  }}
                 >
-                  <span className={`w-2.5 h-2.5 rounded-full block ${paymentMethod === 'online' ? 'bg-green' : 'bg-ink-4'}`} />
+                  <span className="w-2.5 h-2.5 rounded-full block" style={{ background: paymentMethod === 'online' ? 'var(--green)' : 'var(--ink4)' }} />
                   Online Payment
                 </button>
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('cod')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border cursor-pointer transition-all ${
-                    paymentMethod === 'cod'
-                      ? 'bg-green-6 border-green-4 text-green shadow-sm'
-                      : 'bg-ivory-2 border-ivory-3 text-ink-3 hover:border-green-5'
-                  }`}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border cursor-pointer transition-all"
+                  style={{
+                    background: paymentMethod === 'cod' ? 'rgba(var(--c-green5), 0.1)' : 'rgb(var(--c-ivory3))',
+                    borderColor: paymentMethod === 'cod' ? 'var(--green)' : 'rgb(var(--c-ivory3))',
+                    color: paymentMethod === 'cod' ? 'var(--green)' : 'var(--ink3)'
+                  }}
                 >
-                  <span className={`w-2.5 h-2.5 rounded-full block ${paymentMethod === 'cod' ? 'bg-green' : 'bg-ink-4'}`} />
+                  <span className="w-2.5 h-2.5 rounded-full block" style={{ background: paymentMethod === 'cod' ? 'var(--green)' : 'var(--ink4)' }} />
                   Cash on Delivery
                 </button>
               </div>
               {paymentMethod === 'cod' && (
-                <p className="text-xs text-terra mt-2">₹29 COD charge will be added to your order.</p>
+                <p className="text-xs mt-2" style={{ color: 'var(--terra)' }}>₹29 COD charge will be added to your order.</p>
               )}
-              <p className="text-xs text-ink-4 mt-2">Secure payment powered by Razorpay</p>
+              <p className="text-xs mt-2" style={{ color: 'var(--ink4)' }}>Secure payment powered by Razorpay</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-ivory-3 rounded-xl p-5 shadow-soft lg:sticky lg:top-20">
-          <h2 className="font-serif text-lg font-normal text-ink mb-4">Order Summary</h2>
+        <div className="rounded-xl p-5 shadow-soft lg:sticky lg:top-20" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
+          <h2 className="font-serif text-lg font-normal mb-4" style={{ color: 'var(--ink)' }}>Order Summary</h2>
 
           <div className="flex flex-col gap-3 mb-4 max-h-[300px] overflow-y-auto pr-2">
             {cartItems.map((item, i) => (
               <div key={`${item.product_id}-${item.variant_id}-${i}`} className="flex gap-3">
-                <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-ivory-2">
+                <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0" style={{ background: 'rgb(var(--c-ivory3))' }}>
                   {item.product_image && <Image src={item.product_image} alt={item.product_name} width={64} height={64} className="object-cover w-full h-full" />}
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
-                  <div className="text-sm font-medium text-ink leading-tight">{item.product_name}</div>
-                  {item.variant_name && <div className="text-xs text-ink-4 mt-0.5">{item.variant_name}</div>}
+                  <div className="text-sm font-medium leading-tight" style={{ color: 'var(--ink)' }}>{item.product_name}</div>
+                  {item.variant_name && <div className="text-xs mt-0.5" style={{ color: 'var(--ink4)' }}>{item.variant_name}</div>}
                   {item.weight_grams > 0 && (
-                    <div className="text-xs text-ink-4 mt-0.5">
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--ink4)' }}>
                       {(item.weight_grams * item.quantity) >= 1000 ? ((item.weight_grams * item.quantity) / 1000).toFixed(1) + 'kg total' : (item.weight_grams * item.quantity) + 'g total'}
                     </div>
                   )}
@@ -892,79 +833,82 @@ export default function CheckoutPage() {
                   <div className="flex items-center gap-2 mt-2">
                     <button
                       onClick={() => updateQty(item.product_id, item.variant_id, item.quantity - 1)}
-                      className="w-6 h-6 rounded border border-ivory-4 bg-transparent text-green text-base flex items-center justify-center cursor-pointer hover:bg-green-6 transition-colors"
+                      className="w-6 h-6 rounded border bg-transparent text-base flex items-center justify-center cursor-pointer transition-colors"
+                      style={{ color: 'var(--green)', borderColor: 'rgb(var(--c-ivory3))' }}
                     >−</button>
-                    <span className="text-sm font-medium text-ink min-w-[20px] text-center">
+                    <span className="text-sm font-medium min-w-[20px] text-center" style={{ color: 'var(--ink)' }}>
                       {item.quantity}
                     </span>
                     <button
                       onClick={() => updateQty(item.product_id, item.variant_id, Math.min(10, item.quantity + 1))}
                       disabled={item.quantity >= 10}
-                      className="w-6 h-6 rounded border border-ivory-4 bg-transparent text-green text-base flex items-center justify-center cursor-pointer hover:bg-green-6 transition-colors disabled:opacity-50"
+                      className="w-6 h-6 rounded border bg-transparent text-base flex items-center justify-center cursor-pointer transition-colors disabled:opacity-50"
+                      style={{ color: 'var(--green)', borderColor: 'rgb(var(--c-ivory3))' }}
                     >+</button>
                     <button
                       onClick={() => removeItem(item.product_id, item.variant_id)}
-                      className="text-xs text-ink-4 underline bg-transparent border-none cursor-pointer hover:text-terra transition-colors ml-2"
+                      className="text-xs underline bg-transparent border-none cursor-pointer hover:text-terra transition-colors ml-2"
+                      style={{ color: 'var(--ink4)' }}
                     >Remove</button>
                   </div>
                 </div>
-                <div className="text-sm font-serif text-green flex flex-col justify-end items-end pb-1">
+                <div className="text-sm font-serif flex flex-col justify-end items-end pb-1" style={{ color: 'var(--green)' }}>
                   {formatPrice(item.price * item.quantity)}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="border-t border-ivory-3 pt-3 flex flex-col gap-2 mb-4">
-            <div className="flex justify-between text-sm text-ink-3">
+          <div className="pt-3 flex flex-col gap-2 mb-4" style={{ borderTop: '1px solid rgb(var(--c-ivory3))' }}>
+            <div className="flex justify-between text-sm" style={{ color: 'var(--ink3)' }}>
               <span>Subtotal</span><span>{formatPrice(subtotal)}</span>
             </div>
             {discount > 0 && (
-              <div className="flex justify-between text-sm text-green-3">
+              <div className="flex justify-between text-sm font-medium" style={{ color: 'var(--green)' }}>
                 <span>Discount ({couponState.code})</span><span>-{formatPrice(discount)}</span>
               </div>
             )}
             {walletApplied > 0 && (
-              <div className="flex justify-between text-sm text-green-3">
+              <div className="flex justify-between text-sm font-medium" style={{ color: 'var(--green)' }}>
                 <span>Wallet Cashback</span><span>-{formatPrice(walletApplied)}</span>
               </div>
             )}
-            <div className="flex justify-between text-sm text-ink-3">
+            <div className="flex justify-between text-sm" style={{ color: 'var(--ink3)' }}>
               <span>Shipping</span>
-              <span>{shipping === 0 ? <span className="text-green-3 font-medium">{couponState.free_shipping ? 'FREE (Coupon)' : 'Free'}</span> : formatPrice(shipping)}</span>
+              <span>{shipping === 0 ? <span className="font-medium" style={{ color: 'var(--green)' }}>{couponState.free_shipping ? 'FREE (Coupon)' : 'Free'}</span> : formatPrice(shipping)}</span>
             </div>
             {(codCharge > 0 || (paymentMethod === 'cod' && couponState.free_cod)) && (
-              <div className="flex justify-between text-sm text-ink-3">
+              <div className="flex justify-between text-sm" style={{ color: 'var(--ink3)' }}>
                 <span>COD Charge</span>
-                <span>{couponState.free_cod ? <span className="text-green-3 font-medium flex items-center gap-1"><span className="line-through text-ink-4 text-xs">₹29</span> FREE</span> : formatPrice(codCharge)}</span>
+                <span>{couponState.free_cod ? <span className="font-medium flex items-center gap-1" style={{ color: 'var(--green)' }}><span className="line-through text-xs" style={{ color: 'var(--ink4)' }}>₹29</span> FREE</span> : formatPrice(codCharge)}</span>
               </div>
             )}
             {(smallOrderFee > 0 || (subtotal < 50000 && couponState.free_handling)) && (
-              <div className="flex justify-between text-sm text-ink-3">
+              <div className="flex justify-between text-sm" style={{ color: 'var(--ink3)' }}>
                 <span>Handling Fee</span>
-                <span>{couponState.free_handling ? <span className="text-green-3 font-medium flex items-center gap-1"><span className="line-through text-ink-4 text-xs">₹19</span> FREE</span> : formatPrice(smallOrderFee)}</span>
+                <span>{couponState.free_handling ? <span className="font-medium flex items-center gap-1" style={{ color: 'var(--green)' }}><span className="line-through text-xs" style={{ color: 'var(--ink4)' }}>₹19</span> FREE</span> : formatPrice(smallOrderFee)}</span>
               </div>
             )}
-            <div className="flex justify-between font-medium text-ink border-t border-ivory-3 pt-2 mt-1">
+            <div className="flex justify-between font-medium pt-2 mt-1" style={{ borderTop: '1px solid rgb(var(--c-ivory3))', color: 'var(--ink)' }}>
               <span>Total</span>
-              <span className="font-serif text-xl text-green">{formatPrice(orderTotal)}</span>
+              <span className="font-serif text-xl" style={{ color: 'var(--green)' }}>{formatPrice(orderTotal)}</span>
             </div>
             {siteSettings.enable_cashback_earning && cashbackPreview > 0 && (
-              <div className="flex items-center justify-between font-medium text-green mb-3 pt-3 border-t border-ivory-3">
-                <span className="text-sm text-green-3">
+              <div className="flex items-center justify-between font-medium mb-3 pt-3" style={{ borderTop: '1px solid rgb(var(--c-ivory3))', color: 'var(--green)' }}>
+                <span className="text-sm">
                   Cashback preview: {formatPrice(cashbackPreview)}
                 </span>
               </div>
             )}
             {shippingCheck?.serviceable && (
-              <div className="text-xs text-green-3">
+              <div className="text-xs font-medium" style={{ color: 'var(--green)' }}>
                 Expected delivery: {shippingCheck.estimatedDeliveryDate
                   ? new Date(shippingCheck.estimatedDeliveryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
                   : 'Will be confirmed soon'}
               </div>
             )}
             {shippingCheck?.serviceable === false && (
-              <div className="text-xs text-terra">
+              <div className="text-xs" style={{ color: 'var(--terra)' }}>
                 This pincode is currently not serviceable for delivery.
               </div>
             )}
@@ -984,7 +928,7 @@ export default function CheckoutPage() {
             </button>
           )}
 
-          <div className="flex items-center justify-center gap-2 mt-3 text-xs text-ink-4">
+          <div className="flex items-center justify-center gap-2 mt-3 text-xs" style={{ color: 'var(--ink4)' }}>
             <span>🔒</span> Secured by Razorpay
           </div>
         </div>
@@ -992,23 +936,25 @@ export default function CheckoutPage() {
 
       {otpStatus === 'code-sent' && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00000080] backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[360px] p-6 relative">
+          <div className="rounded-2xl shadow-2xl w-full max-w-[360px] p-6 relative" style={{ background: 'rgb(var(--c-ivory2))' }}>
             <button 
               onClick={() => setOtpStatus('unverified')} 
-              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-ivory-2 text-ink-3 hover:text-ink hover:bg-ivory-3 transition-colors border-none cursor-pointer"
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full transition-colors border-none cursor-pointer"
+              style={{ background: 'rgb(var(--c-ivory3))', color: 'var(--ink3)' }}
             >
               ✕
             </button>
-            <h3 className="font-serif text-xl mb-1 text-ink text-center">OTP Verification</h3>
-            <p className="text-sm text-ink-3 text-center mb-6">
-              Code sent to <strong className="text-ink font-medium">+91 {normalizedPhone}</strong>
+            <h3 className="font-serif text-xl mb-1 text-center" style={{ color: 'var(--ink)' }}>OTP Verification</h3>
+            <p className="text-sm text-center mb-6" style={{ color: 'var(--ink3)' }}>
+              Code sent to <strong style={{ color: 'var(--ink)' }}>+91 {normalizedPhone}</strong>
             </p>
             
             <input
               value={otpCode}
               onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="123456"
-              className="input w-full text-center tracking-[0.5em] text-2xl font-bold mb-4 py-3 placeholder:tracking-normal placeholder:font-normal placeholder:text-base outline-none focus:ring-2 focus:ring-green-4 border-2 border-ivory-3"
+              className="input w-full text-center tracking-[0.5em] text-2xl font-bold mb-4 py-3 placeholder:tracking-normal placeholder:font-normal placeholder:text-base outline-none focus:ring-2 focus:ring-green-4"
+              style={{ border: '2px solid rgb(var(--c-ivory3))' }}
               inputMode="numeric"
               autoFocus
             />
@@ -1027,14 +973,15 @@ export default function CheckoutPage() {
                 type="button" 
                 onClick={sendOtp} 
                 disabled={otpLoading}
-                className="text-xs font-medium text-green-3 hover:text-green-2 underline bg-transparent border-none cursor-pointer p-0"
+                className="text-xs font-medium underline bg-transparent border-none cursor-pointer p-0"
+                style={{ color: 'var(--green)' }}
               >
                 Didn't receive it? Resend
               </button>
             </div>
             
             {otpHint && (
-              <div className="mt-5 p-3 rounded-lg bg-green-6 border border-green-5 text-xs text-center text-green-2">
+              <div className="mt-5 p-3 rounded-lg text-xs text-center font-medium" style={{ border: '1px solid var(--green)', background: 'rgba(var(--c-green5), 0.1)', color: 'var(--green)' }}>
                 {otpHint}
               </div>
             )}
