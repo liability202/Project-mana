@@ -136,7 +136,7 @@ const websiteSchema = {
 
 // Runs before first paint so the saved theme is applied without a flash of the
 // wrong palette. Kept in sync with components/ui/ThemeToggle.tsx.
-const themeScript = `(function(){try{var t=localStorage.getItem('mana_theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark')}catch(e){}})()`
+const themeScript = `(function(){try{var t=localStorage.getItem('mana-theme');if(t==='dark')document.documentElement.classList.add('dark')}catch(e){}})()`
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

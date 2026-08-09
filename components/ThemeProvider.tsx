@@ -11,11 +11,10 @@ const ThemeContext = createContext<{
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('light')
 
-  // Read saved preference (or system preference) on mount
+  // Read saved preference on mount; default to light if no preference is stored
   useEffect(() => {
     const saved = localStorage.getItem('mana-theme') as Theme | null
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    const initial: Theme = saved ?? (prefersDark ? 'dark' : 'light')
+    const initial: Theme = saved === 'dark' ? 'dark' : 'light'
     setTheme(initial)
     document.documentElement.classList.toggle('dark', initial === 'dark')
   }, [])
