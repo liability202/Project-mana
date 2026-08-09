@@ -410,12 +410,39 @@ export default function CheckoutPage() {
     return true
   }
 
+  // Dynamically loads the Razorpay checkout script if not already present.
+  // Resolves when window.Razorpay is ready, rejects on load failure.
+  const loadRazorpayScript = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (typeof window.Razorpay === 'function') {
+        resolve()
+        return
+      }
+      const existing = document.getElementById('razorpay-checkout-js')
+      if (existing) {
+        // Script tag already in DOM but not yet executed — wait for it
+        existing.addEventListener('load', () => resolve())
+        existing.addEventListener('error', () => reject(new Error('Razorpay script failed to load')))
+        return
+      }
+      const script = document.createElement('script')
+      script.id = 'razorpay-checkout-js'
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+      script.async = true
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error('Could not load Razorpay. Check your internet connection.'))
+      document.body.appendChild(script)
+    })
+  }
+
   const handlePayment = async () => {
     if (!validate()) return
     if (cartItems.length === 0) { showToast('Your cart is empty'); return }
     setLoading(true)
 
     try {
+      // Ensure Razorpay SDK is loaded before proceeding
+      await loadRazorpayScript()
       const orderRes = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
