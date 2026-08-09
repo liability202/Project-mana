@@ -5,20 +5,22 @@ export async function POST(req: Request) {
   try {
     const { creatorCode, phone } = await req.json()
 
-    if (!creatorCode || !phone) {
-      return NextResponse.json({ error: 'creatorCode and phone are required' }, { status: 400 })
+    if (!creatorCode) {
+      return NextResponse.json({ error: 'creatorCode is required' }, { status: 400 })
     }
+
+    // Always store UPPERCASE so it matches the stats API's codesArray (which uppercases)
+    const normalizedCode = String(creatorCode).trim().toUpperCase()
 
     const { error } = await supabaseAdmin
       .from('referral_visits')
       .insert({
-        creator_code: creatorCode,
-        visitor_phone: phone
+        creator_code: normalizedCode,
+        visitor_phone: phone || 'anonymous_visit',
       })
 
     if (error) {
       console.error('Failed to log referral visit:', error)
-      // We don't want to fail the user's flow just because analytics failed
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
@@ -27,3 +29,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
