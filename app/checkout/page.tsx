@@ -416,7 +416,7 @@ export default function CheckoutPage() {
     setLoading(true)
 
     try {
-      const orderRes = await fetch('/api/razorpay', {
+      const orderRes = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: orderTotal }),
@@ -425,12 +425,12 @@ export default function CheckoutPage() {
       if (!orderRes.ok) throw new Error(rzpOrder?.error || 'Could not create payment session')
 
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        key: (process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '').replace(/"/g, ''),
         amount: rzpOrder.amount,
         currency: 'INR',
         name: 'Mana Dry Fruits',
         description: 'Order Payment',
-        order_id: rzpOrder.id,
+        order_id: rzpOrder.orderId,
         prefill: {
           name: form.name,
           email: form.email || undefined,
