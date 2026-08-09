@@ -4,13 +4,14 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { slugify } from '@/lib/utils'
 import { ImageManager } from '@/components/admin/ImageManager'
+import { VariantEditor, type AdminVariant } from '@/components/admin/VariantEditor'
 
 type Category = 'dry-fruits' | 'herbs' | 'spices' | 'pansari' | 'kits'
 
 const CATEGORY_OPTIONS: Category[] = ['dry-fruits', 'herbs', 'spices', 'pansari', 'kits']
 
-const DEFAULT_VARIANTS = [
-  { id: 'v1', name: 'Standard', description: 'Default option', price: 0, quality_tag: 'popular', images: [] },
+const DEFAULT_VARIANTS: AdminVariant[] = [
+  { id: 'v1', name: 'Standard', description: 'Default option', price: 0, quality_tag: 'popular', images: [], in_stock: true },
 ]
 
 export default function NewAdminProductPage() {
@@ -25,7 +26,7 @@ export default function NewAdminProductPage() {
   const [vendor, setVendor] = useState('')
   const [tagsInput, setTagsInput] = useState('bestseller, organic')
   const [imagesInput, setImagesInput] = useState('')
-  const [variantsInput, setVariantsInput] = useState(JSON.stringify(DEFAULT_VARIANTS, null, 2))
+  const [variants, setVariants] = useState<AdminVariant[]>(DEFAULT_VARIANTS)
   const [inStock, setInStock] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -49,7 +50,6 @@ export default function NewAdminProductPage() {
       const secret = localStorage.getItem('mana_admin') || ''
       if (!secret) throw new Error('Admin login not found. Please login again.')
 
-      const variants = variantsInput.trim() ? JSON.parse(variantsInput) : []
       const tags = tagsInput.split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean)
       const images = imagesInput.split('\n').map(url => url.trim()).filter(Boolean)
 
@@ -97,7 +97,7 @@ export default function NewAdminProductPage() {
       setVendor('')
       setTagsInput('bestseller, organic')
       setImagesInput('')
-      setVariantsInput(JSON.stringify(DEFAULT_VARIANTS, null, 2))
+      setVariants(DEFAULT_VARIANTS)
       setInStock(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -177,8 +177,8 @@ export default function NewAdminProductPage() {
               </div>
 
               <div className="md:col-span-2">
-                  <ImageManager label="Product Images" value={imagesInput} onChange={setImagesInput} />
-                </div>
+                <ImageManager label="Product Images" value={imagesInput} onChange={setImagesInput} />
+              </div>
 
               <div className="md:col-span-2">
                 <label className="text-xs text-ink-3 block mb-1.5">Tags</label>
@@ -186,9 +186,9 @@ export default function NewAdminProductPage() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="text-xs text-ink-3 block mb-1.5">Variants JSON</label>
-                <textarea value={variantsInput} onChange={e => setVariantsInput(e.target.value)} className="input min-h-[220px] font-mono text-xs" />
-                <div className="text-xs text-ink-4 mt-2">Tip: add an `images` array inside any variant. When that variant is selected, its first image appears in the main product image holder.</div>
+                <label className="text-xs text-ink-3 block mb-1.5">Variants</label>
+                <VariantEditor value={variants} onChange={setVariants} />
+                <div className="text-xs text-ink-4 mt-2">Each variant can have its own images, price, quality tag and stock status.</div>
               </div>
             </div>
           </div>

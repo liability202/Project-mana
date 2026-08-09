@@ -37,7 +37,9 @@ export type Variant = {
   price: number; quality_tag?: 'best' | 'popular' | 'basic'
   images?: string[]
   items?: any[]
+  in_stock?: boolean   // undefined = in stock; false = out of stock
 }
+
 export type CartItem = {
   product_id: string; product_name: string; product_image: string
   variant_id?: string; variant_name?: string

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { slugify } from '@/lib/utils'
 import { ImageManager } from '@/components/admin/ImageManager'
+import { VariantEditor, type AdminVariant } from '@/components/admin/VariantEditor'
 import type { Product } from '@/lib/supabase'
 
 type Category = 'dry-fruits' | 'herbs' | 'spices' | 'pansari' | 'kits'
@@ -26,7 +27,7 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
   const [vendor, setVendor] = useState('')
   const [tagsInput, setTagsInput] = useState('')
   const [imagesInput, setImagesInput] = useState('')
-  const [variantsInput, setVariantsInput] = useState('[]')
+  const [variants, setVariants] = useState<AdminVariant[]>([])
   const [inStock, setInStock] = useState(true)
 
   const derivedSlug = useMemo(() => slugify(name), [name])
@@ -57,7 +58,7 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
         setVendor(product.vendor || '')
         setTagsInput((product.tags || []).join(', '))
         setImagesInput((product.images || []).join('\n'))
-        setVariantsInput(JSON.stringify(product.variants || [], null, 2))
+        setVariants((product.variants || []) as AdminVariant[])
         setInStock(Boolean(product.in_stock))
         setLoading(false)
       })
@@ -93,7 +94,7 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
         tags: tagsInput.split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean),
         vendor: vendor.trim() || null,
         in_stock: inStock,
-        variants: variantsInput.trim() ? JSON.parse(variantsInput) : [],
+        variants: variants,
       }
 
       const res = await fetch('/api/products', {
@@ -202,9 +203,9 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
                   <input value={tagsInput} onChange={e => setTagsInput(e.target.value)} className="input" />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="text-xs text-ink-3 block mb-1.5">Variants JSON</label>
-                  <textarea value={variantsInput} onChange={e => setVariantsInput(e.target.value)} className="input min-h-[260px] font-mono text-xs" />
-                  <div className="text-xs text-ink-4 mt-2">Tip: each variant can include an `images` array to show different pictures per variant.</div>
+                  <label className="text-xs text-ink-3 block mb-1.5">Variants</label>
+                  <VariantEditor value={variants} onChange={setVariants} />
+                  <div className="text-xs text-ink-4 mt-2">Each variant can have its own images, price, quality tag and stock status.</div>
                 </div>
               </div>
             </div>

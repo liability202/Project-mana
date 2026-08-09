@@ -76,7 +76,9 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
       .then(({ data }) => {
         if (data) {
           setProduct(data)
-          setActiveVar(data.variants?.[0] || null)
+          // Auto-select the first IN-STOCK variant; fall back to first variant if all OOS
+          const firstInStock = data.variants?.find((v: Variant) => v.in_stock !== false) || data.variants?.[0] || null
+          setActiveVar(firstInStock)
           setGrams(getDefaultWeight(data.category))
           setCustomWeight(false)
           // Fetch real review average
@@ -367,22 +369,39 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
               <div className="text-[.62rem] tracking-[.2em] uppercase text-ink-4 mb-3">Select Variety</div>
               <div className="grid grid-cols-2 gap-2">
                 {product.variants.map((v: Variant) => {
+                  const isOOS = v.in_stock === false
                   const qt = v.quality_tag ? (QUALITY_TAGS[v.quality_tag] || { label: v.quality_tag, cls: 'bg-green-6 text-green-2 border border-green-5' }) : null
                   return (
                     <button
                       key={v.id}
+                      disabled={isOOS}
                       onClick={() => {
+                        if (isOOS) return
                         setActiveVar(v)
                         setActiveImg(0)
                       }}
-                      className={`border rounded-lg p-3 text-left cursor-pointer transition-all ${activeVar?.id === v.id ? 'border-green bg-green-6' : 'border-ivory-3 bg-white hover:border-green-4'}`}
+                      className={`relative border rounded-lg p-3 text-left transition-all ${
+                        isOOS
+                          ? 'border-ivory-3 bg-ivory-2 opacity-60 cursor-not-allowed'
+                          : activeVar?.id === v.id
+                            ? 'border-green bg-green-6 cursor-pointer'
+                            : 'border-ivory-3 bg-white hover:border-green-4 cursor-pointer'
+                      }`}
                     >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <div className="text-sm font-medium text-ink">{v.name}</div>
-                        {qt && <span className={`text-[.5rem] font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded-sm ${qt.cls}`}>{qt.label}</span>}
+                      {/* Out of stock overlay badge */}
+                      {isOOS && (
+                        <span className="absolute top-2 right-2 text-[.45rem] font-semibold tracking-widest uppercase px-1.5 py-0.5 rounded-sm bg-ink-4/20 text-ink-3 border border-ink-4/30">
+                          Out of Stock
+                        </span>
+                      )}
+                      <div className="flex items-center justify-between mb-0.5 pr-14">
+                        <div className={`text-sm font-medium ${isOOS ? 'text-ink-3' : 'text-ink'}`}>{v.name}</div>
+                        {!isOOS && qt && <span className={`text-[.5rem] font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded-sm ${qt.cls}`}>{qt.label}</span>}
                       </div>
                       {v.description && <div className="text-[.65rem] text-ink-4">{v.description}</div>}
-                      <div className="font-serif text-base text-green mt-1">{formatPrice(v.price)} {product.price_per_unit}</div>
+                      <div className={`font-serif text-base mt-1 ${isOOS ? 'text-ink-4 line-through' : 'text-green'}`}>
+                        {formatPrice(v.price)} {product.price_per_unit}
+                      </div>
                     </button>
                   )
                 })}
@@ -558,26 +577,37 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 mb-5 flex-wrap">
-            {inCart ? (
-              <Link href="/checkout" className="btn-primary flex-1 justify-center bg-green-2 border-green-2 hover:bg-green-3">
-                <span>Proceed to Checkout</span>
-              </Link>
-            ) : (
-              <button onClick={handleAddToCart} className="btn-primary flex-1 justify-center">
-                <span>Add to Cart</span>
+          {activeVar?.in_stock === false ? (
+            <div className="mb-5">
+              <button disabled className="btn-primary flex-1 w-full justify-center opacity-50 cursor-not-allowed">
+                <span>Out of Stock</span>
               </button>
-            )}
-            <button
-              onClick={() => {
-                handleAddToCart()
-                setIsBuyNowOpen(true)
-              }}
-              className="btn-outline flex-1 justify-center"
-            >
-              Buy Now
-            </button>
-          </div>
+              <p className="text-[.72rem] text-ink-3 text-center mt-2">
+                This variety is currently out of stock. Please select another.
+              </p>
+            </div>
+          ) : (
+            <div className="flex gap-3 mb-5 flex-wrap">
+              {inCart ? (
+                <Link href="/checkout" className="btn-primary flex-1 justify-center bg-green-2 border-green-2 hover:bg-green-3">
+                  <span>Proceed to Checkout</span>
+                </Link>
+              ) : (
+                <button onClick={handleAddToCart} className="btn-primary flex-1 justify-center">
+                  <span>Add to Cart</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  handleAddToCart()
+                  setIsBuyNowOpen(true)
+                }}
+                className="btn-outline flex-1 justify-center"
+              >
+                Buy Now
+              </button>
+            </div>
+          )}
 
           {/* Features */}
           <div className="grid grid-cols-2 gap-2">
