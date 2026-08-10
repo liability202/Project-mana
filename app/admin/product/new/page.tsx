@@ -30,6 +30,7 @@ export default function NewAdminProductPage() {
   const [inStock, setInStock] = useState(true)
   const [badgeX, setBadgeX] = useState(50)
   const [badgeY, setBadgeY] = useState(82)
+  const [badgeScale, setBadgeScale] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -70,6 +71,7 @@ export default function NewAdminProductPage() {
         variants,
         badge_x: Number(badgeX),
         badge_y: Number(badgeY),
+        badge_scale: Number(badgeScale),
       }
 
       if (!payload.name) throw new Error('Product name is required.')
@@ -193,8 +195,10 @@ export default function NewAdminProductPage() {
                 imageUrl={imagesInput} 
                 badgeX={badgeX} 
                 badgeY={badgeY} 
+                badgeScale={badgeScale}
                 onChangeX={setBadgeX} 
                 onChangeY={setBadgeY} 
+                onChangeScale={setBadgeScale}
               />
 
               <div className="md:col-span-2">
@@ -244,14 +248,18 @@ function BadgePositionPicker({
   imageUrl,
   badgeX,
   badgeY,
+  badgeScale = 1,
   onChangeX,
-  onChangeY
+  onChangeY,
+  onChangeScale
 }: {
   imageUrl: string
   badgeX: number
   badgeY: number
+  badgeScale?: number
   onChangeX: (val: number) => void
   onChangeY: (val: number) => void
+  onChangeScale: (val: number) => void
 }) {
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -265,8 +273,8 @@ function BadgePositionPicker({
 
   return (
     <div className="md:col-span-2 border-t border-ivory-3 pt-5 mt-3">
-      <div className="text-xs font-semibold text-ink mb-1">Image Weight Badge Position (Live Preview)</div>
-      <div className="text-[.72rem] text-ink-4 mb-4">Click anywhere on the image below or adjust the sliders to position the weight badge.</div>
+      <div className="text-xs font-semibold text-ink mb-1">Image Weight Badge Position & Size (Live Preview)</div>
+      <div className="text-[.72rem] text-ink-4 mb-4">Click anywhere on the image below or adjust the sliders to position and resize the weight badge.</div>
       
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 items-center">
         {/* Live Interactive Preview Box */}
@@ -284,10 +292,14 @@ function BadgePositionPicker({
             </div>
           )}
 
-          {/* Live Moving Badge */}
+          {/* Live Moving & Scaled Badge */}
           <div
-            className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 transition-all duration-150 z-10"
-            style={{ top: `${badgeY}%`, left: `${badgeX}%` }}
+            className="absolute pointer-events-none transition-all duration-150 z-10"
+            style={{ 
+              top: `${badgeY}%`, 
+              left: `${badgeX}%`,
+              transform: `translate(-50%, -50%) scale(${badgeScale})` 
+            }}
           >
             <div className="bg-black/80 text-white border border-white/30 px-2.5 py-0.5 rounded-full text-[10px] font-serif font-medium tracking-wider shadow-md whitespace-nowrap">
               500g
@@ -314,6 +326,7 @@ function BadgePositionPicker({
               className="w-full accent-green cursor-pointer h-2 bg-ivory-3 rounded-lg" 
             />
           </div>
+
           <div>
             <div className="flex justify-between text-xs text-ink-3 mb-1">
               <span>Vertical (Y Axis):</span>
@@ -328,12 +341,29 @@ function BadgePositionPicker({
               className="w-full accent-green cursor-pointer h-2 bg-ivory-3 rounded-lg" 
             />
           </div>
+
+          <div>
+            <div className="flex justify-between text-xs text-ink-3 mb-1">
+              <span>Badge Size (Scale):</span>
+              <span className="font-mono font-bold text-green">{badgeScale}x</span>
+            </div>
+            <input 
+              type="range" 
+              min="0.5" 
+              max="2.0" 
+              step="0.1"
+              value={badgeScale} 
+              onChange={e => onChangeScale(Number(e.target.value))} 
+              className="w-full accent-green cursor-pointer h-2 bg-ivory-3 rounded-lg" 
+            />
+          </div>
+
           <button
             type="button"
-            onClick={() => { onChangeX(50); onChangeY(82); }}
+            onClick={() => { onChangeX(50); onChangeY(82); onChangeScale(1); }}
             className="text-[.68rem] text-green-3 hover:text-green font-semibold uppercase tracking-wider bg-transparent border-none cursor-pointer"
           >
-            ↺ Reset to Default Position (50%, 82%)
+            ↺ Reset Position & Size (50%, 82%, 1.0x)
           </button>
         </div>
       </div>

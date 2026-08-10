@@ -321,10 +321,11 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             {/* Dynamic Weight Badge Overlay (Main Image Only) */}
             {activeImg === 0 && galleryImages?.[0] && (
               <div
-                className="absolute pointer-events-none select-none -translate-x-1/2 -translate-y-1/2 transition-all duration-300 z-10"
+                className="absolute pointer-events-none select-none transition-all duration-300 z-10"
                 style={{
                   top: `${(product as any)?.badge_y ?? 82}%`,
                   left: `${(product as any)?.badge_x ?? 50}%`,
+                  transform: `translate(-50%, -50%) scale(${(product as any)?.badge_scale ?? (product as any)?.badge_size ?? 1})`,
                 }}
               >
                 <div className="bg-black/75 backdrop-blur-md text-ivory border border-white/20 px-3.5 py-1 rounded-full text-xs sm:text-sm font-medium tracking-wider shadow-lg flex items-center justify-center font-serif text-center">
