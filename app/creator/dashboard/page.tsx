@@ -167,18 +167,21 @@ export default function CreatorDashboard() {
           value={formatPrice(stats.thisMonthEarnings)} 
           icon={<TrendingUp size={18} />} 
           subtitle="Current month earnings" 
+          href="/creator/earnings"
         />
         <StatCard 
           label="Pending Payout" 
           value={formatPrice(stats.pendingPayout)} 
           icon={<Clock size={18} />} 
           subtitle="Ready for next settlement"
+          href="/creator/earnings"
         />
         <StatCard 
           label="Total Earned" 
           value={formatPrice(stats.totalEarnedLifetime)} 
           icon={<CircleDollarSign size={18} />} 
           subtitle="Lifetime referral rewards"
+          href="/creator/earnings"
         />
       </div>
 
