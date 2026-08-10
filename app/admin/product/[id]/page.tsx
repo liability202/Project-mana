@@ -53,6 +53,7 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
         }
         setName(product.name)
         setSlug(product.slug)
+        setSlugTouched(true)
         setDescription(product.description || '')
         setCategory(product.category as Category)
         setPriceRupees(String((product.price || 0) / 100))

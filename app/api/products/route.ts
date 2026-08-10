@@ -91,6 +91,21 @@ export async function GET(req: Request) {
   return NextResponse.json(formatted)
 }
 
+async function makeUniqueSlug(baseSlug: string, currentId?: string): Promise<string> {
+  if (!baseSlug) return baseSlug
+  let uniqueSlug = baseSlug
+  let counter = 1
+  while (counter <= 50) {
+    let query = supabaseAdmin.from('products').select('id').eq('slug', uniqueSlug)
+    if (currentId) query = query.neq('id', currentId)
+    const { data } = await query.limit(1)
+    if (!data || data.length === 0) return uniqueSlug
+    uniqueSlug = `${baseSlug}-${counter}`
+    counter++
+  }
+  return `${baseSlug}-${Date.now()}`
+}
+
 export async function POST(req: Request) {
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
@@ -100,6 +115,9 @@ export async function POST(req: Request) {
   try {
     const rawBody = await req.json()
     const payload = prepareProductData(rawBody)
+    if (payload.slug) {
+      payload.slug = await makeUniqueSlug(payload.slug)
+    }
     const { data, error } = await supabaseAdmin.from('products').insert(payload).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json(formatProductResponse(data))
@@ -122,6 +140,9 @@ export async function PUT(req: Request) {
     if (!id) return NextResponse.json({ error: 'Product id is required' }, { status: 400 })
 
     const payload = prepareProductData(updates)
+    if (payload.slug) {
+      payload.slug = await makeUniqueSlug(payload.slug, id)
+    }
     const { data, error } = await supabaseAdmin.from('products').update(payload).eq('id', id).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json(formatProductResponse(data))
