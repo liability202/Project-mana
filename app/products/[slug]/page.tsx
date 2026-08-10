@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useCart, useCoupon } from '@/lib/store'
-import { calcPriceForWeight, formatPrice, formatWeight } from '@/lib/utils'
+import { calcPriceForWeight, extractBadgeConfig, formatPrice, formatWeight } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 import { ReviewForm } from '@/components/product/ReviewForm'
 import { ReviewList } from '@/components/product/ReviewList'
@@ -319,20 +319,23 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             )}
 
             {/* Dynamic Weight Badge Overlay (Main Image Only) */}
-            {activeImg === 0 && galleryImages?.[0] && (
-              <div
-                className="absolute pointer-events-none select-none transition-all duration-300 z-10"
-                style={{
-                  top: `${(product as any)?.badge_y ?? 82}%`,
-                  left: `${(product as any)?.badge_x ?? 50}%`,
-                  transform: `translate(-50%, -50%) scale(${(product as any)?.badge_scale ?? (product as any)?.badge_size ?? 1})`,
-                }}
-              >
-                <div className="bg-black/75 backdrop-blur-md text-ivory border border-white/20 px-3.5 py-1 rounded-full text-xs sm:text-sm font-medium tracking-wider shadow-lg flex items-center justify-center font-serif text-center">
-                  {formatWeight(grams)}
+            {activeImg === 0 && galleryImages?.[0] && (() => {
+              const badgeCfg = extractBadgeConfig(product?.tags, product)
+              return (
+                <div
+                  className="absolute pointer-events-none select-none transition-all duration-300 z-10"
+                  style={{
+                    top: `${badgeCfg.badge_y}%`,
+                    left: `${badgeCfg.badge_x}%`,
+                    transform: `translate(-50%, -50%) scale(${badgeCfg.badge_scale})`,
+                  }}
+                >
+                  <div className="bg-black/75 backdrop-blur-md text-ivory border border-white/20 px-3.5 py-1 rounded-full text-xs sm:text-sm font-medium tracking-wider shadow-lg flex items-center justify-center font-serif text-center">
+                    {formatWeight(grams)}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
             
             {galleryImages && galleryImages.length > 1 && (
               <>

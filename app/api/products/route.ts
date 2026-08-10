@@ -1,6 +1,27 @@
 import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { matchCatalogProducts } from '@/lib/product-search'
+import { extractBadgeConfig } from '@/lib/utils'
+
+function prepareProductData(payload: any) {
+  const { badge_x, badge_y, badge_scale, badge_size, ...cleanData } = payload
+
+  let tags: string[] = Array.isArray(cleanData.tags) ? cleanData.tags.filter((t: string) => typeof t === 'string' && !t.startsWith('badge:')) : []
+
+  if (badge_x !== undefined && badge_y !== undefined) {
+    const scale = badge_scale ?? badge_size ?? 1
+    tags.push(`badge:${badge_x}:${badge_y}:${scale}`)
+  }
+
+  cleanData.tags = tags
+  return cleanData
+}
+
+function formatProductResponse(product: any) {
+  if (!product) return product
+  if (Array.isArray(product)) return product.map(p => ({ ...p, ...extractBadgeConfig(p.tags, p) }))
+  return { ...product, ...extractBadgeConfig(product.tags, product) }
+}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -8,7 +29,7 @@ export async function GET(req: Request) {
   const category = searchParams.get('category')
   const tag = searchParams.get('tag')
   const q = searchParams.get('q')
-  const slug = searchParams.get('slug') // ADD THIS
+  const slug = searchParams.get('slug')
   const limit = parseInt(searchParams.get('limit') || '24')
   const id = searchParams.get('id')
 
@@ -25,7 +46,7 @@ export async function GET(req: Request) {
     query = query.eq('id', id)
 
   if (slug)
-    query = query.eq('slug', slug) // ADD THIS
+    query = query.eq('slug', slug)
 
   if (category)
     query = query.eq('category', category)
@@ -42,13 +63,15 @@ export async function GET(req: Request) {
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 })
 
+  const formatted = formatProductResponse(data || [])
+
   if (q) {
     return NextResponse.json(
-      matchCatalogProducts(data || [], q, limit).map(match => match.product)
+      matchCatalogProducts(formatted, q, limit).map(match => match.product)
     )
   }
 
-  return NextResponse.json(data)
+  return NextResponse.json(formatted)
 }
 
 export async function POST(req: Request) {
@@ -58,10 +81,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json()
-    const { data, error } = await supabaseAdmin.from('products').insert(body).select().single()
+    const rawBody = await req.json()
+    const payload = prepareProductData(rawBody)
+    const { data, error } = await supabaseAdmin.from('products').insert(payload).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(data)
+    return NextResponse.json(formatProductResponse(data))
   } catch (error) {
     return NextResponse.json({
       error: error instanceof Error ? error.message : 'Invalid product payload',
@@ -76,12 +100,14 @@ export async function PUT(req: Request) {
   }
 
   try {
-    const { id, ...updates } = await req.json()
+    const rawBody = await req.json()
+    const { id, ...updates } = rawBody
     if (!id) return NextResponse.json({ error: 'Product id is required' }, { status: 400 })
 
-    const { data, error } = await supabaseAdmin.from('products').update(updates).eq('id', id).select().single()
+    const payload = prepareProductData(updates)
+    const { data, error } = await supabaseAdmin.from('products').update(payload).eq('id', id).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(data)
+    return NextResponse.json(formatProductResponse(data))
   } catch (error) {
     return NextResponse.json({
       error: error instanceof Error ? error.message : 'Invalid product payload',

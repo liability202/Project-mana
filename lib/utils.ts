@@ -65,3 +65,30 @@ export function whatsappUrl(message: string): string {
   const num = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919876543210'
   return `https://wa.me/${num}?text=${encodeURIComponent(message)}`
 }
+
+// Extract dynamic badge config from tags or direct attributes
+export function extractBadgeConfig(tags?: string[] | null, rawProduct?: any) {
+  let badge_x = rawProduct?.badge_x !== undefined && rawProduct?.badge_x !== null ? Number(rawProduct.badge_x) : 50
+  let badge_y = rawProduct?.badge_y !== undefined && rawProduct?.badge_y !== null ? Number(rawProduct.badge_y) : 82
+  let badge_scale = rawProduct?.badge_scale !== undefined && rawProduct?.badge_scale !== null
+    ? Number(rawProduct.badge_scale)
+    : (rawProduct?.badge_size !== undefined && rawProduct?.badge_size !== null ? Number(rawProduct.badge_size) : 1)
+
+  if (tags && Array.isArray(tags)) {
+    const found = tags.find(t => typeof t === 'string' && t.startsWith('badge:'))
+    if (found) {
+      const parts = found.split(':')
+      if (parts.length >= 3) {
+        badge_x = Number(parts[1]) || 50
+        badge_y = Number(parts[2]) || 82
+        if (parts[3] !== undefined && parts[3] !== '') badge_scale = Number(parts[3]) || 1
+      }
+    }
+  }
+
+  return { 
+    badge_x: Number.isFinite(badge_x) ? badge_x : 50, 
+    badge_y: Number.isFinite(badge_y) ? badge_y : 82, 
+    badge_scale: Number.isFinite(badge_scale) ? badge_scale : 1 
+  }
+}
