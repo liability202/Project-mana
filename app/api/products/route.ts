@@ -41,6 +41,18 @@ export async function GET(req: Request) {
   const client = (id || slug || includeAll || isAdmin) ? supabaseAdmin : supabase
   let query = client.from('products').select('*')
 
+  if (id) {
+    query = query.eq('id', id)
+  }
+
+  if (category) {
+    query = query.eq('category', category)
+  }
+
+  if (tag) {
+    query = query.contains('tags', [tag])
+  }
+
   // Only filter in_stock for general catalog browsing
   if (!includeAll && !isAdmin && !id && !slug)
     query = query.eq('in_stock', true)
