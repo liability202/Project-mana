@@ -45,23 +45,31 @@ export async function GET(req: Request) {
   if (!includeAll && !isAdmin && !id && !slug)
     query = query.eq('in_stock', true)
 
-  if (id)
-    query = query.eq('id', id)
+  if (slug) {
+    // 1. Try exact/ilike slug match
+    const { data: exactMatch } = await client.from('products').select('*').ilike('slug', slug).limit(1)
+    if (exactMatch && exactMatch.length > 0) {
+      return NextResponse.json(formatProductResponse(exactMatch))
+    }
 
-  if (slug)
-    query = query.ilike('slug', slug)
+    // 2. Try singular/plural fallback (e.g. walnut-kernels -> walnut-kernel)
+    const altSlug = slug.endsWith('s') ? slug.slice(0, -1) : `${slug}s`
+    const { data: altMatch } = await client.from('products').select('*').ilike('slug', altSlug).limit(1)
+    if (altMatch && altMatch.length > 0) {
+      return NextResponse.json(formatProductResponse(altMatch))
+    }
 
-  if (category)
-    query = query.eq('category', category)
+    // 3. Try key word match on name or slug (e.g. "walnut" in name/slug)
+    const keyword = slug.split('-')[0]
+    if (keyword && keyword.length >= 3) {
+      const { data: kwMatch } = await client.from('products').select('*').or(`slug.ilike.%${keyword}%,name.ilike.%${keyword}%`).limit(1)
+      if (kwMatch && kwMatch.length > 0) {
+        return NextResponse.json(formatProductResponse(kwMatch))
+      }
+    }
 
-  if (tag)
-    query = query.contains('tags', [tag])
-
-  const fetchLimit = q ? Math.max(200, limit) : limit
-
-  const { data, error } = await query
-    .order('created_at', { ascending: false })
-    .limit(fetchLimit)
+    return NextResponse.json([])
+  }
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 })

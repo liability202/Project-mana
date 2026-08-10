@@ -12,11 +12,23 @@ type Props = { params: { slug: string } }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const client = supabaseAdmin || supabase
-  const { data: product } = await client
+  let { data: product } = await client
     .from('products')
     .select('name, description, category, images, price, in_stock')
     .ilike('slug', params.slug)
     .maybeSingle()
+
+  if (!product && params.slug) {
+    const kw = params.slug.split('-')[0]
+    if (kw && kw.length >= 3) {
+      const { data: kwMatch } = await client
+        .from('products')
+        .select('name, description, category, images, price, in_stock')
+        .or(`slug.ilike.%${kw}%,name.ilike.%${kw}%`)
+        .limit(1)
+      if (kwMatch && kwMatch[0]) product = kwMatch[0]
+    }
+  }
 
   if (!product) {
     return {
