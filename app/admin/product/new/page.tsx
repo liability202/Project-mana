@@ -189,20 +189,13 @@ export default function NewAdminProductPage() {
                 <input value={tagsInput} onChange={e => setTagsInput(e.target.value)} className="input" placeholder="bestseller, organic, premium" />
               </div>
 
-              <div className="md:col-span-2 border-t border-ivory-3 pt-4 mt-2">
-                <div className="text-xs font-semibold text-ink mb-1">Image Weight Badge Position (%)</div>
-                <div className="text-[.7rem] text-ink-4 mb-3">Adjust where the dynamic weight badge (e.g. 500g, 1kg) is pinned over the product pouch image.</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-ink-3 block mb-1">Horizontal (X): {badgeX}%</label>
-                    <input type="range" min="10" max="90" value={badgeX} onChange={e => setBadgeX(Number(e.target.value))} className="w-full accent-green cursor-pointer" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-ink-3 block mb-1">Vertical (Y): {badgeY}%</label>
-                    <input type="range" min="10" max="90" value={badgeY} onChange={e => setBadgeY(Number(e.target.value))} className="w-full accent-green cursor-pointer" />
-                  </div>
-                </div>
-              </div>
+              <BadgePositionPicker 
+                imageUrl={imagesInput} 
+                badgeX={badgeX} 
+                badgeY={badgeY} 
+                onChangeX={setBadgeX} 
+                onChangeY={setBadgeY} 
+              />
 
               <div className="md:col-span-2">
                 <label className="text-xs text-ink-3 block mb-1.5">Variants</label>
@@ -242,6 +235,107 @@ export default function NewAdminProductPage() {
             </div>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+function BadgePositionPicker({
+  imageUrl,
+  badgeX,
+  badgeY,
+  onChangeX,
+  onChangeY
+}: {
+  imageUrl: string
+  badgeX: number
+  badgeY: number
+  onChangeX: (val: number) => void
+  onChangeY: (val: number) => void
+}) {
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100)
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100)
+    onChangeX(Math.max(5, Math.min(95, x)))
+    onChangeY(Math.max(5, Math.min(95, y)))
+  }
+
+  const firstUrl = (imageUrl || '').split('\n').map(u => u.trim()).filter(Boolean)[0] || ''
+
+  return (
+    <div className="md:col-span-2 border-t border-ivory-3 pt-5 mt-3">
+      <div className="text-xs font-semibold text-ink mb-1">Image Weight Badge Position (Live Preview)</div>
+      <div className="text-[.72rem] text-ink-4 mb-4">Click anywhere on the image below or adjust the sliders to position the weight badge.</div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 items-center">
+        {/* Live Interactive Preview Box */}
+        <div 
+          onClick={handleClick}
+          className="relative w-full max-w-[220px] aspect-square rounded-xl overflow-hidden border-2 border-dashed border-green-5 bg-ivory-2 cursor-crosshair group shadow-soft mx-auto md:mx-0 select-none"
+          title="Click anywhere on this image to set badge position"
+        >
+          {firstUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={firstUrl} alt="Preview" className="w-full h-full object-cover pointer-events-none" />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-ink-4 text-xs">
+              <span>Add a product image URL above to see live preview</span>
+            </div>
+          )}
+
+          {/* Live Moving Badge */}
+          <div
+            className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 transition-all duration-150 z-10"
+            style={{ top: `${badgeY}%`, left: `${badgeX}%` }}
+          >
+            <div className="bg-black/80 text-white border border-white/30 px-2.5 py-0.5 rounded-full text-[10px] font-serif font-medium tracking-wider shadow-md whitespace-nowrap">
+              500g
+            </div>
+          </div>
+          <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2 pointer-events-none">
+            <span className="bg-black/60 text-white text-[9px] px-2 py-0.5 rounded-md">Click to position pin</span>
+          </div>
+        </div>
+
+        {/* Sliders */}
+        <div className="space-y-4">
+          <div>
+            <div className="flex justify-between text-xs text-ink-3 mb-1">
+              <span>Horizontal (X Axis):</span>
+              <span className="font-mono font-bold text-green">{badgeX}%</span>
+            </div>
+            <input 
+              type="range" 
+              min="5" 
+              max="95" 
+              value={badgeX} 
+              onChange={e => onChangeX(Number(e.target.value))} 
+              className="w-full accent-green cursor-pointer h-2 bg-ivory-3 rounded-lg" 
+            />
+          </div>
+          <div>
+            <div className="flex justify-between text-xs text-ink-3 mb-1">
+              <span>Vertical (Y Axis):</span>
+              <span className="font-mono font-bold text-green">{badgeY}%</span>
+            </div>
+            <input 
+              type="range" 
+              min="5" 
+              max="95" 
+              value={badgeY} 
+              onChange={e => onChangeY(Number(e.target.value))} 
+              className="w-full accent-green cursor-pointer h-2 bg-ivory-3 rounded-lg" 
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => { onChangeX(50); onChangeY(82); }}
+            className="text-[.68rem] text-green-3 hover:text-green font-semibold uppercase tracking-wider bg-transparent border-none cursor-pointer"
+          >
+            ↺ Reset to Default Position (50%, 82%)
+          </button>
+        </div>
       </div>
     </div>
   )
