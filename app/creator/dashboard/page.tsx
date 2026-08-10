@@ -22,7 +22,7 @@ import {
 } from 'recharts'
 import { formatPrice } from '@/lib/utils'
 import { RangeFilter } from '@/components/ui/RangeFilter'
-import { chartCaption, type DateRange } from '@/lib/date-ranges'
+import { chartCaption, DATE_RANGE_LABELS, type DateRange } from '@/lib/date-ranges'
 
 export default function CreatorDashboard() {
   const [stats, setStats] = useState<any>(null)
@@ -153,7 +153,7 @@ export default function CreatorDashboard() {
           label="Link Visits" 
           value={stats.totalVisits ?? 0} 
           icon={<Users size={18} />} 
-          subtitle="People who verified via your link"
+          subtitle={chartRange === 'all' ? 'All-time referral link opens' : `Referral link opens · ${DATE_RANGE_LABELS[chartRange].toLowerCase()}`}
         />
         <StatCard
           label="Total Orders"

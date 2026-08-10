@@ -75,12 +75,16 @@ export async function GET(req: Request) {
 
       chartQuery,
 
-      // Visits — match any of the creator's codes
+      // Visits — match any of the creator's codes (respecting selected date range)
       codesArray.length > 0
-        ? supabaseAdmin
-            .from('referral_visits')
-            .select('*', { count: 'exact', head: true })
-            .in('creator_code', codesArray)
+        ? (() => {
+            let q = supabaseAdmin
+              .from('referral_visits')
+              .select('*', { count: 'exact', head: true })
+              .in('creator_code', codesArray)
+            if (chartSince) q = q.gte('created_at', chartSince)
+            return q
+          })()
         : Promise.resolve({ count: 0, error: null }),
 
       // Orders — match any of the creator's coupon codes
