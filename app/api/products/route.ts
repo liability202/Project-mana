@@ -69,7 +69,11 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json([])
-  }
+  const fetchLimit = q ? Math.max(200, limit) : limit
+
+  const { data, error } = await query
+    .order('created_at', { ascending: false })
+    .limit(fetchLimit)
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 })
