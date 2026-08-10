@@ -302,7 +302,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-[70vh] pt-12 pb-24 overflow-x-hidden" style={{ background: 'rgb(var(--c-ivory))' }}>
-      <div className="max-w-4xl mx-auto px-4 sm:px-[5%]">
+      <div className="max-w-5xl mx-auto px-4 sm:px-[5%]">
         
         {step !== 'dashboard' && (
           <div className="max-w-md mx-auto rounded-2xl p-8 shadow-soft" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
@@ -388,7 +388,7 @@ export default function ProfilePage() {
               </div>
               <button 
                 onClick={logout}
-                className="text-sm font-medium transition-colors px-4 py-2 border rounded-lg"
+                className="text-sm font-medium transition-colors px-4 py-2 border rounded-lg cursor-pointer"
                 style={{ background: 'rgb(var(--c-ivory2))', borderColor: 'rgb(var(--c-ivory3))', color: 'var(--ink3)' }}
               >
                 Log out
@@ -400,28 +400,27 @@ export default function ProfilePage() {
                 <div className="w-8 h-8 border-4 border-t-green rounded-full animate-spin" style={{ borderColor: 'rgb(var(--c-ivory3))' }} />
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
+              <div className={`grid grid-cols-1 ${siteSettings.enable_cashback_spending ? 'lg:grid-cols-[280px_1fr]' : 'w-full'} gap-8 items-start`}>
                 
-                {/* Left Column: Wallet & Quick Actions */}
-                <div className="space-y-6">
-                  {/* Wallet Card */}
-                  {siteSettings.enable_cashback_spending && (
-                  <div className="rounded-2xl p-6 relative overflow-hidden shadow-sm border" style={{ background: 'rgba(var(--c-green5), 0.1)', borderColor: 'rgba(var(--c-green5), 0.3)' }}>
-                    <div className="absolute -right-6 -top-6 opacity-30" style={{ color: 'var(--green)' }}>
-                      <Wallet size={120} strokeWidth={1} />
-                    </div>
-                    <div className="relative z-10">
-                      <div className="text-sm font-semibold mb-1 flex items-center gap-2" style={{ color: 'var(--green)' }}>
-                        <Wallet size={16} /> Mana Cashback Wallet
+                {/* Left Column: Wallet (only rendered if cashback spending is enabled) */}
+                {siteSettings.enable_cashback_spending && (
+                  <div className="space-y-6">
+                    <div className="rounded-2xl p-6 relative overflow-hidden shadow-sm border" style={{ background: 'rgba(var(--c-green5), 0.1)', borderColor: 'rgba(var(--c-green5), 0.3)' }}>
+                      <div className="absolute -right-6 -top-6 opacity-30" style={{ color: 'var(--green)' }}>
+                        <Wallet size={120} strokeWidth={1} />
                       </div>
-                      <div className="font-serif text-4xl mb-2" style={{ color: 'var(--green)' }}>{formatPrice(walletBalance)}</div>
-                      <p className="text-xs leading-relaxed max-w-[200px]" style={{ color: 'var(--green2)' }}>
-                        Available balance to use on your next purchase. {siteSettings.enable_cashback_earning ? 'Earn 5% cashback on every order!' : ''}
-                      </p>
+                      <div className="relative z-10">
+                        <div className="text-sm font-semibold mb-1 flex items-center gap-2" style={{ color: 'var(--green)' }}>
+                          <Wallet size={16} /> Mana Cashback Wallet
+                        </div>
+                        <div className="font-serif text-4xl mb-2" style={{ color: 'var(--green)' }}>{formatPrice(walletBalance)}</div>
+                        <p className="text-xs leading-relaxed max-w-[200px]" style={{ color: 'var(--green2)' }}>
+                          Available balance to use on your next purchase. {siteSettings.enable_cashback_earning ? 'Earn 5% cashback on every order!' : ''}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  )}
-                </div>
+                )}
 
                 {/* Right Column: Order History & Support */}
                 <div className="space-y-6">
