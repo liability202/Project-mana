@@ -37,9 +37,12 @@ export async function GET(req: Request) {
   const auth = req.headers.get('authorization')
   const isAdmin = auth === `Bearer ${process.env.ADMIN_SECRET}`
 
-  let query = supabase.from('products').select('*')
+  // Use supabaseAdmin if searching by id, slug, or admin include_all
+  const client = (id || slug || includeAll || isAdmin) ? supabaseAdmin : supabase
+  let query = client.from('products').select('*')
 
-  if (!(includeAll && isAdmin))
+  // Only filter in_stock for general catalog browsing
+  if (!includeAll && !isAdmin && !id && !slug)
     query = query.eq('in_stock', true)
 
   if (id)
