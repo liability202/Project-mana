@@ -318,8 +318,8 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
               <div className="w-full aspect-square bg-ivory-2 flex items-center justify-center text-ink-4">No image</div>
             )}
 
-            {/* Dynamic Weight Badge Overlay */}
-            {galleryImages?.[activeImg] && (
+            {/* Dynamic Weight Badge Overlay (Main Image Only) */}
+            {activeImg === 0 && galleryImages?.[0] && (
               <div
                 className="absolute pointer-events-none select-none -translate-x-1/2 -translate-y-1/2 transition-all duration-300 z-10"
                 style={{
