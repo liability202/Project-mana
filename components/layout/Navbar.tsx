@@ -91,7 +91,9 @@ export function Navbar() {
           <button
             id="theme-toggle"
             onClick={handleThemeToggle}
-            className="cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ink transition-colors hover:text-green dark:hover:text-green"
+            className={`cursor-pointer border-none bg-transparent p-1.5 text-ink-2 dark:text-ink transition-colors hover:text-green dark:hover:text-green ${
+              mobileOpen ? 'block' : 'hidden lg:block'
+            }`}
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {theme === 'dark'
@@ -145,6 +147,25 @@ export function Navbar() {
             >
               Chat & Buy on WhatsApp
             </a>
+            <div className="flex items-center justify-between border-t border-ivory-3 dark:border-green-5/10 px-[5%] py-4">
+              <span className="text-sm font-medium text-ink-2 dark:text-ivory-3">Theme Mode</span>
+              <button
+                onClick={handleThemeToggle}
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-ivory-3 dark:border-green-5/20 bg-ivory-2 dark:bg-green-6/20 px-3 py-1.5 text-xs font-medium text-ink-2 dark:text-ivory"
+              >
+                {theme === 'dark' ? (
+                  <>
+                    <Sun size={15} className={`text-amber-500 ${spinning ? 'animate-theme-spin' : ''}`} />
+                    <span>Light Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon size={15} className={`text-ink-2 dark:text-ivory-3 ${spinning ? 'animate-theme-spin' : ''}`} />
+                    <span>Dark Mode</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
