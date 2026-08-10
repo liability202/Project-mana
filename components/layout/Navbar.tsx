@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { label: 'Herbs', href: '/products?category=herbs' },
   { label: 'Spices', href: '/products?category=spices' },
   { label: 'Kits', href: '/kits' },
+  { label: 'Blog', href: '/blog' },
   { label: 'About Us', href: '/about' },
 ]
 

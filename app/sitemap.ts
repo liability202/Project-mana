@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { supabase } from '@/lib/supabase'
 import { SITE_URL } from '@/lib/seo'
+import { BLOG_POSTS } from '@/lib/blog-data'
 
 // Regenerate the sitemap hourly so newly published products get discovered.
 export const revalidate = 3600
@@ -17,6 +18,7 @@ const STATIC_ROUTES: Array<{
   { path: '/products?category=herbs', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/products?category=spices', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/products?category=pansari', changeFrequency: 'weekly', priority: 0.8 },
+  { path: '/blog', changeFrequency: 'weekly', priority: 0.7 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/faq', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/appointment', changeFrequency: 'monthly', priority: 0.5 },
@@ -34,6 +36,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }))
+
+  for (const post of BLOG_POSTS) {
+    entries.push({
+      url: `${SITE_URL}/blog/${post.slug}`,
+      lastModified: new Date(post.updatedAt),
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    })
+  }
 
   // A build must never fail because Supabase is unreachable — a static-only
   // sitemap is far better than no sitemap at all.
