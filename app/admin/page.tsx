@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/utils'
 import { LoyaltyPanel } from '@/components/admin/LoyaltyPanel'
 import type { Coupon, Order, Product, Review } from '@/lib/supabase'
@@ -60,7 +60,6 @@ function isOverdue(order: Order) {
 
 export default function AdminPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [auth, setAuth] = useState(false)
   const [password, setPassword] = useState('')
   // Mirrors localStorage `mana_admin`; child panels need it during render, and
@@ -69,11 +68,14 @@ export default function AdminPage() {
   const [tab, setTabState] = useState<AdminTab>('orders')
 
   useEffect(() => {
-    const t = searchParams.get('tab') as AdminTab | null
-    if (t && ['orders', 'products', 'kits', 'coupons', 'customers', 'reviews', 'creators', 'settings'].includes(t)) {
-      setTabState(t)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const t = params.get('tab') as AdminTab | null
+      if (t && ['orders', 'products', 'kits', 'coupons', 'customers', 'reviews', 'creators', 'settings'].includes(t)) {
+        setTabState(t)
+      }
     }
-  }, [searchParams])
+  }, [])
 
   const setTab = (newTab: AdminTab) => {
     setTabState(newTab)
