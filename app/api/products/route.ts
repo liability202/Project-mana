@@ -78,7 +78,7 @@ export async function GET(req: Request) {
     .limit(fetchLimit)
 
   if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: (error as any)?.message || 'Database error' }, { status: 500 })
 
   const formatted = formatProductResponse(data || [])
 
