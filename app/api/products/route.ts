@@ -69,6 +69,8 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json([])
+  }
+
   const fetchLimit = q ? Math.max(200, limit) : limit
 
   const { data, error } = await query
