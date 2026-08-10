@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { BRAND_NAME, SITE_URL } from '@/lib/seo'
 
 // The product page itself is a client component, so it cannot export metadata.
@@ -11,10 +11,11 @@ export const revalidate = 3600
 type Props = { params: { slug: string } }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { data: product } = await supabase
+  const client = supabaseAdmin || supabase
+  const { data: product } = await client
     .from('products')
     .select('name, description, category, images, price, in_stock')
-    .eq('slug', params.slug)
+    .ilike('slug', params.slug)
     .maybeSingle()
 
   if (!product) {

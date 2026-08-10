@@ -49,7 +49,7 @@ export async function GET(req: Request) {
     query = query.eq('id', id)
 
   if (slug)
-    query = query.eq('slug', slug)
+    query = query.ilike('slug', slug)
 
   if (category)
     query = query.eq('category', category)

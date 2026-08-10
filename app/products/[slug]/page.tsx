@@ -92,17 +92,19 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   }, [product?.id, reviewCheckLoading, params.slug])
 
   useEffect(() => {
-    supabase.from('products').select('*').eq('slug', params.slug).single()
-      .then(({ data }) => {
-        if (data) {
-          setProduct(data)
+    fetch(`/api/products?slug=${encodeURIComponent(params.slug)}`)
+      .then(r => r.json())
+      .then((data: any) => {
+        const prod = Array.isArray(data) ? data[0] : data
+        if (prod && prod.id) {
+          setProduct(prod)
           // Auto-select the first IN-STOCK variant; fall back to first variant if all OOS
-          const firstInStock = data.variants?.find((v: Variant) => v.in_stock !== false) || data.variants?.[0] || null
+          const firstInStock = prod.variants?.find((v: Variant) => v.in_stock !== false) || prod.variants?.[0] || null
           setActiveVar(firstInStock)
-          setGrams(getDefaultWeight(data.category))
+          setGrams(getDefaultWeight(prod.category))
           setCustomWeight(false)
           // Fetch real review average
-          fetch(`/api/reviews?slug=${data.slug}`)
+          fetch(`/api/reviews?slug=${prod.slug}`)
             .then(r => r.json())
             .then((reviews: any[]) => {
               if (Array.isArray(reviews) && reviews.length > 0) {
@@ -113,6 +115,9 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             })
             .catch(() => {})
         }
+        setLoading(false)
+      })
+      .catch(() => {
         setLoading(false)
       })
 
