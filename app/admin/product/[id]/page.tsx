@@ -29,6 +29,8 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
   const [imagesInput, setImagesInput] = useState('')
   const [variants, setVariants] = useState<AdminVariant[]>([])
   const [inStock, setInStock] = useState(true)
+  const [badgeX, setBadgeX] = useState(50)
+  const [badgeY, setBadgeY] = useState(82)
 
   const derivedSlug = useMemo(() => slugify(name), [name])
   const effectiveSlug = slugTouched ? slug : derivedSlug
@@ -60,6 +62,8 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
         setImagesInput((product.images || []).join('\n'))
         setVariants((product.variants || []) as AdminVariant[])
         setInStock(Boolean(product.in_stock))
+        setBadgeX((product as any).badge_x ?? 50)
+        setBadgeY((product as any).badge_y ?? 82)
         setLoading(false)
       })
       .catch(() => {
@@ -95,6 +99,8 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
         vendor: vendor.trim() || null,
         in_stock: inStock,
         variants: variants,
+        badge_x: Number(badgeX),
+        badge_y: Number(badgeY),
       }
 
       const res = await fetch('/api/products', {
@@ -201,6 +207,20 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
                 <div className="md:col-span-2">
                   <label className="text-xs text-ink-3 block mb-1.5">Tags</label>
                   <input value={tagsInput} onChange={e => setTagsInput(e.target.value)} className="input" />
+                </div>
+                <div className="md:col-span-2 border-t border-ivory-3 pt-4 mt-2">
+                  <div className="text-xs font-semibold text-ink mb-1">Image Weight Badge Position (%)</div>
+                  <div className="text-[.7rem] text-ink-4 mb-3">Adjust where the dynamic weight badge (e.g. 500g, 1kg) is pinned over the product pouch image.</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-ink-3 block mb-1">Horizontal (X): {badgeX}%</label>
+                      <input type="range" min="10" max="90" value={badgeX} onChange={e => setBadgeX(Number(e.target.value))} className="w-full accent-green cursor-pointer" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-ink-3 block mb-1">Vertical (Y): {badgeY}%</label>
+                      <input type="range" min="10" max="90" value={badgeY} onChange={e => setBadgeY(Number(e.target.value))} className="w-full accent-green cursor-pointer" />
+                    </div>
+                  </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-xs text-ink-3 block mb-1.5">Variants</label>

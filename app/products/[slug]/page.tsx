@@ -317,6 +317,21 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             ) : (
               <div className="w-full aspect-square bg-ivory-2 flex items-center justify-center text-ink-4">No image</div>
             )}
+
+            {/* Dynamic Weight Badge Overlay */}
+            {galleryImages?.[activeImg] && (
+              <div
+                className="absolute pointer-events-none select-none -translate-x-1/2 -translate-y-1/2 transition-all duration-300 z-10"
+                style={{
+                  top: `${(product as any)?.badge_y ?? 82}%`,
+                  left: `${(product as any)?.badge_x ?? 50}%`,
+                }}
+              >
+                <div className="bg-black/75 backdrop-blur-md text-ivory border border-white/20 px-3.5 py-1 rounded-full text-xs sm:text-sm font-medium tracking-wider shadow-lg flex items-center justify-center font-serif text-center">
+                  {formatWeight(grams)}
+                </div>
+              </div>
+            )}
             
             {galleryImages && galleryImages.length > 1 && (
               <>

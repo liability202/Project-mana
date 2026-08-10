@@ -28,6 +28,8 @@ export default function NewAdminProductPage() {
   const [imagesInput, setImagesInput] = useState('')
   const [variants, setVariants] = useState<AdminVariant[]>(DEFAULT_VARIANTS)
   const [inStock, setInStock] = useState(true)
+  const [badgeX, setBadgeX] = useState(50)
+  const [badgeY, setBadgeY] = useState(82)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -66,6 +68,8 @@ export default function NewAdminProductPage() {
         vendor: vendor.trim() || null,
         in_stock: inStock,
         variants,
+        badge_x: Number(badgeX),
+        badge_y: Number(badgeY),
       }
 
       if (!payload.name) throw new Error('Product name is required.')
@@ -183,6 +187,21 @@ export default function NewAdminProductPage() {
               <div className="md:col-span-2">
                 <label className="text-xs text-ink-3 block mb-1.5">Tags</label>
                 <input value={tagsInput} onChange={e => setTagsInput(e.target.value)} className="input" placeholder="bestseller, organic, premium" />
+              </div>
+
+              <div className="md:col-span-2 border-t border-ivory-3 pt-4 mt-2">
+                <div className="text-xs font-semibold text-ink mb-1">Image Weight Badge Position (%)</div>
+                <div className="text-[.7rem] text-ink-4 mb-3">Adjust where the dynamic weight badge (e.g. 500g, 1kg) is pinned over the product pouch image.</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-ink-3 block mb-1">Horizontal (X): {badgeX}%</label>
+                    <input type="range" min="10" max="90" value={badgeX} onChange={e => setBadgeX(Number(e.target.value))} className="w-full accent-green cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-ink-3 block mb-1">Vertical (Y): {badgeY}%</label>
+                    <input type="range" min="10" max="90" value={badgeY} onChange={e => setBadgeY(Number(e.target.value))} className="w-full accent-green cursor-pointer" />
+                  </div>
+                </div>
               </div>
 
               <div className="md:col-span-2">
