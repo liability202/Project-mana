@@ -530,22 +530,27 @@ export default function ProfilePage() {
 
                   {/* Need Help with an Order Box (Placed below Order History) */}
                   <div className="rounded-2xl p-6 sm:p-8 shadow-sm border" style={{ background: 'rgb(var(--c-ivory2))', borderColor: 'rgb(var(--c-ivory3))' }}>
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div>
-                        <h3 className="font-serif text-xl mb-1 flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-                          <Headphones style={{ color: 'var(--green)' }} size={22} /> Need help with an order?
-                        </h3>
-                        <p className="text-xs sm:text-sm max-w-md" style={{ color: 'var(--ink3)' }}>
-                          Our support team is available 24/7 to assist with your order status, delivery, or tracking.
-                        </p>
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                      <div className="flex items-start gap-4 flex-1 min-w-0">
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(var(--c-green5), 0.25)' }}>
+                          <Headphones style={{ color: 'var(--green)' }} size={24} />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-serif text-xl sm:text-2xl mb-1 font-normal" style={{ color: 'var(--ink)' }}>
+                            Need help with an order?
+                          </h3>
+                          <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--ink3)' }}>
+                            Our support team is available 24/7 to assist with your order status, delivery, or tracking.
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
                         <a
                           href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hi Mana! I need help with my order (+91 ${verifiedPhone}).`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn-primary justify-center gap-2 py-3 px-5 text-sm bg-green shadow-soft no-underline"
+                          className="btn-primary justify-center gap-2 py-3.5 px-6 text-sm bg-green shadow-soft no-underline whitespace-nowrap"
                         >
                           <MessageCircle size={18} /> Chat with Support
                         </a>
@@ -553,7 +558,7 @@ export default function ProfilePage() {
                         <button
                           onClick={handleRequestCallback}
                           disabled={callbackRequested}
-                          className="btn-outline justify-center gap-2 py-3 px-5 text-sm cursor-pointer disabled:opacity-60"
+                          className="btn-outline justify-center gap-2 py-3.5 px-6 text-sm cursor-pointer disabled:opacity-60 whitespace-nowrap"
                           style={{ borderColor: 'rgb(var(--c-ivory3))', color: 'var(--ink)' }}
                         >
                           <PhoneCall size={18} style={{ color: 'var(--green)' }} />
