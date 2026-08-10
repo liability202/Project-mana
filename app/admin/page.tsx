@@ -68,6 +68,10 @@ export default function AdminPage() {
   const [tab, setTab] = useState<AdminTab>('orders')
   const [orders, setOrders] = useState<Order[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [prodSearch, setProdSearch] = useState('')
+  const [prodCategoryFilter, setProdCategoryFilter] = useState('all')
+  const [prodStockFilter, setProdStockFilter] = useState('all')
+  const [prodSortBy, setProdSortBy] = useState<'newest' | 'oldest' | 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc'>('newest')
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(false)
@@ -565,6 +569,42 @@ export default function AdminPage() {
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 
+  const filteredProducts = products
+    .filter(p => p.category !== 'kits')
+    .filter(p => {
+      if (prodCategoryFilter !== 'all' && p.category !== prodCategoryFilter) return false
+      if (prodStockFilter === 'in_stock' && !p.in_stock) return false
+      if (prodStockFilter === 'out_of_stock' && p.in_stock) return false
+
+      if (prodSearch.trim()) {
+        const q = prodSearch.toLowerCase().trim()
+        const matchName = (p.name || '').toLowerCase().includes(q)
+        const matchSlug = (p.slug || '').toLowerCase().includes(q)
+        const matchVendor = (p.vendor || '').toLowerCase().includes(q)
+        const matchTags = (p.tags || []).some((t: string) => typeof t === 'string' && t.toLowerCase().includes(q))
+        if (!matchName && !matchSlug && !matchVendor && !matchTags) return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      if (prodSortBy === 'oldest') {
+        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+      }
+      if (prodSortBy === 'name-asc') {
+        return (a.name || '').localeCompare(b.name || '')
+      }
+      if (prodSortBy === 'name-desc') {
+        return (b.name || '').localeCompare(a.name || '')
+      }
+      if (prodSortBy === 'price-asc') {
+        return (a.price || 0) - (b.price || 0)
+      }
+      if (prodSortBy === 'price-desc') {
+        return (b.price || 0) - (a.price || 0)
+      }
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    })
+
   return (
     <div className="min-h-screen bg-ivory">
       <div className="bg-green px-6 py-3 flex items-center justify-between">
@@ -801,13 +841,113 @@ export default function AdminPage() {
           </div>
         ) : tab === 'products' ? (
           <div>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-serif text-xl text-ink">Products</h2>
+            <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
+              <div>
+                <h2 className="font-serif text-xl text-ink">Products ({filteredProducts.length})</h2>
+                <div className="text-xs text-ink-3 mt-0.5">Manage, search, filter and sort product catalog</div>
+              </div>
               <div className="flex gap-2">
                 <a href="/admin/product/new" className="btn-primary text-sm py-2 px-4 no-underline">+ Add Product</a>
               </div>
             </div>
-            <div className="bg-white border border-ivory-3 rounded-xl overflow-hidden">
+
+            {/* Search, Filter & Sort Controls Bar */}
+            <div className="bg-white border border-ivory-3 rounded-xl p-4 mb-4 space-y-3 shadow-sm">
+              <div className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr_1fr_1.2fr] gap-3 items-center">
+                
+                {/* Search Box */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={prodSearch}
+                    onChange={e => setProdSearch(e.target.value)}
+                    placeholder="Search by name, slug, tag..."
+                    className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border border-ivory-3 outline-none focus:border-green bg-ivory-2 text-ink font-medium"
+                  />
+                  <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-4 text-xs pointer-events-none">🔍</div>
+                  {prodSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setProdSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-ink-4 hover:text-ink cursor-pointer bg-transparent border-none"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Filter */}
+                <div>
+                  <select
+                    value={prodCategoryFilter}
+                    onChange={e => setProdCategoryFilter(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-ivory-3 bg-white text-ink font-medium outline-none cursor-pointer"
+                  >
+                    <option value="all">All Categories</option>
+                    <option value="dry-fruits">Dry Fruits</option>
+                    <option value="herbs">Herbs</option>
+                    <option value="spices">Spices</option>
+                    <option value="pansari">Pansari</option>
+                  </select>
+                </div>
+
+                {/* Stock Status Filter */}
+                <div>
+                  <select
+                    value={prodStockFilter}
+                    onChange={e => setProdStockFilter(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-ivory-3 bg-white text-ink font-medium outline-none cursor-pointer"
+                  >
+                    <option value="all">All Stock Status</option>
+                    <option value="in_stock">In Stock Only</option>
+                    <option value="out_of_stock">Out of Stock Only</option>
+                  </select>
+                </div>
+
+                {/* Sort By */}
+                <div>
+                  <select
+                    value={prodSortBy}
+                    onChange={e => setProdSortBy(e.target.value as any)}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-ivory-3 bg-white text-ink font-medium outline-none cursor-pointer"
+                  >
+                    <option value="newest">Sort: Newest First</option>
+                    <option value="oldest">Sort: Oldest First</option>
+                    <option value="name-asc">Sort: Name (A to Z)</option>
+                    <option value="name-desc">Sort: Name (Z to A)</option>
+                    <option value="price-asc">Sort: Price (Low to High)</option>
+                    <option value="price-desc">Sort: Price (High to Low)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Active Filter Indicators & Reset Button */}
+              {(prodSearch || prodCategoryFilter !== 'all' || prodStockFilter !== 'all' || prodSortBy !== 'newest') && (
+                <div className="flex items-center justify-between border-t border-ivory-3 pt-2 text-xs text-ink-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span>Active Filters:</span>
+                    {prodSearch && <span className="px-2 py-0.5 bg-ivory-2 border border-ivory-3 rounded-md text-ink font-medium">Search: &quot;{prodSearch}&quot;</span>}
+                    {prodCategoryFilter !== 'all' && <span className="px-2 py-0.5 bg-ivory-2 border border-ivory-3 rounded-md text-ink font-medium capitalize">Category: {prodCategoryFilter.replace('-', ' ')}</span>}
+                    {prodStockFilter !== 'all' && <span className="px-2 py-0.5 bg-ivory-2 border border-ivory-3 rounded-md text-ink font-medium">{prodStockFilter === 'in_stock' ? 'In Stock' : 'Out of Stock'}</span>}
+                    {prodSortBy !== 'newest' && <span className="px-2 py-0.5 bg-ivory-2 border border-ivory-3 rounded-md text-ink font-medium">Sort: {prodSortBy}</span>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProdSearch('')
+                      setProdCategoryFilter('all')
+                      setProdStockFilter('all')
+                      setProdSortBy('newest')
+                    }}
+                    className="text-xs text-green-3 hover:text-green font-medium cursor-pointer underline bg-transparent border-none ml-auto"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white border border-ivory-3 rounded-xl overflow-hidden shadow-sm">
               <table className="w-full text-sm">
                 <thead className="bg-ivory-2 border-b border-ivory-3">
                   <tr>
@@ -815,28 +955,56 @@ export default function AdminPage() {
                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Category</th>
                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Price</th>
                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Stock</th>
-                    <th className="px-4 py-3" />
+                    <th className="px-4 py-3 text-right text-xs uppercase tracking-wide text-ink-4 font-normal">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ivory-3">
-                  {products.filter(product => product.category !== 'kits').map(product => (
+                  {filteredProducts.map(product => (
                     <tr key={product.id} className="hover:bg-ivory-2 transition-colors">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-ink">{product.name}</div>
-                        <div className="text-xs text-ink-4">{product.slug}</div>
+                        <div className="font-medium text-ink flex items-center gap-2">
+                          {product.name}
+                          {product.tags && product.tags.some((t: string) => typeof t === 'string' && t.startsWith('badge:')) && (
+                            <span className="text-[10px] bg-green-6 text-green-2 px-1.5 py-0.5 rounded border border-green-5 font-sans font-medium" title="Has Weight Badge Configured">
+                              🏷️ Badge
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-ink-4 font-mono mt-0.5">{product.slug}</div>
                       </td>
                       <td className="px-4 py-3 text-ink-3 capitalize">{product.category.replace('-', ' ')}</td>
-                      <td className="px-4 py-3 font-serif text-green">{formatPrice(product.price)}</td>
+                      <td className="px-4 py-3 font-serif text-green font-semibold">{formatPrice(product.price)}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded border ${product.in_stock ? 'bg-green-6 text-green-2 border-green-5' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                        <span className={`text-xs px-2 py-0.5 rounded border font-medium ${product.in_stock ? 'bg-green-6 text-green-2 border-green-5' : 'bg-red-50 text-red-600 border-red-200'}`}>
                           {product.in_stock ? 'In Stock' : 'Out of Stock'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <a href={`/admin/product/${product.id}`} className="text-xs text-green-3 hover:text-green no-underline">Edit</a>
+                        <a href={`/admin/product/${product.id}`} className="text-xs text-green-3 hover:text-green font-medium no-underline px-2 py-1 rounded bg-ivory-2 hover:bg-ivory-3 border border-ivory-3">
+                          Edit
+                        </a>
                       </td>
                     </tr>
                   ))}
+                  {filteredProducts.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-sm text-ink-3">
+                        No products match your search or filter criteria.
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProdSearch('')
+                            setProdCategoryFilter('all')
+                            setProdStockFilter('all')
+                            setProdSortBy('newest')
+                          }}
+                          className="block mx-auto mt-2 text-xs text-green underline bg-transparent border-none cursor-pointer"
+                        >
+                          Clear Filters
+                        </button>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
