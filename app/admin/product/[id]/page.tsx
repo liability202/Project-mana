@@ -29,9 +29,9 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
   const [imagesInput, setImagesInput] = useState('')
   const [variants, setVariants] = useState<AdminVariant[]>([])
   const [inStock, setInStock] = useState(true)
-  const [badgeX, setBadgeX] = useState(50)
-  const [badgeY, setBadgeY] = useState(82)
-  const [badgeScale, setBadgeScale] = useState(1)
+  const [badgeX, setBadgeX] = useState(49)
+  const [badgeY, setBadgeY] = useState(88)
+  const [badgeScale, setBadgeScale] = useState(0.9)
 
   const derivedSlug = useMemo(() => slugify(name), [name])
   const effectiveSlug = slugTouched ? slug : derivedSlug
@@ -63,9 +63,9 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
         setImagesInput((product.images || []).join('\n'))
         setVariants((product.variants || []) as AdminVariant[])
         setInStock(Boolean(product.in_stock))
-        setBadgeX((product as any).badge_x ?? 50)
-        setBadgeY((product as any).badge_y ?? 82)
-        setBadgeScale((product as any).badge_scale ?? (product as any).badge_size ?? 1)
+        setBadgeX((product as any).badge_x ?? 49)
+        setBadgeY((product as any).badge_y ?? 88)
+        setBadgeScale((product as any).badge_scale ?? (product as any).badge_size ?? 0.9)
         setLoading(false)
       })
       .catch(() => {
@@ -259,7 +259,7 @@ function BadgePositionPicker({
   imageUrl,
   badgeX,
   badgeY,
-  badgeScale = 1,
+  badgeScale = 0.9,
   onChangeX,
   onChangeY,
   onChangeScale
@@ -371,10 +371,10 @@ function BadgePositionPicker({
 
           <button
             type="button"
-            onClick={() => { onChangeX(50); onChangeY(82); onChangeScale(1); }}
+            onClick={() => { onChangeX(49); onChangeY(88); onChangeScale(0.9); }}
             className="text-[.68rem] text-green-3 hover:text-green font-semibold uppercase tracking-wider bg-transparent border-none cursor-pointer"
           >
-            ↺ Reset Position & Size (50%, 82%, 1.0x)
+            ↺ Reset Position & Size (49%, 88%, 0.9x)
           </button>
         </div>
       </div>
