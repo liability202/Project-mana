@@ -6,7 +6,7 @@ export default function CreatorCodePage() {
   const [creator, setCreator] = useState<any>(null)
 
   useEffect(() => {
-    const creatorStr = sessionStorage.getItem('mana_creator')
+    const creatorStr = localStorage.getItem('mana_creator')
     if (!creatorStr) return
     const cached = JSON.parse(creatorStr)
     setCreator(cached) // show cached first for instant render
@@ -19,7 +19,7 @@ export default function CreatorCodePage() {
           if (fresh && !fresh.error) {
             const updated = { ...cached, ...fresh }
             setCreator(updated)
-            sessionStorage.setItem('mana_creator', JSON.stringify(updated))
+            localStorage.setItem('mana_creator', JSON.stringify(updated))
           }
         })
         .catch(() => {/* keep cached */})

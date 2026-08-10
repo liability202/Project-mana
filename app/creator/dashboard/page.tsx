@@ -33,7 +33,7 @@ export default function CreatorDashboard() {
   const [linkedCodes, setLinkedCodes] = useState<string[]>([])
 
   useEffect(() => {
-    const creatorStr = sessionStorage.getItem('mana_creator')
+    const creatorStr = localStorage.getItem('mana_creator')
     if (!creatorStr) return
     const c = JSON.parse(creatorStr)
     setCreator(c)
@@ -45,7 +45,7 @@ export default function CreatorDashboard() {
         if (fresh && !fresh.error) {
           const updated = { ...c, ...fresh }
           setCreator(updated)
-          sessionStorage.setItem('mana_creator', JSON.stringify(updated))
+          localStorage.setItem('mana_creator', JSON.stringify(updated))
         }
       })
       .catch(() => {/* keep cached */})

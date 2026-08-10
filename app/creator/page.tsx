@@ -13,7 +13,7 @@ export default function CreatorLoginPage() {
 
   useEffect(() => {
     // If already logged in, redirect to dashboard
-    const creator = sessionStorage.getItem('mana_creator')
+    const creator = localStorage.getItem('mana_creator')
     if (creator) {
       router.push('/creator/dashboard')
     }
@@ -32,7 +32,7 @@ export default function CreatorLoginPage() {
       if (res.ok) {
         // Test-login numbers come back already authenticated — skip the OTP step.
         if (data.bypass && data.creator) {
-          sessionStorage.setItem('mana_creator', JSON.stringify(data.creator))
+          localStorage.setItem('mana_creator', JSON.stringify(data.creator))
           router.push('/creator/dashboard')
           return
         }
@@ -58,7 +58,7 @@ export default function CreatorLoginPage() {
       })
       const data = await res.json()
       if (res.ok) {
-        sessionStorage.setItem('mana_creator', JSON.stringify(data.creator))
+        localStorage.setItem('mana_creator', JSON.stringify(data.creator))
         router.push('/creator/dashboard')
       } else {
         setError(data.error || 'Invalid OTP. Please try again.')

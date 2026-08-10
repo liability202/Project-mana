@@ -18,7 +18,7 @@ export default function CreatorEarningsPage() {
   const [creator, setCreator] = useState<any>(null)
 
   useEffect(() => {
-    const creatorStr = sessionStorage.getItem('mana_creator')
+    const creatorStr = localStorage.getItem('mana_creator')
     if (creatorStr) {
       const c = JSON.parse(creatorStr)
       setCreator(c)

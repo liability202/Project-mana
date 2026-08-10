@@ -11,7 +11,7 @@ export default function CreatorOrdersPage() {
   const [range, setRange] = useState<DateRange>('all')
 
   useEffect(() => {
-    const creatorStr = sessionStorage.getItem('mana_creator')
+    const creatorStr = localStorage.getItem('mana_creator')
     if (creatorStr) {
       const creator = JSON.parse(creatorStr)
       fetchOrders(creator.id, filter, range)

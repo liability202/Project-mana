@@ -25,7 +25,7 @@ export function CreatorNav() {
   const [creator, setCreator] = useState<any>(null)
   
   useEffect(() => {
-    const creatorStr = sessionStorage.getItem('mana_creator')
+    const creatorStr = localStorage.getItem('mana_creator')
     if (creatorStr) {
       setCreator(JSON.parse(creatorStr))
     } else if (pathname.startsWith('/creator') && pathname !== '/creator') {
@@ -34,7 +34,7 @@ export function CreatorNav() {
   }, [pathname, router])
 
   const handleLogout = () => {
-    sessionStorage.removeItem('mana_creator')
+    localStorage.removeItem('mana_creator')
     setCreator(null)
     router.push('/creator')
   }
