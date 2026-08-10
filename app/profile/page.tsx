@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useCart } from '@/lib/store'
 import { formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
-import { Package, Wallet, Clock, ChevronRight, Star, Download } from 'lucide-react'
+import { Package, Wallet, Clock, ChevronRight, Star, Download, MessageCircle, PhoneCall, Headphones } from 'lucide-react'
 import Link from 'next/link'
 
 const ACCOUNT_PHONE_KEY = 'mana_account_phone'
@@ -116,6 +116,14 @@ export default function ProfilePage() {
   const [orders, setOrders] = useState<any[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [siteSettings, setSiteSettings] = useState({ enable_cashback_earning: true, enable_cashback_spending: true })
+  const [callbackRequested, setCallbackRequested] = useState(false)
+
+  const handleRequestCallback = () => {
+    setCallbackRequested(true)
+    showToast(`Callback requested! Our team will call +91 ${verifiedPhone} shortly.`)
+    const msg = encodeURIComponent(`Hi Mana! Please call me back at +91 ${verifiedPhone} regarding my order.`)
+    window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || ''}?text=${msg}`, '_blank')
+  }
 
   useEffect(() => {
     fetch(`/api/settings?t=${Date.now()}`, { cache: 'no-store' }).then(res => res.json()).then(data => setSiteSettings(data)).catch(() => {})
@@ -413,123 +421,147 @@ export default function ProfilePage() {
                     </div>
                   </div>
                   )}
-
-                  {/* Need Help Box */}
-                  <div className="rounded-2xl p-6 text-center shadow-sm relative overflow-hidden" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
-                    <p className="text-sm font-medium mb-3" style={{ color: 'var(--ink)' }}>Need help with an order?</p>
-                    <a
-                      href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=Hi%20Mana!%20I%20have%20a%20question%20regarding%20my%20recent%20order.`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn-primary w-full justify-center bg-green shadow-soft"
-                    >
-                      Chat with Support
-                    </a>
-                  </div>
                 </div>
 
-                {/* Right Column: Order History */}
-                <div className="rounded-2xl p-6 sm:p-8 shadow-sm" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
-                  <h2 className="font-serif text-2xl mb-6 flex items-center gap-2" style={{ color: 'var(--ink)' }}>
-                    <Package style={{ color: 'var(--green)' }} /> Order History
-                  </h2>
+                {/* Right Column: Order History & Support */}
+                <div className="space-y-6">
+                  <div className="rounded-2xl p-6 sm:p-8 shadow-sm" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
+                    <h2 className="font-serif text-2xl mb-6 flex items-center gap-2" style={{ color: 'var(--ink)' }}>
+                      <Package style={{ color: 'var(--green)' }} /> Order History
+                    </h2>
 
-                  {orders.length === 0 ? (
-                    <div className="text-center py-12 rounded-xl border border-dashed" style={{ background: 'rgb(var(--c-ivory))', borderColor: 'rgb(var(--c-ivory3))' }}>
-                      <Clock className="mx-auto mb-3" style={{ color: 'var(--ink4)' }} size={32} />
-                      <h3 className="font-medium mb-1" style={{ color: 'var(--ink)' }}>No orders yet</h3>
-                      <p className="text-sm mb-4" style={{ color: 'var(--ink4)' }}>When you place an order, it will appear here.</p>
-                      <button onClick={() => router.push('/products')} className="btn-outline">
-                        Start Shopping
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      {orders.map((order) => (
-                        <div key={order.id} className="rounded-xl overflow-hidden transition-all" style={{ border: '1px solid rgb(var(--c-ivory3))' }}>
-                          {/* Order Header */}
-                          <div className="px-5 py-4 flex flex-wrap justify-between items-center gap-4" style={{ background: 'rgb(var(--c-ivory3))', borderBottom: '1px solid rgb(var(--c-ivory3))' }}>
-                            <div>
-                              <div className="text-xs font-mono mb-1" style={{ color: 'var(--ink4)' }}>#{order.order_ref || order.id?.slice(0, 8) || 'ORDER'}</div>
-                              <div className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{formatDate(order.created_at)}</div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <div className="text-sm font-serif" style={{ color: 'var(--green)' }}>{formatPrice(order.final_amount || order.total || 0)}</div>
-                                <div className="text-[.65rem] uppercase tracking-wider" style={{ color: 'var(--ink4)' }}>{order.items?.length || 0} Items</div>
+                    {orders.length === 0 ? (
+                      <div className="text-center py-12 rounded-xl border border-dashed" style={{ background: 'rgb(var(--c-ivory))', borderColor: 'rgb(var(--c-ivory3))' }}>
+                        <Clock className="mx-auto mb-3" style={{ color: 'var(--ink4)' }} size={32} />
+                        <h3 className="font-medium mb-1" style={{ color: 'var(--ink)' }}>No orders yet</h3>
+                        <p className="text-sm mb-4" style={{ color: 'var(--ink4)' }}>When you place an order, it will appear here.</p>
+                        <button onClick={() => router.push('/products')} className="btn-outline">
+                          Start Shopping
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {orders.map((order) => (
+                          <div key={order.id} className="rounded-xl overflow-hidden transition-all" style={{ border: '1px solid rgb(var(--c-ivory3))' }}>
+                            {/* Order Header */}
+                            <div className="px-5 py-4 flex flex-wrap justify-between items-center gap-4" style={{ background: 'rgb(var(--c-ivory3))', borderBottom: '1px solid rgb(var(--c-ivory3))' }}>
+                              <div>
+                                <div className="text-xs font-mono mb-1" style={{ color: 'var(--ink4)' }}>#{order.order_ref || order.id?.slice(0, 8) || 'ORDER'}</div>
+                                <div className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{formatDate(order.created_at)}</div>
                               </div>
-                              <span className={`text-xs px-2.5 py-1 rounded-full border border-solid capitalize font-medium ${getStatusColor(order.status)}`}>
-                                {(order.status || 'Processing').replace('_', ' ')}
-                              </span>
+                              <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                  <div className="text-sm font-serif" style={{ color: 'var(--green)' }}>{formatPrice(order.final_amount || order.total || 0)}</div>
+                                  <div className="text-[.65rem] uppercase tracking-wider" style={{ color: 'var(--ink4)' }}>{order.items?.length || 0} Items</div>
+                                </div>
+                                <span className={`text-xs px-2.5 py-1 rounded-full border border-solid capitalize font-medium ${getStatusColor(order.status)}`}>
+                                  {(order.status || 'Processing').replace('_', ' ')}
+                                </span>
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="px-5 pt-4">
-                            <TrackingTimeline status={order.status || 'pending'} />
-                            {order.status !== 'cancelled' && <TrackingDetails order={order} formatDate={formatDate} />}
-                          </div>
+                            <div className="px-5 pt-4">
+                              <TrackingTimeline status={order.status || 'pending'} />
+                              {order.status !== 'cancelled' && <TrackingDetails order={order} formatDate={formatDate} />}
+                            </div>
 
-                          {/* Order Items */}
-                          <div className="px-5 py-4 divide-y divide-ivory-3 dark:divide-green-5/20">
-                            {order.items?.map((item: any, i: number) => (
-                              <div key={i} className="py-3 flex justify-between items-start gap-4 first:pt-0 last:pb-0">
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-medium line-clamp-1" style={{ color: 'var(--ink)' }}>{item.product_name}</div>
-                                  <div className="text-xs mt-0.5" style={{ color: 'var(--ink3)' }}>
-                                    {item.quantity} × {item.weight_grams >= 1000 ? (item.weight_grams / 1000).toFixed(1) + 'kg' : item.weight_grams + 'g'}
-                                    {item.variant_name ? ` • ${item.variant_name}` : ''}
+                            {/* Order Items */}
+                            <div className="px-5 py-4 divide-y divide-ivory-3 dark:divide-green-5/20">
+                              {order.items?.map((item: any, i: number) => (
+                                <div key={i} className="py-3 flex justify-between items-start gap-4 first:pt-0 last:pb-0">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-sm font-medium line-clamp-1" style={{ color: 'var(--ink)' }}>{item.product_name}</div>
+                                    <div className="text-xs mt-0.5" style={{ color: 'var(--ink3)' }}>
+                                      {item.quantity} × {item.weight_grams >= 1000 ? (item.weight_grams / 1000).toFixed(1) + 'kg' : item.weight_grams + 'g'}
+                                      {item.variant_name ? ` • ${item.variant_name}` : ''}
+                                    </div>
+                                    {order.status === 'delivered' && item.product_slug && (
+                                      <Link
+                                        href={`/products/${item.product_slug}#reviews`}
+                                        className="inline-flex items-center gap-1 mt-2 text-[0.7rem] font-medium bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full transition-colors no-underline dark:bg-amber-900/10 dark:border-amber-800/30"
+                                        style={{ color: 'var(--terra)' }}
+                                      >
+                                        <Star size={10} fill="currentColor" />
+                                        Leave a Review
+                                      </Link>
+                                    )}
                                   </div>
-                                  {order.status === 'delivered' && item.product_slug && (
-                                    <Link
-                                      href={`/products/${item.product_slug}#reviews`}
-                                      className="inline-flex items-center gap-1 mt-2 text-[0.7rem] font-medium bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full transition-colors no-underline dark:bg-amber-900/10 dark:border-amber-800/30"
-                                      style={{ color: 'var(--terra)' }}
-                                    >
-                                      <Star size={10} fill="currentColor" />
-                                      Leave a Review
-                                    </Link>
-                                  )}
+                                  <div className="text-sm font-serif whitespace-nowrap" style={{ color: 'var(--ink2)' }}>
+                                    {formatPrice(item.price * item.quantity)}
+                                  </div>
                                 </div>
-                                <div className="text-sm font-serif whitespace-nowrap" style={{ color: 'var(--ink2)' }}>
-                                  {formatPrice(item.price * item.quantity)}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                              ))}
+                            </div>
 
-                          {/* Order Action */}
-                          <div className="px-5 py-3 border-t flex flex-wrap items-center justify-between gap-3" style={{ background: 'rgba(var(--c-ivory), 0.3)', borderColor: 'rgb(var(--c-ivory3))' }}>
-                            {order.invoice_url ? (
-                              <a
-                                href={order.invoice_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download
-                                className="text-sm font-medium text-ink-2 flex items-center gap-1.5 hover:text-green transition-colors no-underline"
+                            {/* Order Action */}
+                            <div className="px-5 py-3 border-t flex flex-wrap items-center justify-between gap-3" style={{ background: 'rgba(var(--c-ivory), 0.3)', borderColor: 'rgb(var(--c-ivory3))' }}>
+                              {order.invoice_url ? (
+                                <a
+                                  href={order.invoice_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download
+                                  className="text-sm font-medium text-ink-2 flex items-center gap-1.5 hover:text-green transition-colors no-underline"
+                                >
+                                  <Download size={15} />
+                                  Download Invoice
+                                  {order.invoice_number && (
+                                    <span className="text-xs text-ink-4">({order.invoice_number})</span>
+                                  )}
+                                </a>
+                              ) : (
+                                <span className="text-xs text-ink-4">
+                                  Invoice will appear here once it&apos;s issued.
+                                </span>
+                              )}
+                              <button
+                                onClick={() => handleReorder(order)}
+                                className="text-sm font-medium flex items-center gap-1 hover:text-green-2 transition-colors ml-auto bg-transparent border-none cursor-pointer"
+                                style={{ color: 'var(--green)' }}
                               >
-                                <Download size={15} />
-                                Download Invoice
-                                {order.invoice_number && (
-                                  <span className="text-xs text-ink-4">({order.invoice_number})</span>
-                                )}
-                              </a>
-                            ) : (
-                              <span className="text-xs text-ink-4">
-                                Invoice will appear here once it&apos;s issued.
-                              </span>
-                            )}
-                            <button
-                              onClick={() => handleReorder(order)}
-                              className="text-sm font-medium flex items-center gap-1 hover:text-green-2 transition-colors ml-auto bg-transparent border-none cursor-pointer"
-                              style={{ color: 'var(--green)' }}
-                            >
-                              1-Click Reorder <ChevronRight size={16} />
-                            </button>
+                                1-Click Reorder <ChevronRight size={16} />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Need Help with an Order Box (Placed below Order History) */}
+                  <div className="rounded-2xl p-6 sm:p-8 shadow-sm border" style={{ background: 'rgb(var(--c-ivory2))', borderColor: 'rgb(var(--c-ivory3))' }}>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                      <div>
+                        <h3 className="font-serif text-xl mb-1 flex items-center gap-2" style={{ color: 'var(--ink)' }}>
+                          <Headphones style={{ color: 'var(--green)' }} size={22} /> Need help with an order?
+                        </h3>
+                        <p className="text-xs sm:text-sm max-w-md" style={{ color: 'var(--ink3)' }}>
+                          Our support team is available 24/7 to assist with your order status, delivery, or tracking.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <a
+                          href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hi Mana! I need help with my order (+91 ${verifiedPhone}).`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-primary justify-center gap-2 py-3 px-5 text-sm bg-green shadow-soft no-underline"
+                        >
+                          <MessageCircle size={18} /> Chat with Support
+                        </a>
+
+                        <button
+                          onClick={handleRequestCallback}
+                          disabled={callbackRequested}
+                          className="btn-outline justify-center gap-2 py-3 px-5 text-sm cursor-pointer disabled:opacity-60"
+                          style={{ borderColor: 'rgb(var(--c-ivory3))', color: 'var(--ink)' }}
+                        >
+                          <PhoneCall size={18} style={{ color: 'var(--green)' }} />
+                          {callbackRequested ? 'Callback Requested ✓' : 'Request a Callback'}
+                        </button>
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
 
               </div>
