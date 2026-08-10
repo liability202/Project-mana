@@ -64,12 +64,32 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
 
   // Auto-scroll to reviews section if URL has #reviews
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash === '#reviews') {
-      setTimeout(() => {
-        document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 800)
+    if (typeof window === 'undefined') return
+
+    const scrollToReviews = () => {
+      if (window.location.hash === '#reviews') {
+        const el = document.getElementById('reviews')
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }
     }
-  }, [])
+
+    if (window.location.hash === '#reviews') {
+      scrollToReviews()
+      const t1 = setTimeout(scrollToReviews, 200)
+      const t2 = setTimeout(scrollToReviews, 600)
+      const t3 = setTimeout(scrollToReviews, 1200)
+
+      window.addEventListener('hashchange', scrollToReviews)
+      return () => {
+        clearTimeout(t1)
+        clearTimeout(t2)
+        clearTimeout(t3)
+        window.removeEventListener('hashchange', scrollToReviews)
+      }
+    }
+  }, [product?.id, reviewCheckLoading, params.slug])
 
   useEffect(() => {
     supabase.from('products').select('*').eq('slug', params.slug).single()
