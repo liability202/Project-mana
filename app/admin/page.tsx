@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { formatPrice } from '@/lib/utils'
 import { LoyaltyPanel } from '@/components/admin/LoyaltyPanel'
 import type { Coupon, Order, Product, Review } from '@/lib/supabase'
@@ -60,12 +60,29 @@ function isOverdue(order: Order) {
 
 export default function AdminPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [auth, setAuth] = useState(false)
   const [password, setPassword] = useState('')
   // Mirrors localStorage `mana_admin`; child panels need it during render, and
   // reading localStorage there would break server rendering.
   const [adminSecret, setAdminSecret] = useState('')
-  const [tab, setTab] = useState<AdminTab>('orders')
+  const [tab, setTabState] = useState<AdminTab>('orders')
+
+  useEffect(() => {
+    const t = searchParams.get('tab') as AdminTab | null
+    if (t && ['orders', 'products', 'kits', 'coupons', 'customers', 'reviews', 'creators', 'settings'].includes(t)) {
+      setTabState(t)
+    }
+  }, [searchParams])
+
+  const setTab = (newTab: AdminTab) => {
+    setTabState(newTab)
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', newTab)
+      window.history.replaceState({}, '', url.toString())
+    }
+  }
   const [orders, setOrders] = useState<Order[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [prodSearch, setProdSearch] = useState('')

@@ -119,8 +119,8 @@ export default function NewAdminProductPage() {
           <div className="font-serif text-ivory text-lg">MANA Admin</div>
           <div className="text-[.72rem] text-green-4 mt-0.5">Create a new product</div>
         </div>
-        <Link href="/admin" className="btn-outline no-underline text-sm py-2 px-4 bg-white/0 border-green-5 text-green-4 hover:bg-green-2 hover:text-ivory">
-          Back to Admin
+        <Link href="/admin?tab=products" className="btn-outline no-underline text-sm py-2 px-4 bg-white/0 border-green-5 text-green-4 hover:bg-green-2 hover:text-ivory">
+          ← Back to Products
         </Link>
       </div>
 

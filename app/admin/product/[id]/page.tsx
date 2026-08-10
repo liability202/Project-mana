@@ -137,7 +137,7 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Failed to delete product.')
-      window.location.href = '/admin'
+      window.location.href = '/admin?tab=products'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
       setSubmitting(false)
@@ -151,8 +151,8 @@ export default function EditAdminProductPage({ params }: { params: { id: string 
           <div className="font-serif text-ivory text-lg">MANA Admin</div>
           <div className="text-[.72rem] text-green-4 mt-0.5">Edit product</div>
         </div>
-        <Link href="/admin" className="btn-outline no-underline text-sm py-2 px-4 bg-white/0 border-green-5 text-green-4 hover:bg-green-2 hover:text-ivory">
-          Back to Admin
+        <Link href="/admin?tab=products" className="btn-outline no-underline text-sm py-2 px-4 bg-white/0 border-green-5 text-green-4 hover:bg-green-2 hover:text-ivory">
+          ← Back to Products
         </Link>
       </div>
 
