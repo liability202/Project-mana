@@ -197,7 +197,7 @@ export default function CreatorProfilePage() {
 
         <button 
           type="submit" 
-          disabled={saving}
+          disabled={saving || !creator?.id}
           className="bg-green text-ivory w-full h-16 rounded-[20px] text-[.9rem] font-bold shadow-soft hover:shadow-medium hover:bg-green-2 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3 border-none cursor-pointer"
         >
           {saving ? (

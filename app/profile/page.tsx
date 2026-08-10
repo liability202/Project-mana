@@ -314,11 +314,20 @@ export default function ProfilePage() {
                     <input 
                       type="tel" 
                       value={phone}
-                      onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                      onChange={e => {
+                        const digits = e.target.value.replace(/\D/g, '')
+                        if (digits.length > 10 && digits.startsWith('91')) {
+                          setPhone(digits.slice(2, 12))
+                        } else if (digits.length > 10 && digits.startsWith('0')) {
+                          setPhone(digits.slice(1, 11))
+                        } else {
+                          setPhone(digits.slice(0, 10))
+                        }
+                      }}
                       className="flex-1 min-w-0 px-4 py-3 rounded-r-lg font-medium outline-none" 
                       style={{ background: 'rgb(var(--c-ivory2))', color: 'var(--ink)', border: '1px solid rgb(var(--c-ivory3))' }}
                       placeholder="98765 43210" 
-                      maxLength={10} 
+                      maxLength={16} 
                     />
                   </div>
                 </div>
@@ -441,12 +450,12 @@ export default function ProfilePage() {
                           {/* Order Header */}
                           <div className="px-5 py-4 flex flex-wrap justify-between items-center gap-4" style={{ background: 'rgb(var(--c-ivory3))', borderBottom: '1px solid rgb(var(--c-ivory3))' }}>
                             <div>
-                              <div className="text-xs font-mono mb-1" style={{ color: 'var(--ink4)' }}>#{order.order_ref || order.id.slice(0, 8)}</div>
+                              <div className="text-xs font-mono mb-1" style={{ color: 'var(--ink4)' }}>#{order.order_ref || order.id?.slice(0, 8) || 'ORDER'}</div>
                               <div className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{formatDate(order.created_at)}</div>
                             </div>
                             <div className="flex items-center gap-4">
                               <div className="text-right">
-                                <div className="text-sm font-serif" style={{ color: 'var(--green)' }}>{formatPrice(order.final_amount || order.total)}</div>
+                                <div className="text-sm font-serif" style={{ color: 'var(--green)' }}>{formatPrice(order.final_amount || order.total || 0)}</div>
                                 <div className="text-[.65rem] uppercase tracking-wider" style={{ color: 'var(--ink4)' }}>{order.items?.length || 0} Items</div>
                               </div>
                               <span className={`text-xs px-2.5 py-1 rounded-full border border-solid capitalize font-medium ${getStatusColor(order.status)}`}>
