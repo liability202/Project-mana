@@ -42,16 +42,31 @@ export function calcPriceForWeight(basePricePaise: number, pricePerUnit: string 
 // Free shipping threshold in paise
 export const FREE_SHIPPING_THRESHOLD = Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD || 999) * 100
 
-export function shippingCost(subtotalPaise: number, city?: string): number {
+export function shippingCost(subtotalPaise: number, city?: string, state?: string, pincode?: string): number {
   if (subtotalPaise >= FREE_SHIPPING_THRESHOLD) return 0
   
-  if (city) {
-    const c = city.toLowerCase()
-    if (c.includes('delhi') || c.includes('noida') || c.includes('ghaziabad') || c.includes('faridabad') || c.includes('gurugram') || c.includes('gurgaon')) {
-      return 3900
-    }
+  const pin = (pincode || '').trim()
+  // Delhi NCR pincode prefixes: 110 (Delhi), 201 (Noida/Ghaziabad), 121 (Faridabad), 122 (Gurugram)
+  if (/^(110|201|121|122)\d{3}$/.test(pin)) {
+    return 3900
   }
-  
+
+  const c = (city || '').toLowerCase()
+  const s = (state || '').toLowerCase()
+
+  if (s.includes('delhi') || s.includes('nct') || s.includes('ncr')) {
+    return 3900
+  }
+
+  const ncrKeywords = [
+    'delhi', 'noida', 'ghaziabad', 'faridabad', 'gurugram', 'gurgaon',
+    'gautam', 'buddha', 'budh', 'gb nagar', 'g.b. nagar', 'ncr'
+  ]
+
+  if (ncrKeywords.some(k => c.includes(k))) {
+    return 3900
+  }
+
   return 5900
 }
 

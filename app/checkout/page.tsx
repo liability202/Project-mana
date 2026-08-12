@@ -153,7 +153,7 @@ export default function CheckoutPage() {
     () => cartItems.reduce((sum, item) => sum + Number(item.weight_grams || 0) * Number(item.quantity || 1), 0) || 500,
     [cartItems]
   )
-  const rawShipping = shippingCost(subtotal, form.city)
+  const rawShipping = shippingCost(subtotal, form.city, form.state, form.pincode)
   const shipping = couponState.free_shipping ? 0 : rawShipping
   const discount = couponState.discountAmount
   const rawCodCharge = paymentMethod === 'cod' ? COD_CHARGE : 0

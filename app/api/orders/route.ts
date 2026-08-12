@@ -130,7 +130,7 @@ export async function POST(req: Request) {
     const walletUsed = Math.min(walletRequested, walletSnapshot.wallet.balance || 0, Math.max(0, body.subtotal - discountAmount))
 
     // Backend fee recalculation and validation
-    const rawShipping = shippingCost(body.subtotal, body.city)
+    const rawShipping = shippingCost(body.subtotal, body.city, body.state, body.pincode)
     const shipping = (coupon && coupon.free_shipping) ? 0 : rawShipping
 
     const isCod = !body.razorpay_order_id && !body.payment_id
