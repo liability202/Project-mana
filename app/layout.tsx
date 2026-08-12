@@ -113,7 +113,7 @@ const organizationSchema = {
   },
   // Add your real Instagram / Facebook / Google Business Profile URLs here —
   // Google leans on these to connect the domain to the brand name.
-  sameAs: [],
+  sameAs: ['https://www.instagram.com/manadryfruits'],
 }
 
 const websiteSchema = {

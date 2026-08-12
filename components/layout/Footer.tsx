@@ -40,7 +40,7 @@ export function Footer() {
             <SocialBtn href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}`} label="WhatsApp">
               <WhatsAppIcon />
             </SocialBtn>
-            <SocialBtn href={process.env.NEXT_PUBLIC_INSTAGRAM_URL || '#'} label="Instagram">
+            <SocialBtn href={process.env.NEXT_PUBLIC_INSTAGRAM_URL || 'https://www.instagram.com/manadryfruits'} label="Instagram">
               <Instagram size={15} strokeWidth={1.8} />
             </SocialBtn>
             <SocialBtn href="/appointment" label="Book Appointment">
