@@ -178,7 +178,7 @@ export default async function HomePage() {
               const image = kit.images?.[0] || 'https://images.unsplash.com/photo-1574226516831-e1dff420e562?w=600&q=80'
               const tag = kit.tags?.filter(t => t !== 'kit')[0] || 'Wellness Kit'
               return (
-                <Link key={kit.id} href="/kits" className="card no-underline group flex flex-col">
+                <Link key={kit.id} href={`/kits/${kit.slug}`} className="card no-underline group flex flex-col">
                   <div className="aspect-[4/3] overflow-hidden relative">
                     <Image src={image} alt={kit.name} fill sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
                   </div>

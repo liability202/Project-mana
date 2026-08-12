@@ -31,7 +31,7 @@ export function ProductCard({ product }: { product: Product }) {
 
   return (
     <Link
-      href={`/products/${product.slug}`}
+      href={product.category === 'kits' ? `/kits/${product.slug}` : `/products/${product.slug}`}
       className="card flex flex-col no-underline group"
     >
       {/* Image */}
