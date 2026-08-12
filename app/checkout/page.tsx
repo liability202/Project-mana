@@ -464,6 +464,12 @@ export default function CheckoutPage() {
           contact: '+91' + normalizedPhone,
         },
         theme: { color: '#1C3D2E' },
+        modal: {
+          ondismiss: function () {
+            setLoading(false)
+            showToast('Payment window closed')
+          },
+        },
         handler: async function (response: any) {
           try {
             const saveRes = await fetch('/api/orders', {
