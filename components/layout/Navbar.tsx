@@ -65,7 +65,7 @@ export function Navbar() {
           </div>
           <div>
             <div className="font-serif text-2xl font-normal leading-none tracking-wide text-green dark:text-green">MANA</div>
-            <div className="mt-0.5 hidden text-[.42rem] uppercase tracking-[.4em] text-ink-3 dark:text-ivory-3 sm:block">The Essence of Nature</div>
+            <div className="mt-0.5 hidden text-[.42rem] uppercase tracking-[.4em] text-ink-3 dark:text-green-4 sm:block">The Essence of Nature</div>
           </div>
         </Link>
 
@@ -135,7 +135,7 @@ export function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className="border-b border-ivory-3 dark:border-green-5/10 px-[5%] py-4 text-sm text-ink-2 dark:text-ivory-3 transition-colors hover:bg-ivory-2 dark:hover:bg-green-6/10 hover:text-green no-underline"
+                className="border-b border-ivory-3 dark:border-green-5/10 px-[5%] py-4 text-sm text-ink-2 dark:text-ink transition-colors hover:bg-ivory-2 dark:hover:bg-green-6/10 hover:text-green no-underline"
               >
                 {link.label}
               </Link>
@@ -149,7 +149,7 @@ export function Navbar() {
               Chat & Buy on WhatsApp
             </a>
             <div className="flex items-center justify-between border-t border-ivory-3 dark:border-green-5/10 px-[5%] py-4">
-              <span className="text-sm font-medium text-ink-2 dark:text-ivory-3">Theme Mode</span>
+              <span className="text-sm font-medium text-ink-2 dark:text-ink">Theme Mode</span>
               <button
                 onClick={handleThemeToggle}
                 className="flex cursor-pointer items-center gap-2 rounded-lg border border-ivory-3 dark:border-green-5/20 bg-ivory-2 dark:bg-green-6/20 px-3 py-1.5 text-xs font-medium text-ink-2 dark:text-ivory"
@@ -161,7 +161,7 @@ export function Navbar() {
                   </>
                 ) : (
                   <>
-                    <Moon size={15} className={`text-ink-2 dark:text-ivory-3 ${spinning ? 'animate-theme-spin' : ''}`} />
+                    <Moon size={15} className={`text-ink-2 dark:text-ink ${spinning ? 'animate-theme-spin' : ''}`} />
                     <span>Dark Mode</span>
                   </>
                 )}

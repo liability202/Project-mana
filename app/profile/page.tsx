@@ -272,7 +272,7 @@ export default function ProfilePage() {
       case 'delivered': return 'text-green bg-green-6 border-green-5 dark:border-green/20'
       case 'cancelled': return 'text-terra bg-terra/10 border-terra/20'
       case 'shipped': return 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/30'
-      default: return 'text-ink-2 bg-ivory-3 border-ivory-4 dark:text-ivory dark:bg-green-5/10 dark:border-green-5/20'
+      default: return 'text-ink-2 bg-ivory-3 border-ivory-4 dark:text-ink dark:bg-green-5/10 dark:border-green-5/20'
     }
   }
 
