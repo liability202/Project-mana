@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    // AVIF/WebP cut the hero and category artwork down dramatically versus the
-    // source PNGs, which is most of the home page's transfer weight.
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
@@ -11,9 +9,28 @@ const nextConfig = {
     ],
   },
   experimental: {
-    // lucide-react has no usable tree-shaking without this; it was pulling the
-    // whole icon set into the client bundle on every page that imports an icon.
     optimizePackageImports: ['lucide-react'],
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Link',
+            value: '</llms.txt>; rel="help"; type="text/markdown", </.well-known/ai-plugin.json>; rel="service-desc", </.well-known/agent.json>; rel="agent-card", </.well-known/ucp.json>; rel="commerce-manifest"',
+          },
+          {
+            key: 'Content-Signal',
+            value: 'ai-ready=true, search=yes, ai-train=yes, agent-accessible=true',
+          },
+          {
+            key: 'X-Robots-Tag',
+            value: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
+          },
+        ],
+      },
+    ]
   },
 }
 
