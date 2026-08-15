@@ -84,18 +84,32 @@ export const viewport: Viewport = {
 // knowledge panel for a navigational query like "manadryfruits".
 const organizationSchema = {
   '@context': 'https://schema.org',
-  '@type': 'Store',
+  '@type': ['Store', 'Organization', 'LocalBusiness', 'OnlineStore'],
   '@id': `${siteUrl}/#organization`,
   name: 'Mana Dry Fruits',
-  alternateName: ['Manadryfruits', 'Mana', 'MK and Sons'],
+  legalName: 'MK and Sons',
+  alternateName: ['Manadryfruits', 'Mana', 'MK and Sons', 'Mana Dry Fruits India'],
   url: siteUrl,
   logo: `${siteUrl}/icon.svg`,
   image: `${siteUrl}/opengraph-image`,
-  description: 'Premium dry fruits, Ayurvedic herbs, single-origin spices and pansari staples. Lab tested, FSSAI certified, packed fresh to order.',
+  description: 'Premium dry fruits, Kashmiri saffron, Ayurvedic herbs, single-origin spices and pansari staples. Lab tested, FSSAI certified, packed fresh to order.',
   priceRange: '₹₹',
   currenciesAccepted: 'INR',
   telephone: '+91-9910899796',
-  areaServed: 'IN',
+  email: 'support@manadryfruits.com',
+  areaServed: {
+    '@type': 'Country',
+    name: 'India',
+  },
+  knowsAbout: [
+    'Dry Fruits',
+    'Ayurvedic Herbs',
+    'Kashmiri Saffron',
+    'Indian Spices',
+    'Pansari Staples',
+    'Mamra Almonds',
+    'Ashwagandha',
+  ],
   contactPoint: {
     '@type': 'ContactPoint',
     telephone: '+91-9910899796',
@@ -111,8 +125,42 @@ const organizationSchema = {
     postalCode: '201014',
     addressCountry: 'IN',
   },
-  // Add your real Instagram / Facebook / Google Business Profile URLs here —
-  // Google leans on these to connect the domain to the brand name.
+  hasMerchantReturnPolicy: {
+    '@type': 'MerchantReturnPolicy',
+    applicableCountry: 'IN',
+    returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+    merchantReturnDays: 7,
+    returnMethod: 'https://schema.org/ReturnByMail',
+    returnFees: 'https://schema.org/FreeReturn',
+    refundType: 'https://schema.org/FullRefund',
+  },
+  shippingDetails: {
+    '@type': 'OfferShippingDetails',
+    shippingRate: {
+      '@type': 'MonetaryAmount',
+      value: '0',
+      currency: 'INR',
+    },
+    shippingDestination: {
+      '@type': 'DefinedRegion',
+      addressCountry: 'IN',
+    },
+    deliveryTime: {
+      '@type': 'ShippingDeliveryTime',
+      handlingTime: {
+        '@type': 'QuantitativeValue',
+        minValue: 1,
+        maxValue: 2,
+        unitCode: 'DAY',
+      },
+      transitTime: {
+        '@type': 'QuantitativeValue',
+        minValue: 2,
+        maxValue: 5,
+        unitCode: 'DAY',
+      },
+    },
+  },
   sameAs: ['https://www.instagram.com/manadryfruits'],
 }
 
@@ -146,6 +194,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Warm up the image CDN before the hero image request is discovered. */}
         <link rel="preconnect" href="https://dktkyiwuegyievucnoxc.supabase.co" />
         <link rel="dns-prefetch" href="https://dktkyiwuegyievucnoxc.supabase.co" />
+        <link rel="help" type="text/markdown" href="/llms.txt" />
+        <link rel="alternate" type="text/markdown" href="/llms.txt" title="LLM Context Document" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}

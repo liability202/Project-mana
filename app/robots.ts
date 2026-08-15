@@ -7,8 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        // Private/transactional surfaces — no SEO value, and we don't want
-        // crawl budget or personal order data leaking into the index.
         disallow: [
           '/api/',
           '/admin',
@@ -20,6 +18,31 @@ export default function robots(): MetadataRoute.Robots {
           '/checkout',
           '/test-bot',
           '/ref/',
+        ],
+      },
+      // Explicitly allow major AI agents, LLM search crawlers, and answer engines
+      {
+        userAgent: [
+          'GPTBot',
+          'ChatGPT-User',
+          'ClaudeBot',
+          'Claude-Web',
+          'PerplexityBot',
+          'Google-Extended',
+          'Amazonbot',
+          'ByteSpider',
+          'Cohere-ai',
+          'Meta-ExternalAgent',
+          'Applebot-Extended',
+        ],
+        allow: '/',
+        disallow: [
+          '/api/',
+          '/admin/',
+          '/creator/',
+          '/profile',
+          '/account',
+          '/checkout',
         ],
       },
     ],
