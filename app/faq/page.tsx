@@ -12,11 +12,11 @@ const faqGroups = [
     items: [
       {
         q: 'What payment methods do you accept?',
-        a: 'We accept UPI, all major debit and credit cards, net banking, and Cash on Delivery. All online payments are powered securely by Cashfree.'
+        a: 'We accept UPI, all major debit and credit cards, net banking, and Cash on Delivery. All online payments are powered securely by Razorpay.'
       },
       {
         q: 'Is it safe to pay on your website?',
-        a: 'Yes. Payments are processed through Cashfree, which is PCI-DSS compliant. We never store your card details on our servers.'
+        a: 'Yes. Payments are processed through Razorpay, which is PCI-DSS compliant. We never store your card details on our servers.'
       },
       {
         q: 'Can I place a COD order?',
@@ -263,7 +263,7 @@ export default function FAQPage() {
           ) : (
             <div className="mt-8 space-y-6">
               {filteredGroups.map((group) => (
-                <section key={group.title} className="rounded-[28px] border border-ivory-3 bg-white p-5 shadow-soft md:p-7">
+                <section key={group.title} id={group.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')} className="scroll-mt-24 rounded-[28px] border border-ivory-3 bg-white p-5 shadow-soft md:p-7">
                   <div className={`inline-flex rounded-full px-4 py-2 text-[0.72rem] font-medium uppercase tracking-[0.18em] ${group.pillClass}`}>
                     {group.title}
                   </div>

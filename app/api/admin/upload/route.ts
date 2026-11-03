@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { isAdminToken } from '@/lib/admin-auth'
 
 export async function POST(req: Request) {
   try {
@@ -8,9 +9,7 @@ export async function POST(req: Request) {
     const headerSecret = req.headers.get('x-admin-secret')
     const formSecret = String(formData.get('admin_secret') || '')
     const token = (headerSecret || auth?.replace(/^Bearer\s+/i, '') || formSecret).trim()
-    const adminSecret = (process.env.ADMIN_SECRET || '').trim()
-
-    if (!adminSecret || token !== adminSecret) {
+    if (!isAdminToken(token)) {
       return NextResponse.json({
         error: 'Unauthorized. Please logout from admin, login again, and retry upload.',
       }, { status: 401 })

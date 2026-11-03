@@ -18,7 +18,12 @@ type OtpRecord = {
 }
 
 function getOtpSecret() {
-  return process.env.OTP_SECRET || process.env.ADMIN_SECRET || 'mana-otp-secret'
+  const secret = process.env.OTP_SECRET || process.env.ADMIN_SECRET
+  if (secret) return secret
+  // A public fallback would let anyone holding a stored hash brute-force the
+  // 6-digit code offline, so refuse to run without a real secret in production.
+  if (process.env.NODE_ENV === 'production') throw new Error('OTP_SECRET is not configured.')
+  return 'mana-local-dev-otp-secret'
 }
 
 function hashOtp(phone: string, otp: string) {
@@ -26,6 +31,12 @@ function hashOtp(phone: string, otp: string) {
     .createHmac('sha256', getOtpSecret())
     .update(`${phone}:${otp}`)
     .digest('hex')
+}
+
+function hashesMatch(a: string, b: string) {
+  const left = Buffer.from(a)
+  const right = Buffer.from(b)
+  return left.length === right.length && crypto.timingSafeEqual(left, right)
 }
 
 function isMissingSchemaError(error: any) {
@@ -224,7 +235,7 @@ export async function verifyOtpCode(
     throw new Error('Too many invalid attempts. Please request a new OTP.')
   }
 
-  if (hashOtp(normalized, params.otp) !== record.otp_hash) {
+  if (!hashesMatch(hashOtp(normalized, params.otp), record.otp_hash)) {
     await saveOtpRecord(client, {
       ...record,
       attempts: (record.attempts || 0) + 1,
@@ -241,20 +252,8 @@ export async function verifyOtpCode(
     email: params.email || null,
   })
 
-  const { data: latestOrder, error } = await client
-    .from('orders')
-    .select('*')
-    .eq('customer_phone', normalized)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (error && !isMissingSchemaError(error)) throw error
-
   return {
     phone: normalized,
     profile,
-    customerType: latestOrder ? 'returning' : 'new',
-    latestOrder: latestOrder || null,
   }
 }

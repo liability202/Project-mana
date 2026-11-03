@@ -25,15 +25,31 @@ export function CreatorNav() {
   const [creator, setCreator] = useState<any>(null)
   
   useEffect(() => {
-    const creatorStr = localStorage.getItem('mana_creator')
-    if (creatorStr) {
-      setCreator(JSON.parse(creatorStr))
-    } else if (pathname.startsWith('/creator') && pathname !== '/creator') {
-      router.push('/creator')
+    if (pathname === '/creator') return
+    let active = true
+    // The signed cookie is what the creator APIs trust; localStorage only
+    // caches the name/code for display.
+    fetch('/api/creator/auth', { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!active) return
+        if (data?.creator) {
+          localStorage.setItem('mana_creator', JSON.stringify(data.creator))
+          setCreator(data.creator)
+        } else {
+          localStorage.removeItem('mana_creator')
+          setCreator(null)
+          router.push('/creator')
+        }
+      })
+      .catch(() => {})
+    return () => {
+      active = false
     }
   }, [pathname, router])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch('/api/creator/auth', { method: 'DELETE' }).catch(() => {})
     localStorage.removeItem('mana_creator')
     setCreator(null)
     router.push('/creator')

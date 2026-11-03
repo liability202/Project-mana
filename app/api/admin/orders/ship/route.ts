@@ -3,12 +3,11 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { buildNimbusShipmentUpdate, hasNimbusPostConfig } from '@/lib/nimbuspost'
 import { sendOrderShipped } from '@/lib/email'
 import { sendWhatsAppMessage } from '@/lib/whatsapp/sender'
+import { isAdminRequest, unauthorized } from '@/lib/admin-auth'
+import { ORDER_NOTE } from '@/lib/checkout'
 
 export async function POST(req: Request) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAdminRequest(req)) return unauthorized()
 
   if (!hasNimbusPostConfig()) {
     return NextResponse.json({ error: 'NimbusPost is not configured yet.' }, { status: 400 })
@@ -40,6 +39,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error?.message || 'Order not found.' }, { status: 404 })
     }
 
+    if (order.notes === ORDER_NOTE.awaitingPayment && order.payment_status !== 'paid') {
+      return NextResponse.json({ error: 'This online order was never paid. Do not ship it.' }, { status: 409 })
+    }
+    if (!['pending', 'confirmed', 'packed'].includes(order.status)) {
+      return NextResponse.json({ error: `This order is already ${order.status}.` }, { status: 409 })
+    }
+
     const shipmentUpdate = await buildNimbusShipmentUpdate(order, {
       weightGrams,
       lengthCm,
@@ -53,18 +59,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Could not create shipment in NimbusPost.' }, { status: 500 })
     }
 
-    const { data: updated, error: updateError } = await supabaseAdmin
+    // No AWB means nothing was booked: keep what NimbusPost told us, but don't
+    // mark the order shipped or tell the customer it is on the way.
+    if (!shipmentUpdate.tracking_number) {
+      await supabaseAdmin.from('orders').update(shipmentUpdate).eq('id', order.id)
+      const unserviceable = shipmentUpdate.shiprocket_tracking_status === 'UNSERVICEABLE'
+      return NextResponse.json({
+        error: unserviceable
+          ? 'NimbusPost cannot deliver to this pincode. The order was not marked shipped.'
+          : 'NimbusPost did not assign an AWB, so nothing was booked. Check the NimbusPost dashboard; the order was not marked shipped.',
+      }, { status: 502 })
+    }
+
+    const { data: updatedRows, error: updateError } = await supabaseAdmin
       .from('orders')
       .update({
         ...shipmentUpdate,
         status: 'shipped',
       })
       .eq('id', order.id)
+      .eq('status', order.status)
       .select('*')
-      .single()
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 })
+    }
+    const updated = updatedRows?.[0]
+    if (!updated) {
+      return NextResponse.json({ error: 'This order was just updated by someone else. Please refresh.' }, { status: 409 })
     }
 
     if (updated.customer_email) {
@@ -72,6 +94,7 @@ export async function POST(req: Request) {
         customerEmail: updated.customer_email,
         customerName: updated.customer_name,
         orderId: updated.id,
+        orderRef: updated.order_ref,
         trackingNumber: updated.tracking_number || undefined,
         courierName: updated.courier_name || undefined,
         trackingLink: updated.tracking_link || undefined,

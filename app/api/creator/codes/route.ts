@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getActiveCreatorId } from '@/lib/creator-auth'
 
 /**
- * GET /api/creator/codes?creatorId=xxx
+ * GET /api/creator/codes (signed-in creator, from the session cookie)
  *
  * Returns all coupon codes associated with this creator:
  *  1. The creator's own code from the creators table
@@ -11,13 +12,12 @@ import { supabaseAdmin } from '@/lib/supabase'
  * This is what the creator portal uses to show all codes and
  * what the stats API uses to aggregate order data correctly.
  */
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(req.url)
-    const creatorId = searchParams.get('creatorId')
+    const creatorId = await getActiveCreatorId()
 
     if (!creatorId) {
-      return NextResponse.json({ error: 'creatorId is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Please sign in to the creator portal.' }, { status: 401 })
     }
 
     // Fetch creator's own code

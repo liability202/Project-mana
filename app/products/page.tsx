@@ -64,8 +64,9 @@ async function getProducts(params: Props['searchParams']): Promise<Product[]> {
   if (params.sort === 'price-asc') query = query.order('price', { ascending: true })
   else if (params.sort === 'price-desc') query = query.order('price', { ascending: false })
   else query = query.order('created_at', { ascending: false })
-  const { data } = await query.limit(params.q ? 200 : 24)
-  if (params.q) return matchCatalogProducts(data || [], params.q, 24).map(match => match.product)
+  // The whole in-stock catalogue fits on one page; 24 hid most of it.
+  const { data } = await query.limit(200)
+  if (params.q) return matchCatalogProducts(data || [], params.q, 48).map(match => match.product)
   return data || []
 }
 

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { matchCatalogProducts } from '@/lib/product-search'
 import { extractBadgeConfig } from '@/lib/utils'
+import { isAdminRequest, unauthorized } from '@/lib/admin-auth'
+import { findProductBySlug } from '@/lib/product-lookup'
 
 function prepareProductData(payload: any) {
   const { badge_x, badge_y, badge_scale, badge_size, ...cleanData } = payload
@@ -34,8 +36,7 @@ export async function GET(req: Request) {
   const id = searchParams.get('id')
 
   const includeAll = searchParams.get('include_all') === '1'
-  const auth = req.headers.get('authorization')
-  const isAdmin = auth === `Bearer ${process.env.ADMIN_SECRET}`
+  const isAdmin = isAdminRequest(req)
 
   // Use supabaseAdmin if searching by id, slug, or admin include_all
   const client = (id || slug || includeAll || isAdmin) ? supabaseAdmin : supabase
@@ -58,29 +59,9 @@ export async function GET(req: Request) {
     query = query.eq('in_stock', true)
 
   if (slug) {
-    // 1. Try exact/ilike slug match
-    const { data: exactMatch } = await client.from('products').select('*').ilike('slug', slug).limit(1)
-    if (exactMatch && exactMatch.length > 0) {
-      return NextResponse.json(formatProductResponse(exactMatch))
-    }
-
-    // 2. Try singular/plural fallback (e.g. walnut-kernels -> walnut-kernel)
-    const altSlug = slug.endsWith('s') ? slug.slice(0, -1) : `${slug}s`
-    const { data: altMatch } = await client.from('products').select('*').ilike('slug', altSlug).limit(1)
-    if (altMatch && altMatch.length > 0) {
-      return NextResponse.json(formatProductResponse(altMatch))
-    }
-
-    // 3. Try key word match on name or slug (e.g. "walnut" in name/slug)
-    const keyword = slug.split('-')[0]
-    if (keyword && keyword.length >= 3) {
-      const { data: kwMatch } = await client.from('products').select('*').or(`slug.ilike.%${keyword}%,name.ilike.%${keyword}%`).limit(1)
-      if (kwMatch && kwMatch.length > 0) {
-        return NextResponse.json(formatProductResponse(kwMatch))
-      }
-    }
-
-    return NextResponse.json([])
+    // Exact, then singular/plural, then first-word match (see lib/product-lookup).
+    const { product } = await findProductBySlug(client, slug)
+    return NextResponse.json(product ? formatProductResponse([product]) : [])
   }
 
   const fetchLimit = q ? Math.max(200, limit) : limit
@@ -119,10 +100,7 @@ async function makeUniqueSlug(baseSlug: string, currentId?: string): Promise<str
 }
 
 export async function POST(req: Request) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAdminRequest(req)) return unauthorized()
 
   try {
     const rawBody = await req.json()
@@ -141,10 +119,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAdminRequest(req)) return unauthorized()
 
   try {
     const rawBody = await req.json()
@@ -166,10 +141,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAdminRequest(req)) return unauthorized()
 
   try {
     const { searchParams } = new URL(req.url)

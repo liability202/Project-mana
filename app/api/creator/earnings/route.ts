@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { creatorAvailableBalance, getActiveCreatorId } from '@/lib/creator-auth'
 
-export async function GET(req: Request) {
+export const dynamic = 'force-dynamic'
+
+export async function GET() {
   try {
-    const { searchParams } = new URL(req.url)
-    const creatorId = searchParams.get('creatorId')
+    const creatorId = await getActiveCreatorId()
 
     if (!creatorId) {
-      return NextResponse.json({ error: 'Creator ID is required.' }, { status: 400 })
+      return NextResponse.json({ error: 'Please sign in to the creator portal.' }, { status: 401 })
     }
 
     const { data: payouts, error } = await supabaseAdmin
@@ -18,36 +20,31 @@ export async function GET(req: Request) {
 
     if (error) throw error
 
-    // Also get the confirmed but not yet paid commissions to calculate available balance
-    const { data: confirmedComms, error: commsError } = await supabaseAdmin
-      .from('commissions')
-      .select('commission_amount')
-      .eq('creator_id', creatorId)
-      .eq('status', 'confirmed')
-
-    if (commsError) throw commsError
-
-    const availableBalance = (confirmedComms || []).reduce((sum, c) => sum + c.commission_amount, 0)
-
     return NextResponse.json({
       payouts: payouts || [],
-      availableBalance
+      availableBalance: Math.max(0, await creatorAvailableBalance(creatorId)),
     })
   } catch (err: any) {
     console.error('Creator Earnings API Error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Could not load earnings.' }, { status: 500 })
   }
 }
 
+const MIN_PAYOUT = 50000 // ₹500, same floor the earnings page shows
+
 export async function POST(req: Request) {
   try {
-    const { creatorId, amount } = await req.json()
-
-    if (!creatorId || !amount) {
-      return NextResponse.json({ error: 'Creator ID and amount are required.' }, { status: 400 })
+    const creatorId = await getActiveCreatorId()
+    if (!creatorId) {
+      return NextResponse.json({ error: 'Please sign in to the creator portal.' }, { status: 401 })
     }
 
-    // 1. Validate creator and payment details
+    const { amount: rawAmount } = await req.json()
+    const amount = Number(rawAmount)
+    if (!Number.isInteger(amount) || amount < MIN_PAYOUT) {
+      return NextResponse.json({ error: 'The minimum payout is ₹500.' }, { status: 400 })
+    }
+
     const { data: creator, error: creatorError } = await supabaseAdmin
       .from('creators')
       .select('upi_id, bank_account, bank_ifsc')
@@ -56,23 +53,14 @@ export async function POST(req: Request) {
 
     if (creatorError) throw creatorError
     if (!creator) return NextResponse.json({ error: 'Creator not found.' }, { status: 404 })
+    if (!creator.upi_id && !(creator.bank_account && creator.bank_ifsc)) {
+      return NextResponse.json({ error: 'Add a UPI ID or bank details in your profile first.' }, { status: 400 })
+    }
 
-    // 2. Validate available balance
-    const { data: confirmedComms, error: commsError } = await supabaseAdmin
-      .from('commissions')
-      .select('commission_amount')
-      .eq('creator_id', creatorId)
-      .eq('status', 'confirmed')
-
-    if (commsError) throw commsError
-
-    const availableBalance = (confirmedComms || []).reduce((sum, c) => sum + c.commission_amount, 0)
-
-    if (amount > availableBalance) {
+    if (amount > (await creatorAvailableBalance(creatorId))) {
       return NextResponse.json({ error: 'Insufficient balance available for payout.' }, { status: 400 })
     }
 
-    // 3. Create payout request
     const { data, error } = await supabaseAdmin
       .from('payout_requests')
       .insert({
@@ -88,9 +76,16 @@ export async function POST(req: Request) {
 
     if (error) throw error
 
+    // Two simultaneous requests can both pass the check above; undo ours if
+    // together they now exceed what was earned.
+    if ((await creatorAvailableBalance(creatorId)) < 0) {
+      await supabaseAdmin.from('payout_requests').delete().eq('id', data.id)
+      return NextResponse.json({ error: 'A payout request is already in progress.' }, { status: 409 })
+    }
+
     return NextResponse.json({ success: true, request: data })
   } catch (err: any) {
     console.error('Creator Payout Request Error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ error: 'Could not create the payout request.' }, { status: 500 })
   }
 }

@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getPublicTrackingUrl } from '@/lib/nimbuspost'
+import { isAdminRequest, unauthorized } from '@/lib/admin-auth'
 
 export async function POST(req: Request) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAdminRequest(req)) return unauthorized()
 
   try {
     const body = await req.json()

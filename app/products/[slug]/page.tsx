@@ -3,8 +3,10 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { useCart, useCoupon } from '@/lib/store'
+import { useCart } from '@/lib/store'
+import { useSessionLoader } from '@/lib/use-session'
 import { calcPriceForWeight, extractBadgeConfig, formatPrice, formatWeight } from '@/lib/utils'
+import { MAX_LINE_GRAMS, MIN_LINE_GRAMS } from '@/lib/pricing'
 import { showToast } from '@/components/ui/Toaster'
 import { ReviewForm } from '@/components/product/ReviewForm'
 import { ReviewList } from '@/components/product/ReviewList'
@@ -13,7 +15,6 @@ import { BuyNowPopup } from '@/components/product/BuyNowPopup'
 import type { Product, Variant } from '@/lib/supabase'
 import { breadcrumbJsonLd, productJsonLd } from '@/lib/seo'
 
-const ACCOUNT_PHONE_KEY = 'mana_account_phone'
 
 function getPresetWeights(category?: string) {
   if (category === 'herbs' || category === 'spices') return [100, 200, 500, 1000]
@@ -25,30 +26,20 @@ function getDefaultWeight(category?: string) {
   return 250
 }
 
-function readAccountPhone() {
-  if (typeof window === 'undefined') return ''
-
-  const stored = window.localStorage.getItem(ACCOUNT_PHONE_KEY)
-  if (stored) return stored
-
-  return document.cookie
-    .split('; ')
-    .find((row) => row.startsWith(`${ACCOUNT_PHONE_KEY}=`))
-    ?.split('=')[1] || ''
-}
-
 export default function ProductPage({ params }: { params: { slug: string } }) {
   const [product, setProduct]       = useState<Product | null>(null)
   const [activeImg, setActiveImg]   = useState(0)
   const [activeVar, setActiveVar]   = useState<Variant | null>(null)
   const [unit, setUnit]             = useState<'g' | 'kg'>('g')
   const [grams, setGrams]           = useState(250)
+  const [weightDraft, setWeightDraft] = useState<string | null>(null)
   const [customWeight, setCustomWeight] = useState(false)
   const [loading, setLoading]       = useState(true)
   const [deliveryPincode, setDeliveryPincode] = useState('')
   const [deliveryCheck, setDeliveryCheck] = useState<any>(null)
   const [deliveryLoading, setDeliveryLoading] = useState(false)
   const [canReview, setCanReview] = useState(false)
+  const session = useSessionLoader()
   const [reviewCheckLoading, setReviewCheckLoading] = useState(true)
   const [refCode, setRefCode] = useState('')
   const [refPct, setRefPct] = useState(10)
@@ -142,8 +133,8 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
       return
     }
 
-    const savedPhone = readAccountPhone().replace(/\D/g, '').slice(-10)
-    if (savedPhone.length !== 10) {
+    if (session.status === 'loading') return
+    if (session.status !== 'authenticated') {
       setCanReview(false)
       setReviewCheckLoading(false)
       return
@@ -151,8 +142,9 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
 
     let active = true
     setReviewCheckLoading(true)
-    void fetch(`/api/orders?phone=${savedPhone}`)
-      .then(res => res.json())
+    // Own orders only: the server reads the phone from the session cookie.
+    void fetch('/api/orders', { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : []))
       .then(data => {
         if (!active) return
         const purchased = Array.isArray(data) && data.some((order: any) =>
@@ -177,7 +169,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
     return () => {
       active = false
     }
-  }, [product])
+  }, [product, session.status])
 
   useEffect(() => {
     const pincode = deliveryPincode.trim()
@@ -243,21 +235,44 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
   const sliderVal = customWeight ? (unit === 'kg' ? grams / 1000 : grams) : (presetIndex >= 0 ? presetIndex : 0)
   const sliderPct = ((sliderVal - sliderMin) / (sliderMax - sliderMin)) * 100
 
+  const outOfStock = product.in_stock === false || activeVar?.in_stock === false
+
   const handleAddToCart = () => {
+    if (outOfStock) {
+      showToast('This item is currently out of stock')
+      return
+    }
     addItem({
       product_id: product.id,
       product_name: product.name,
       product_image: galleryImages?.[0] || '',
       variant_id: activeVar?.id,
       variant_name: activeVar?.name,
-      weight_grams: grams,
+      weight_grams: Math.min(MAX_LINE_GRAMS, Math.max(MIN_LINE_GRAMS, grams)),
       price: livePrice,
       quantity: 1,
     })
     showToast(`✦ ${product.name} added!`)
   }
 
-  const inCart = cartItems.some(i => i.product_id === product.id && i.weight_grams === grams)
+  const inCart = cartItems.some(i =>
+    i.product_id === product.id &&
+    (i.variant_id || '') === (activeVar?.id || '') &&
+    i.weight_grams === grams
+  )
+
+  // Typing goes into a draft; the weight is clamped when the box loses focus,
+  // so partial input like "2." in kg mode isn't reformatted mid-keystroke.
+  const commitWeightDraft = () => {
+    if (weightDraft === null) return
+    const value = parseFloat(weightDraft)
+    setWeightDraft(null)
+    if (!Number.isFinite(value) || value <= 0) return
+    const typedGrams = unit === 'kg' ? Math.round(value * 1000) : Math.round(value)
+    const minGrams = unit === 'kg' ? sliderMin * 1000 : sliderMin
+    const maxGrams = unit === 'kg' ? sliderMax * 1000 : sliderMax
+    setGrams(Math.min(maxGrams, Math.max(minGrams, typedGrams)))
+  }
 
   const QUALITY_TAGS: Record<string, { label: string; cls: string }> = {
     best:    { label: 'Best Quality', cls: 'bg-green text-ivory' },
@@ -550,16 +565,18 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
               <div className="flex items-center gap-3 flex-wrap">
                 <input
                   type="number"
-                  value={unit === 'kg' ? (grams / 1000).toFixed(1) : grams}
+                  value={weightDraft ?? (unit === 'kg' ? (grams / 1000).toFixed(1) : grams)}
                   min={customWeight ? sliderMin : presetWeights[0]}
                   max={customWeight ? sliderMax : presetWeights[presetWeights.length - 1]}
                   step={customWeight ? sliderStep : 1}
                   readOnly={!customWeight}
                   onChange={e => {
                     if (!customWeight) return
-                    const v = parseFloat(e.target.value) || 0
-                    setGrams(unit === 'kg' ? Math.round(v * 1000) : Math.round(v))
+                    setWeightDraft(e.target.value)
                   }}
+                  onBlur={commitWeightDraft}
+                  onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                  aria-label={`Weight in ${unit}`}
                   className={`w-24 text-center px-3 py-2 border border-ivory-3 rounded-md font-sans text-sm text-ink bg-white outline-none focus:border-green-3 ${customWeight ? '' : 'cursor-default'}`}
                 />
                 <span className="text-sm text-ink-3">{unit}</span>
@@ -621,13 +638,15 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
           </div>
 
           {/* Actions */}
-          {activeVar?.in_stock === false ? (
+          {outOfStock ? (
             <div className="mb-5">
               <button disabled className="btn-primary flex-1 w-full justify-center opacity-50 cursor-not-allowed">
                 <span>Out of Stock</span>
               </button>
               <p className="text-[.72rem] text-ink-3 text-center mt-2">
-                This variety is currently out of stock. Please select another.
+                {product.in_stock === false
+                  ? 'This product is currently out of stock.'
+                  : 'This variety is currently out of stock. Please select another.'}
               </p>
             </div>
           ) : (
@@ -643,7 +662,8 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
               )}
               <button
                 onClick={() => {
-                  handleAddToCart()
+                  // Buy Now shouldn't add another one each time it's clicked.
+                  if (!inCart) handleAddToCart()
                   setIsBuyNowOpen(true)
                 }}
                 className="btn-outline flex-1 justify-center"
@@ -699,14 +719,18 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
             <div className="bg-white border border-ivory-3 rounded-2xl p-6 shadow-soft">
               <div className="font-serif text-2xl text-ink mb-2">Write a review</div>
               <div className="text-sm text-ink-3 leading-[1.8]">
-                This section appears only for customers who have already ordered this product using their saved WhatsApp number on this device.
+                Reviews are open to customers who have ordered this product.
               </div>
               <div className="mt-4 rounded-lg border border-ivory-3 bg-ivory-2 px-4 py-3 text-sm text-ink-3 leading-[1.7]">
-                If you have already purchased it, open your account first so this device remembers your number, then come back to this product page.
+                {session.status === 'authenticated'
+                  ? 'We could not find this product in the orders for your number yet. Once your order is placed, you can review it here.'
+                  : 'If you have purchased it, sign in with your WhatsApp number, then come back to this page.'}
               </div>
-              <Link href="/account" className="btn-outline no-underline inline-flex mt-5">
-                Open My Account
-              </Link>
+              {session.status !== 'authenticated' && (
+                <Link href="/profile" className="btn-outline no-underline inline-flex mt-5">
+                  Sign In
+                </Link>
+              )}
             </div>
           )}
         </div>

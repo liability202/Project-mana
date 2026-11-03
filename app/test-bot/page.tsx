@@ -30,9 +30,11 @@ export default function TestBotPage() {
     setMessage('')
 
     try {
+      // Admin-only tool: reuse the password saved by the /admin login.
+      const adminSecret = localStorage.getItem('mana_admin') || ''
       const response = await fetch('/api/test-bot', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${adminSecret}` },
         body: JSON.stringify({
           phone: trimmedPhone,
           message: trimmedMessage,
@@ -40,6 +42,9 @@ export default function TestBotPage() {
       })
 
       const data = await response.json()
+      if (response.status === 401) {
+        throw new Error('Log in at /admin first — this tool is for admins only.')
+      }
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Could not test bot.')
       }

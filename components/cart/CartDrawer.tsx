@@ -13,8 +13,6 @@ export function CartDrawer() {
 
   // ✅ Only compute cart values after client hydration
   const subtotal = mounted ? total() : 0
-  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : 6000
-  const orderTotal = subtotal + shipping
   const cartCount = mounted ? count() : 0
   const cartItems = mounted ? items : []
 
@@ -77,8 +75,8 @@ export function CartDrawer() {
             </div>
           ) : (
             <div className="flex flex-col divide-y divide-ivory-3 dark:divide-green-5/20">
-              {cartItems.map((item, i) => (
-                <div key={`${item.product_id}-${item.variant_id}-${i}`} className="flex gap-3 py-4" style={{ borderColor: 'rgb(var(--c-ivory3))' }}>
+              {cartItems.map((item) => (
+                <div key={`${item.product_id}-${item.variant_id}-${item.weight_grams}`} className="flex gap-3 py-4" style={{ borderColor: 'rgb(var(--c-ivory3))' }}>
                   <div className="w-[62px] h-[62px] rounded-lg overflow-hidden flex-shrink-0" style={{ background: 'rgb(var(--c-ivory3))' }}>
                     {item.product_image ? (
                       <Image
@@ -109,7 +107,8 @@ export function CartDrawer() {
                     </div>
                     <div className="flex items-center gap-2 mt-2">
                       <button
-                        onClick={() => updateQty(item.product_id, item.variant_id, item.quantity - 1)}
+                        onClick={() => updateQty(item.product_id, item.variant_id, item.quantity - 1, item.weight_grams)}
+                        aria-label={`Decrease quantity of ${item.product_name}`}
                         className="w-6 h-6 rounded border bg-transparent text-base flex items-center justify-center cursor-pointer transition-colors"
                         style={{ color: 'var(--green)', borderColor: 'rgb(var(--c-ivory3))' }}
                       >−</button>
@@ -117,13 +116,14 @@ export function CartDrawer() {
                         {item.quantity}
                       </span>
                       <button
-                        onClick={() => updateQty(item.product_id, item.variant_id, Math.min(10, item.quantity + 1))}
+                        onClick={() => updateQty(item.product_id, item.variant_id, Math.min(10, item.quantity + 1), item.weight_grams)}
+                        aria-label={`Increase quantity of ${item.product_name}`}
                         disabled={item.quantity >= 10}
                         className="w-6 h-6 rounded border bg-transparent text-base flex items-center justify-center cursor-pointer transition-colors disabled:opacity-50"
                         style={{ color: 'var(--green)', borderColor: 'rgb(var(--c-ivory3))' }}
                       >+</button>
                       <button
-                        onClick={() => removeItem(item.product_id, item.variant_id)}
+                        onClick={() => removeItem(item.product_id, item.variant_id, item.weight_grams)}
                         className="text-xs underline bg-transparent border-none cursor-pointer hover:text-terra transition-colors ml-1"
                         style={{ color: 'var(--ink4)' }}
                       >Remove</button>
@@ -145,14 +145,14 @@ export function CartDrawer() {
             <div className="flex justify-between mb-3">
               <span className="text-sm" style={{ color: 'var(--ink3)' }}>Shipping</span>
               <span className="text-sm" style={{ color: 'var(--ink)' }}>
-                {shipping === 0
+                {subtotal >= FREE_SHIPPING_THRESHOLD
                   ? <span style={{ color: 'var(--green)' }}>Free</span>
-                  : formatPrice(shipping)}
+                  : <span style={{ color: 'var(--ink3)' }}>Calculated at checkout</span>}
               </span>
             </div>
             <div className="mb-4 mt-2">
               {subtotal >= FREE_SHIPPING_THRESHOLD ? (
-                <div className="rounded-lg px-3 py-2 text-center" style={{ background: 'rgba(var(--c-green5), 0.1)', border: '1px solid var(--green)' }}>
+                <div className="rounded-lg px-3 py-2 text-center" style={{ background: 'rgb(var(--c-green5) / 0.1)', border: '1px solid var(--green)' }}>
                   <div className="text-xs font-bold tracking-wide" style={{ color: 'var(--green)' }}>🎉 You've unlocked Free Shipping!</div>
                 </div>
               ) : (
@@ -169,10 +169,9 @@ export function CartDrawer() {
                 </div>
               )}
             </div>
-            <div className="flex justify-between mb-4 pt-2 border-t" style={{ borderColor: 'rgb(var(--c-ivory3))' }}>
-              <span className="font-medium text-ink">Total</span>
-              <span className="font-serif text-xl" style={{ color: 'var(--green)' }}>{formatPrice(orderTotal)}</span>
-            </div>
+            <p className="mb-4 pt-2 border-t text-xs text-center" style={{ borderColor: 'rgb(var(--c-ivory3))', color: 'var(--ink4)' }}>
+              Shipping, fees and discounts are calculated at checkout.
+            </p>
             <Link
               href="/checkout"
               onClick={() => setOpen(false)}

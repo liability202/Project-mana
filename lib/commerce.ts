@@ -86,11 +86,12 @@ export function getAppliedCouponDiscount(subtotal: number, coupon: CouponRecord)
 
 export async function getCouponByCode(client: SupabaseClient, code: string) {
   const normalized = code.trim().toUpperCase()
+  // Look the row up whether or not it is active: a deactivated coupon must
+  // stay off, not fall through to a creator with the same code below.
   const { data, error } = await client
     .from('coupons')
     .select('*')
     .eq('code', normalized)
-    .eq('is_active', true)
     .maybeSingle()
 
   if (error && !isMissingRelationError(error)) throw error

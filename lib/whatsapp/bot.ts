@@ -3,6 +3,8 @@ import { getWalletSnapshot, normalizePhone } from '@/lib/commerce'
 import { sendWhatsAppButtons, sendWhatsAppList, sendWhatsAppMessage } from './sender'
 import { getAIAdvice, type AdviceHistoryMessage } from './ai'
 import { createRazorpayPaymentLink } from './razorpay'
+import { ORDER_NOTE, generateOrderRef, isVisibleToCustomer } from '@/lib/checkout'
+import { phoneVariants } from '@/lib/session'
 
 type SessionRecord = {
   phone: string
@@ -92,6 +94,9 @@ type HandleIncomingMessageOptions = {
 type SupportIssueType = 'order_issue' | 'payment' | 'delivery' | 'damaged' | 'refund' | 'return' | 'other'
 
 const OWNER_PHONE = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919910899796'
+// Ticket alerts should reach a person. NEXT_PUBLIC_WHATSAPP_NUMBER is the bot's
+// own public number, so set SUPPORT_ALERT_PHONE to a staffed one.
+const SUPPORT_ALERT_PHONE = process.env.SUPPORT_ALERT_PHONE || OWNER_PHONE
 
 const SMART_TRIGGERS = {
   order: ['order', 'buy', 'purchase', 'kharido', 'chahiye', 'lena', 'order karna'],
@@ -149,8 +154,14 @@ function normalize(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Match keywords at the start of a word: "recommend" still finds "recommended",
+// but "order" no longer matches inside "border", nor "0" inside "500".
 function containsAnyKeyword(text: string, keywords: readonly string[]) {
-  return keywords.some((keyword) => text.includes(keyword))
+  return keywords.some((keyword) => new RegExp(`(^|[^a-z0-9_])${escapeRegExp(keyword)}`, 'i').test(text))
 }
 
 function formatMoney(amountPaise: number) {
@@ -767,40 +778,36 @@ async function getWhatsAppMediaUrl(mediaId: string): Promise<string | null> {
   }
 }
 
-async function lookupOrderByRef(orderRef: string) {
+// Every lookup is limited to the sender's own WhatsApp number (verified by
+// Meta), in both the bot's 91XXXXXXXXXX form and the website's 10-digit form.
+// Typing someone else's order ref or phone number reveals nothing.
+
+async function lookupOrderByRef(orderRef: string, phone: string) {
   const { data } = await supabaseAdmin
     .from('orders')
     .select('*')
     .eq('order_ref', orderRef.toUpperCase())
+    .in('customer_phone', phoneVariants(phone))
     .maybeSingle()
-  return data
+  return data && isVisibleToCustomer(data) ? data : null
 }
 
 async function lookupOrdersByPhone(phone: string) {
   const { data } = await supabaseAdmin
     .from('orders')
     .select('*')
-    .eq('customer_phone', phone)
+    .in('customer_phone', phoneVariants(phone))
     .order('created_at', { ascending: false })
-    .limit(5)
-  return data || []
+    .limit(10)
+  return (data || []).filter(isVisibleToCustomer).slice(0, 5)
 }
 
 async function lookupOrderByIdOrPhone(input: string, sessionPhone: string) {
   // Try as order ref first
   const normalized = input.trim().toUpperCase()
   if (normalized.startsWith('MANA') || /^[A-Z0-9]{6,}$/.test(normalized)) {
-    const order = await lookupOrderByRef(normalized)
+    const order = await lookupOrderByRef(normalized, sessionPhone)
     if (order) return { type: 'single' as const, orders: [order] }
-  }
-
-  // Try input as phone number
-  const phoneInput = input.replace(/[^0-9]/g, '')
-  if (phoneInput.length >= 10) {
-    const searchPhone = phoneInput.length === 10 ? `91${phoneInput}` : phoneInput
-    const orders = await lookupOrdersByPhone(searchPhone)
-    if (orders.length === 1) return { type: 'single' as const, orders }
-    if (orders.length > 1) return { type: 'multiple' as const, orders }
   }
 
   // Fallback: look up orders by caller's own WhatsApp number
@@ -974,9 +981,14 @@ async function notifyOwner(
   if (ticket.issue_detail) lines.push(`Detail: ${ticket.issue_detail}`)
   if (order?.order_ref) lines.push(`Order: #${order.order_ref}`)
   if (ticket.image_url) lines.push(`Photo: ${ticket.image_url}`)
-  lines.push(`Time: ${new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })}`)
+  lines.push(`Time: ${new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}`)
 
-  await sendWhatsAppMessage(OWNER_PHONE, lines.join('\n'))
+  try {
+    await sendWhatsAppMessage(SUPPORT_ALERT_PHONE, lines.join('\n'))
+  } catch (error) {
+    // A failed staff alert must not stop the customer getting a reply.
+    console.error('Support alert failed', ticket?.ticket_ref, error)
+  }
 }
 
 export async function handleIncomingMessage(phone: string, input: string, options: HandleIncomingMessageOptions = {}) {
@@ -1038,7 +1050,7 @@ export async function handleIncomingMessage(phone: string, input: string, option
       await notifyOwner(normalizedPhone, ticket, null, transport)
       await transport.sendMessage(
         normalizedPhone,
-        `🙋 *Connecting you to our team...*\n\nOur support hours:\nMon–Sat: 9 AM – 7 PM\nSun: 10 AM – 4 PM\n\n⏳ Current wait: ~5 minutes\n\nYour ticket: *#${ticket.ticket_ref}*\n\nA team member will message you shortly.`
+        `🙋 *Connecting you to our team...*\n\nOur support hours:\nMon–Sat: 9 AM – 7 PM\nSun: 10 AM – 4 PM\n\nYour ticket: *#${ticket.ticket_ref}*\n\nA team member will message you shortly.`
       )
     } else {
       await transport.sendMessage(
@@ -1055,11 +1067,9 @@ export async function handleIncomingMessage(phone: string, input: string, option
   const SMART_SUPPRESS = new Set(['GREETING', 'LANGUAGE', 'ORDER_DETAILS', 'ORDER_WEIGHT_CLARIFY', 'SUPPORT_DETAIL'])
 
   if (!SMART_SUPPRESS.has(session.state) && session.state !== 'MENU') {
-    if (containsAnyKeyword(msg, SMART_TRIGGERS.menu)) {
-      await saveSession(normalizedPhone, { state: 'MENU', cart: {} })
-      await showMenu(normalizedPhone, session.lang || 'English', transport)
-      return transcript.join('\n\n')
-    }
+    // No catch-all "menu" keyword check here: matching "hi", "0" or "back"
+    // anywhere in a message wiped carts mid-order. Exact "menu"/"0" and
+    // greetings are handled above.
 
     if (containsAnyKeyword(msg, PAYMENT_TRIGGERS.paid) || containsAnyKeyword(msg, PAYMENT_TRIGGERS.failed)) {
       await saveSession(normalizedPhone, {
@@ -1080,7 +1090,9 @@ export async function handleIncomingMessage(phone: string, input: string, option
     }
 
     if (containsAnyKeyword(msg, SMART_TRIGGERS.account)) {
-      const snapshot = await getWalletSnapshot(supabaseAdmin, { phone: normalizedPhone })
+      // Wallets are keyed by the 10-digit number the website uses; the bot's
+      // 91-prefixed number would create a second, empty wallet.
+      const snapshot = await getWalletSnapshot(supabaseAdmin, { phone: normalizedPhone.slice(-10) })
       await transport.sendMessage(
         normalizedPhone,
         isHindi(session.lang)
@@ -1533,7 +1545,7 @@ export async function handleIncomingMessage(phone: string, input: string, option
         break
       }
 
-      const orderRef = `MANA${Date.now().toString().slice(-6)}`
+      const orderRef = generateOrderRef()
       const orderItems = selectedItems.map((item) => ({
         product_id: item.productId,
         product_name: item.productName,
@@ -1560,9 +1572,12 @@ export async function handleIncomingMessage(phone: string, input: string, option
           shipping: 0,
           total,
           final_amount: total,
+          // Same as website online orders: an unpaid attempt until Razorpay's
+          // payment_link.paid webhook marks it paid, so it can't be shipped
+          // (or booked with the courier as cash-on-delivery) before that.
           payment_status: 'pending',
-          status: 'pending',
-          notes: 'Created via WhatsApp bot',
+          status: 'cancelled',
+          notes: ORDER_NOTE.awaitingPayment,
           order_ref: orderRef,
         })
         .select('*')
@@ -1580,12 +1595,26 @@ export async function handleIncomingMessage(phone: string, input: string, option
         break
       }
 
-      const paymentLink = await createRazorpayPaymentLink({
-        amount: total,
-        description: `MANA - ${selectedItems.map((item) => `${item.productName} ${formatWeight(item.requestedWeightGrams)}`).join(', ')}`,
-        orderId: order.id,
-        phone: normalizedPhone,
-      })
+      let paymentLink: string
+      try {
+        paymentLink = await createRazorpayPaymentLink({
+          amount: total,
+          description: `MANA - ${selectedItems.map((item) => `${item.productName} ${formatWeight(item.requestedWeightGrams)}`).join(', ')}`,
+          orderId: order.id,
+          orderRef,
+          phone: normalizedPhone,
+        })
+      } catch (linkError) {
+        console.error('WhatsApp payment link error:', order.id, linkError)
+        await transport.sendMessage(
+          normalizedPhone,
+          isHindi(session.lang)
+            ? 'Payment link abhi nahin ban paya. Kripya thodi der baad dobara try karein ya support se baat karein.'
+            : 'We could not create a payment link right now. Please try again in a little while or talk to support.'
+        )
+        await saveSession(normalizedPhone, { state: 'MENU', cart: {} })
+        break
+      }
 
       await supabaseAdmin
         .from('orders')
@@ -1757,15 +1786,15 @@ export async function handleIncomingMessage(phone: string, input: string, option
       }
 
       // Look up order for owner notification
-      const supportOrder = orderRef ? await lookupOrderByRef(orderRef) : null
+      const supportOrder = orderRef ? await lookupOrderByRef(orderRef, normalizedPhone) : null
       await notifyOwner(normalizedPhone, ticket, supportOrder, transport)
 
       // Confirm to customer
       await transport.sendMessage(
         normalizedPhone,
         isHindi(session.lang)
-          ? `✅ *Ticket Created: #${ticket.ticket_ref}*\n\nHumne aapki request receive kar li hai.\nHumari team jald se jald reply karegi.\n\n⏰ Expected response: 2-4 hours\n📞 Support: Mon–Sat 9AM–7PM`
-          : `✅ *Ticket Created: #${ticket.ticket_ref}*\n\nWe've received your request and our team will get back to you shortly.\n\n⏰ Expected response: 2-4 hours\n📞 Support hours: Mon–Sat 9AM–7PM`
+          ? `✅ *Ticket Created: #${ticket.ticket_ref}*\n\nHumne aapki request receive kar li hai.\nHumari team jald se jald reply karegi.\n\n📞 Support: Mon–Sat 9AM–7PM`
+          : `✅ *Ticket Created: #${ticket.ticket_ref}*\n\nWe've received your request and our team will get back to you shortly.\n\n📞 Support hours: Mon–Sat 9AM–7PM`
       )
 
       await saveSession(normalizedPhone, { state: 'MENU', cart: {} })

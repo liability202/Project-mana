@@ -1,4 +1,5 @@
 import type { Product } from '@/lib/supabase'
+import { shippingCost } from '@/lib/utils'
 
 export const SITE_URL = 'https://manadryfruits.com'
 export const BRAND_NAME = 'Mana Dry Fruits'
@@ -61,13 +62,14 @@ export function productJsonLd({ product, path, price, images, aggregateRating }:
         returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
         merchantReturnDays: 7,
         returnMethod: 'https://schema.org/ReturnByMail',
-        returnFees: 'https://schema.org/FreeReturn',
       },
       shippingDetails: {
         '@type': 'OfferShippingDetails',
         shippingRate: {
           '@type': 'MonetaryAmount',
-          value: offerPrice >= 99900 ? '0' : '50',
+          // Same rule as checkout: free above the threshold, otherwise the
+          // standard (non-NCR) rate. NCR is cheaper, so this never understates.
+          value: priceInRupees(shippingCost(offerPrice)),
           currency: 'INR',
         },
         shippingDestination: {
@@ -77,7 +79,7 @@ export function productJsonLd({ product, path, price, images, aggregateRating }:
         deliveryTime: {
           '@type': 'ShippingDeliveryTime',
           handlingTime: { '@type': 'QuantitativeValue', minValue: 1, maxValue: 2, unitCode: 'DAY' },
-          transitTime: { '@type': 'QuantitativeValue', minValue: 2, maxValue: 5, unitCode: 'DAY' },
+          transitTime: { '@type': 'QuantitativeValue', minValue: 2, maxValue: 7, unitCode: 'DAY' },
         },
       },
     },

@@ -12,7 +12,6 @@ export function ReviewForm({
   productName: string
 }) {
   const [customerName, setCustomerName] = useState('')
-  const [customerPhone, setCustomerPhone] = useState('')
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [title, setTitle] = useState('')
@@ -49,7 +48,6 @@ export function ReviewForm({
           product_slug: productSlug,
           product_name: productName,
           customer_name: customerName,
-          customer_phone: customerPhone,
           rating,
           title,
           body,
@@ -59,7 +57,6 @@ export function ReviewForm({
       if (!res.ok) throw new Error(data?.error || 'Could not submit review.')
       setMessage('Thank you! Your review will appear after verification.')
       setCustomerName('')
-      setCustomerPhone('')
       setRating(0)
       setHoverRating(0)
       setTitle('')
@@ -98,13 +95,9 @@ export function ReviewForm({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs text-ink-3 block mb-1.5">Name *</label>
-          <input value={customerName} onChange={e => setCustomerName(e.target.value)} className="input" placeholder="Your name" />
-        </div>
-        <div>
-          <label className="text-xs text-ink-3 block mb-1.5">WhatsApp Number *</label>
-          <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="input" placeholder="98765 43210" />
+        <div className="sm:col-span-2">
+          <label htmlFor="review-name" className="text-xs text-ink-3 block mb-1.5">Name *</label>
+          <input id="review-name" value={customerName} onChange={e => setCustomerName(e.target.value)} maxLength={60} className="input" placeholder="Your name as it should appear" />
         </div>
         <div className="sm:col-span-2">
           <label className="text-xs text-ink-3 block mb-1.5">Review title</label>
@@ -117,7 +110,7 @@ export function ReviewForm({
       </div>
 
       <div className="text-xs font-medium text-ink-3 mt-3 px-3 py-2 bg-ivory-2 rounded-lg border border-ivory-3 leading-relaxed">
-        Please use the same WhatsApp number you used during checkout. Reviews still go for admin approval before appearing publicly.
+        Reviews are linked to your signed-in WhatsApp number (never shown publicly) and appear after admin approval.
       </div>
 
       {error && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}

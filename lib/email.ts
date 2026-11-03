@@ -10,7 +10,19 @@ import { CashbackCreditedEmail } from '@/emails/CashbackCredited'
 // 4. From address: orders@yourdomain.com
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
-const fromEmail = process.env.RESEND_FROM_EMAIL || 'orders@yourdomain.com'
+const fromEmail = process.env.RESEND_FROM_EMAIL || ''
+
+// Resend reports failures in its return value rather than throwing, so log
+// them; and never send from a placeholder domain Resend will reject.
+async function deliver(payload: Parameters<Resend['emails']['send']>[0]) {
+  if (!resend) return
+  if (!fromEmail) {
+    console.warn('[email] RESEND_FROM_EMAIL is not set; not sending:', payload.subject)
+    return
+  }
+  const { error } = await resend.emails.send(payload)
+  if (error) console.error('[email] send failed:', payload.subject, error)
+}
 const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
 const siteUrl = (rawSiteUrl && !rawSiteUrl.includes('localhost')) ? rawSiteUrl : 'https://manadryfruits.com'
 const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || ''
@@ -23,6 +35,7 @@ export async function sendOrderConfirmation(params: {
   customerEmail?: string | null
   customerName: string
   orderId: string
+  orderRef?: string | null
   items: any[]
   subtotal: number
   shipping: number
@@ -35,13 +48,16 @@ export async function sendOrderConfirmation(params: {
 }) {
   if (!resend || !params.customerEmail) return
 
-  await resend.emails.send({
+  // Show the same order code the customer sees on the site and in WhatsApp.
+  const orderCode = params.orderRef || params.orderId.slice(0, 8).toUpperCase()
+
+  await deliver({
     from: fromEmail,
     to: params.customerEmail,
-    subject: `Your Mana order is confirmed \u2713 | Order #${params.orderId.slice(0, 8).toUpperCase()}`,
+    subject: `Your Mana order is confirmed \u2713 | Order #${orderCode}`,
     react: OrderConfirmationEmail({
       customerName: params.customerName,
-      orderId: params.orderId.slice(0, 8).toUpperCase(),
+      orderId: orderCode,
       items: params.items,
       subtotal: params.subtotal,
       shipping: params.shipping,
@@ -51,7 +67,7 @@ export async function sendOrderConfirmation(params: {
       city: params.city,
       state: params.state || undefined,
       pincode: params.pincode,
-      whatsappUrl: getWhatsappUrl(`Hi Mana! I have a question about order #${params.orderId.slice(0, 8).toUpperCase()}.`),
+      whatsappUrl: getWhatsappUrl(`Hi Mana! I have a question about order #${orderCode}.`),
     }),
   })
 }
@@ -60,6 +76,7 @@ export async function sendOrderShipped(params: {
   customerEmail?: string | null
   customerName: string
   orderId: string
+  orderRef?: string | null
   trackingNumber?: string
   courierName?: string
   trackingLink?: string
@@ -68,13 +85,13 @@ export async function sendOrderShipped(params: {
 }) {
   if (!resend || !params.customerEmail) return
 
-  await resend.emails.send({
+  await deliver({
     from: fromEmail,
     to: params.customerEmail,
     subject: 'Your Mana order is on its way! \u{1F69A}',
     react: OrderShippedEmail({
       customerName: params.customerName,
-      orderId: params.orderId.slice(0, 8).toUpperCase(),
+      orderId: params.orderRef || params.orderId.slice(0, 8).toUpperCase(),
       trackingNumber: params.trackingNumber,
       courierName: params.courierName,
       trackingLink: params.trackingLink,
@@ -93,7 +110,7 @@ export async function sendCashbackCredited(params: {
 }) {
   if (!resend || !params.customerEmail) return
 
-  await resend.emails.send({
+  await deliver({
     from: fromEmail,
     to: params.customerEmail,
     subject: `\u20B9${(params.cashbackAmount / 100).toLocaleString('en-IN')} cashback has been added to your Mana wallet \u{1F4B0}`,

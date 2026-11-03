@@ -68,7 +68,7 @@ export default function AboutPage() {
             ['🔬', 'Lab tested', 'All batches undergo quality testing before dispatch. We are FSSAI licensed and maintain documentation for every product.'],
           ].map(([ico, t, d]) => (
             <div key={t} className="rounded-xl p-7" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4" style={{ background: 'rgba(var(--c-green5), 0.1)', border: '1px solid var(--green)' }}>{ico}</div>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4" style={{ background: 'rgb(var(--c-green5) / 0.1)', border: '1px solid var(--green)' }}>{ico}</div>
               <div className="font-serif text-[1.18rem] mb-2" style={{ color: 'var(--ink)' }}>{t}</div>
               <p className="text-[.83rem] leading-[1.72]" style={{ color: 'var(--ink3)' }}>{d}</p>
             </div>

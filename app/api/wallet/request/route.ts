@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server'
-import { normalizePhone } from '@/lib/commerce'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getSessionPhone } from '@/lib/session'
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const phone = normalizePhone(body.phone || '')
-    const instagramHandle = String(body.instagram_handle || '').trim()
+    const phone = getSessionPhone()
+    if (!phone) return NextResponse.json({ error: 'Please sign in first.' }, { status: 401 })
 
-    if (!phone) return NextResponse.json({ error: 'Phone is required.' }, { status: 400 })
+    const body = await req.json()
+    const instagramHandle = String(body.instagram_handle || '').trim().replace(/^@/, '').slice(0, 60)
+    if (instagramHandle && !/^[A-Za-z0-9._]{1,30}$/.test(instagramHandle)) {
+      return NextResponse.json({ error: 'Please enter a valid Instagram handle.' }, { status: 400 })
+    }
 
     const { data, error } = await supabaseAdmin
       .from('user_profiles')
@@ -20,9 +23,13 @@ export async function POST(req: Request) {
       .select('*')
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error('Cashback request failed', error)
+      return NextResponse.json({ error: 'Could not submit your request.' }, { status: 500 })
+    }
     return NextResponse.json({ success: true, profile: data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err) {
+    console.error('Cashback request failed', err)
+    return NextResponse.json({ error: 'Could not submit your request.' }, { status: 500 })
   }
 }
