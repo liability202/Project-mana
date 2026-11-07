@@ -6,8 +6,12 @@ import { CartDrawer } from '@/components/cart/CartDrawer'
 import { Toaster } from '@/components/ui/Toaster'
 import { ScrollObserver } from '@/components/ScrollObserver'
 import { ThemeProvider } from '@/components/ThemeProvider'
+import { HideOnPaths } from '@/components/layout/HideOnPaths'
 
 import { SITE_URL } from '@/lib/seo'
+
+// Design prototypes bring their own header and footer.
+const OWN_CHROME = ['/prototypes']
 
 const siteUrl = SITE_URL
 
@@ -181,12 +185,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider>
           <ScrollObserver />
-          <Navbar />
+          <HideOnPaths prefixes={OWN_CHROME}><Navbar /></HideOnPaths>
           <CartDrawer />
           <main id="main-content">
             {children}
           </main>
-          <Footer />
+          <HideOnPaths prefixes={OWN_CHROME}><Footer /></HideOnPaths>
           <Toaster />
         </ThemeProvider>
       </body>
