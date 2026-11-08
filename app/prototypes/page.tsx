@@ -1,5 +1,7 @@
+import Image from 'next/image'
+import Link from 'next/link'
 import { Plus_Jakarta_Sans } from 'next/font/google'
-import { Check, ExternalLink, Lightbulb, Wrench } from 'lucide-react'
+import { ArrowRight, Check, ExternalLink, Lightbulb, Wrench } from 'lucide-react'
 import { IndexGrid } from './_lib/IndexGrid'
 import { PROTOTYPES } from './_lib/registry'
 
@@ -83,6 +85,27 @@ export default function PrototypesIndex() {
             Open a few on your phone, add something to the cart, and pick one to build out, or mix parts (e.g. “Market’s cards in Utsav’s colours”).
           </p>
         </div>
+
+        {/* The simple store came after the ten, from feedback that they were too much. */}
+        <Link
+          href="/prototypes/store"
+          className="group mt-10 grid overflow-hidden rounded-3xl bg-[#191512] text-[#F6EFE3] shadow-[0_20px_50px_rgba(25,21,18,0.18)] md:grid-cols-[1fr_1.15fr]"
+        >
+          <div className="flex flex-col justify-center p-6 sm:p-9">
+            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#D9B872]">New · from your feedback</div>
+            <h2 className="mt-2 text-3xl font-extrabold tracking-tight">The simple store</h2>
+            <p className="mt-3 max-w-md text-[15px] leading-relaxed text-[#F6EFE3]/75">
+              One calm, premium shop instead of ten ideas: search at the top, clear categories, and every product with its type, pack size and an Add to cart
+              button.
+            </p>
+            <span className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-[#F6EFE3] px-5 py-2.5 text-sm font-bold text-[#191512] transition group-hover:bg-white">
+              Open the simple store <ArrowRight size={16} />
+            </span>
+          </div>
+          <div className="relative min-h-[220px] bg-[#FBF7F0] md:min-h-[320px]">
+            <Image src="/prototype-thumbs/store-desktop.jpg" alt="The simple store homepage" fill sizes="(max-width: 768px) 100vw, 640px" className="object-cover object-top" />
+          </div>
+        </Link>
 
         <IndexGrid />
 
