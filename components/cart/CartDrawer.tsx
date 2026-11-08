@@ -39,7 +39,9 @@ export function CartDrawer() {
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 bottom-0 w-full sm:w-[420px] z-[1000] flex flex-col shadow-[-4px_0_32px_rgba(26,18,8,0.1)] border-l transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        // Hidden (not just moved off-screen) when closed: no shadow bleeding onto the page edge,
+        // and its buttons can't be reached with Tab. Visibility flips after the slide-out ends.
+        className={`fixed top-0 right-0 bottom-0 w-full sm:w-[420px] z-[1000] flex flex-col shadow-[-4px_0_32px_rgba(26,18,8,0.1)] border-l transition-[transform,visibility] duration-300 ${open ? 'visible translate-x-0' : 'invisible translate-x-full'}`}
         style={{ background: 'rgb(var(--c-ivory2))', borderColor: 'rgb(var(--c-ivory3))' }}
       >
         {/* Header */}
