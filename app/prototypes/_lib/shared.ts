@@ -1,5 +1,6 @@
 import type { Product } from '@/lib/supabase'
 import { calcPrice, parseBaseWeightGrams } from '@/lib/utils'
+import { CASHBACK_PERCENT } from '@/lib/pricing'
 
 /**
  * Pure helpers shared by the server pages and the client buttons of the
@@ -63,4 +64,18 @@ export function displayName(name: string) {
   const quiet = lettersOnly === lettersOnly.toLowerCase()
   if (!shouty && !quiet) return clean.charAt(0).toUpperCase() + clean.slice(1)
   return clean.toLowerCase().replace(/(^|[\s(\/-])([a-z])/g, (_m, start, letter) => start + letter.toUpperCase())
+}
+
+/** Wallet cashback earned on an amount (5% today, credited after delivery). */
+export function cashbackOn(paise: number) {
+  return Math.round((paise * CASHBACK_PERCENT) / 100)
+}
+
+/** Hindi/everyday name inside brackets or after a slash: "Almonds (Badaam)" → "Badaam", "Clove/ Long" → "Long". */
+export function localName(name: string) {
+  const clean = String(name || '')
+  const bracket = clean.match(/\(([^)]+)\)/)
+  if (bracket) return bracket[1].trim()
+  const slash = clean.split('/')
+  return slash.length > 1 ? slash[slash.length - 1].trim() : ''
 }

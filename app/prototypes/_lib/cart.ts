@@ -4,7 +4,7 @@ import { useCart } from '@/lib/store'
 import { showToast } from '@/components/ui/Toaster'
 import { cartLineKey } from '@/lib/pricing'
 import type { Product } from '@/lib/supabase'
-import { baseGrams, defaultVariant, displayName, priceAt } from './shared'
+import { baseGrams, canQuickAdd, defaultVariant, displayName, priceAt } from './shared'
 
 /** Adds a product's default option at a pack size; the server re-prices it at checkout. */
 export function useQuickAdd() {
@@ -58,6 +58,37 @@ export function useLineQuantity(product: Product, grams: number) {
   if (!ready) return 0
   const key = cartLineKey({ product_id: product.id, variant_id: defaultVariant(product)?.id, weight_grams: grams })
   return items.find(item => cartLineKey(item) === key)?.quantity || 0
+}
+
+/**
+ * Adds several products at once (gift sets, recipes, mixes). Each line is the
+ * product's default option at a pack size; the server re-prices at checkout.
+ */
+export function useAddMany() {
+  const addItem = useCart(state => state.addItem)
+  return (
+    lines: { product: Product; grams?: number; quantity?: number }[],
+    options: { openCart?: boolean; message?: string } = {}
+  ) => {
+    const usable = lines.filter(line => canQuickAdd(line.product))
+    for (const line of usable) {
+      const variant = defaultVariant(line.product)
+      const grams = line.grams ?? baseGrams(line.product)
+      addItem({
+        product_id: line.product.id,
+        product_name: line.product.name,
+        product_image: line.product.images?.[0] || '',
+        variant_id: variant?.id,
+        variant_name: variant?.name,
+        weight_grams: grams,
+        price: priceAt(line.product, grams),
+        quantity: line.quantity ?? 1,
+      })
+    }
+    if (usable.length) showToast(options.message || `Added ${usable.length} item${usable.length === 1 ? '' : 's'} to your cart`)
+    if (options.openCart) openCart()
+    return usable.length
+  }
 }
 
 export function openCart() {

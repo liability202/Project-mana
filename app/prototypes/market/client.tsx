@@ -6,7 +6,7 @@ import { ArrowRight, Leaf, Minus, Plus, ShoppingCart, Truck } from 'lucide-react
 import type { Product } from '@/lib/supabase'
 import { FREE_SHIPPING_THRESHOLD, formatPrice } from '@/lib/utils'
 import { openCart, useCartSummary, useLineQuantity, useQuickAdd, useSetLineQuantity } from '../_lib/cart'
-import { baseGrams, canQuickAdd, defaultVariant, displayName, gramsLabel, priceAt, productHref, weightChoices } from '../_lib/shared'
+import { baseGrams, canQuickAdd, cashbackOn, defaultVariant, displayName, gramsLabel, priceAt, productHref, weightChoices } from '../_lib/shared'
 
 export function MarketCard({ product, badge, tag, priority = false }: { product: Product; badge?: string; tag?: string; priority?: boolean }) {
   const choices = weightChoices(product)
@@ -88,7 +88,9 @@ export function MarketCard({ product, badge, tag, priority = false }: { product:
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
           <div className="leading-tight">
             <div className="text-[15px] font-extrabold text-[#1A1A1A]">{formatPrice(priceAt(product, grams))}</div>
-            <div className="text-[10px] font-medium text-[#6B6B6B]">{gramsLabel(grams)}</div>
+            <div className="text-[10px] font-medium text-[#6B6B6B]">
+              {gramsLabel(grams)} · <span className="font-bold text-[#0F7A47]">{formatPrice(cashbackOn(priceAt(product, grams)))} back</span>
+            </div>
           </div>
           {!canQuickAdd(product) ? (
             <Link href={productHref(product)} className="inline-flex h-9 items-center rounded-lg border border-[#ECEAE4] px-3 text-xs font-bold text-[#6B6B6B]">

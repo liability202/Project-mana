@@ -117,7 +117,7 @@ export default async function MarketPrototype() {
             <div className="absolute inset-0 bg-gradient-to-r from-[#0B5E37] via-[#0B5E37]/90 to-[#0B5E37]/10" />
             <div className="relative max-w-lg px-6 py-9 text-white sm:px-10 sm:py-14">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold backdrop-blur">
-                <PackageCheck size={13} /> Packed fresh, the day you order
+                <PackageCheck size={13} /> Packed fresh to order
               </span>
               <h1 className="mt-4 text-[2rem] font-extrabold leading-[1.08] tracking-tight sm:text-5xl">
                 Dry fruits &amp; superfoods, <span className="text-[#FCD34D]">delivered fresh</span>

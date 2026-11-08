@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { PrototypeBar } from './_lib/PrototypeBar'
 
 // Design explorations: never indexed.
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 }
 
 export default function PrototypesLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+  return (
+    <>
+      <PrototypeBar />
+      {children}
+    </>
+  )
 }
