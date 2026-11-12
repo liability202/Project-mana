@@ -1,8 +1,11 @@
 'use client'
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useCart } from '@/lib/store'
-import { formatPrice, shippingCost, FREE_SHIPPING_THRESHOLD } from '@/lib/utils'
+import { confirmOtp, requestOtp, useSession, useSessionLoader } from '@/lib/use-session'
+import { LOYALTY_CODE } from '@/lib/commerce'
+import { COD_CHARGE, SMALL_ORDER_FEE, SMALL_ORDER_THRESHOLD, computeTotals, type CouponRules, type Totals } from '@/lib/pricing'
+import { formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 
 declare global {
@@ -21,16 +24,6 @@ type FormData = {
   pincode: string
 }
 
-type CouponState = {
-  code: string
-  discountAmount: number
-  valid: boolean
-  free_shipping?: boolean
-  free_cod?: boolean
-  free_handling?: boolean
-}
-
-type CustomerType = 'new' | 'returning' | null
 type ShippingCheck = {
   configured: boolean
   serviceable: boolean | null
@@ -40,178 +33,138 @@ type ShippingCheck = {
   message?: string
 }
 
-const ACCOUNT_PHONE_KEY = 'mana_account_phone'
-const COD_CHARGE = 2900 // ₹29 in paise
-const SMALL_ORDER_FEE = 1900 // ₹19 in paise – charged on orders below ₹500
-
-function rememberAccountPhone(phone: string) {
-  localStorage.setItem(ACCOUNT_PHONE_KEY, phone)
-  document.cookie = `${ACCOUNT_PHONE_KEY}=${phone}; path=/; max-age=${60 * 60 * 24 * 180}; SameSite=Lax`
+type QuoteResponse = {
+  lines: {
+    input_key: string
+    product_id: string
+    product_name: string
+    product_image: string
+    variant_id: string | null
+    variant_name: string | null
+    weight_grams: number
+    price: number
+  }[]
+  errors: string[]
+  totals: Totals
+  coupon: null | {
+    code: string
+    rules: CouponRules | null
+    applied: boolean
+    error: string | null
+    message: string | null
+  }
+  wallet: { balance: number }
+  settings: { enable_cashback_earning: boolean; enable_cashback_spending: boolean }
 }
 
+type PlacedOrder = { id: string; ref: string; cashback: number }
+
+const DEFAULT_SETTINGS = { enable_cashback_earning: true, enable_cashback_spending: true }
+
 export default function CheckoutPage() {
-  const { items, total, clearCart, hydrated, updateQty, removeItem } = useCart()
+  const { items, hydrated, updateQty, removeItem, clearCart, syncPrices } = useCart()
+  const session = useSessionLoader()
+  const isPhoneVerified = session.status === 'authenticated'
+
   const [form, setForm] = useState<FormData>({ name: '', phone: '', email: '', address: '', city: '', state: '', pincode: '' })
   const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState<'details' | 'success'>('details')
-  const [orderId, setOrderId] = useState('')
+  const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null)
   const [couponInput, setCouponInput] = useState('')
-  const [couponState, setCouponState] = useState<CouponState>({ code: '', discountAmount: 0, valid: false })
-  const [couponLoading, setCouponLoading] = useState(false)
-  const [walletBalance, setWalletBalance] = useState(0)
-  const [walletEligible, setWalletEligible] = useState(false)
-  const [walletLoading, setWalletLoading] = useState(false)
+  const [couponCode, setCouponCode] = useState('')
+  const [couponFeedbackFor, setCouponFeedbackFor] = useState('')
   const [useCashback, setUseCashback] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online')
   const [otpCode, setOtpCode] = useState('')
-  const [otpStatus, setOtpStatus] = useState<'unverified' | 'code-sent' | 'verified'>('unverified')
+  const [otpOpen, setOtpOpen] = useState(false)
   const [otpLoading, setOtpLoading] = useState(false)
-  const [verifiedPhone, setVerifiedPhone] = useState('')
-  const [verifiedUserId, setVerifiedUserId] = useState<string | null>(null)
-  const [customerType, setCustomerType] = useState<CustomerType>(null)
-  const [otpHint, setOtpHint] = useState('')
+  const [quote, setQuote] = useState<(QuoteResponse & { key: string }) | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(false)
+  const [quoteError, setQuoteError] = useState('')
+  const [quoteNonce, setQuoteNonce] = useState(0)
+  const [quoteRetries, setQuoteRetries] = useState(0)
   const [shippingCheck, setShippingCheck] = useState<ShippingCheck | null>(null)
   const [shippingCheckLoading, setShippingCheckLoading] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online')
-  const [siteSettings, setSiteSettings] = useState({ enable_cashback_earning: true, enable_cashback_spending: true })
   const [pincodeLoading, setPincodeLoading] = useState(false)
+  const prefilledFor = useRef('')
+  const loyaltyAutoApplied = useRef(false)
 
+  const cartItems = useMemo(() => (hydrated ? items : []), [hydrated, items])
+  const normalizedPhone = form.phone.replace(/\D/g, '').slice(0, 10)
+
+  // A creator's referral link pre-fills their code.
   useEffect(() => {
-    fetch(`/api/settings?t=${Date.now()}`, { cache: 'no-store' }).then(res => res.json()).then(data => setSiteSettings(data)).catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    let rememberedPhone = ''
-    try {
-      rememberedPhone = localStorage.getItem(ACCOUNT_PHONE_KEY) || document.cookie.split('; ').find((row) => row.startsWith(`${ACCOUNT_PHONE_KEY}=`))?.split('=')[1] || ''
-    } catch(e) {}
-
     try {
       const refCookie = document.cookie.split('; ').find((row) => row.startsWith('mana_ref='))?.split('=')[1]
-      if (refCookie && !couponState.valid) {
-        setCouponInput(refCookie)
-      }
-    } catch(e) {}
-
-    const normalized = rememberedPhone.replace(/\D/g, '').slice(-10)
-
-    if (normalized.length === 10) {
-      setForm(prev => ({ ...prev, phone: normalized }))
-      setVerifiedPhone(normalized)
-      setOtpStatus('verified')
-      
-      fetch(`/api/orders?phone=${normalized}`)
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data) && data.length > 0) {
-            const latest = data[0]
-            setForm(prev => ({
-              ...prev,
-              phone: normalized,
-              name: prev.name || latest.customer_name || '',
-              email: prev.email || latest.customer_email || '',
-              address: prev.address || latest.address || '',
-              city: prev.city || latest.city || '',
-              state: prev.state || latest.state || '',
-              pincode: prev.pincode || latest.pincode || '',
-            }))
-            setCustomerType('returning')
-          } else {
-            setCustomerType('new')
-          }
-        })
-        .catch(() => {})
-    }
+      if (refCookie) setCouponInput(decodeURIComponent(refCookie).toUpperCase())
+    } catch {}
   }, [])
 
+  // Signed in: fill the phone and the last delivery address.
   useEffect(() => {
-    if (form.pincode.length === 6) {
-      setPincodeLoading(true)
-      fetch(`https://api.postalpincode.in/pincode/${form.pincode}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data[0]?.Status === 'Success') {
-            const postOffice = data[0].PostOffice[0]
-            if (postOffice) {
-              setForm(prev => ({
-                ...prev,
-                city: postOffice.District || postOffice.Region || prev.city || '',
-                state: postOffice.State || prev.state || ''
-              }))
-            }
-          }
-        })
-        .catch(() => {})
-        .finally(() => setPincodeLoading(false))
-    } else {
+    if (session.status !== 'authenticated' || prefilledFor.current === session.phone) return
+    prefilledFor.current = session.phone
+    setForm(prev => ({ ...prev, phone: session.phone }))
+
+    fetch('/api/orders', { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : []))
+      .then(data => {
+        const latest = Array.isArray(data) ? data[0] : null
+        if (!latest) return
+        setForm(prev => ({
+          ...prev,
+          name: prev.name || latest.customer_name || '',
+          email: prev.email || latest.customer_email || '',
+          address: prev.address || latest.address || '',
+          city: prev.city || latest.city || '',
+          state: prev.state || latest.state || '',
+          pincode: prev.pincode || latest.pincode || '',
+        }))
+      })
+      .catch(() => {})
+  }, [session.status, session.phone])
+
+  // Returning customers get LOYAL12 unless they've picked another code.
+  useEffect(() => {
+    if (session.status === 'authenticated' && session.customerType === 'returning') {
+      setCouponCode(current => {
+        if (current) return current
+        loyaltyAutoApplied.current = true
+        return LOYALTY_CODE
+      })
+    }
+  }, [session.status, session.customerType])
+
+  useEffect(() => {
+    if (form.pincode.length !== 6) {
       setPincodeLoading(false)
+      return
+    }
+    let active = true
+    setPincodeLoading(true)
+    fetch(`https://api.postalpincode.in/pincode/${form.pincode}`)
+      .then(res => res.json())
+      .then(data => {
+        const postOffice = data?.[0]?.Status === 'Success' ? data[0].PostOffice?.[0] : null
+        if (!active || !postOffice) return
+        setForm(prev => ({
+          ...prev,
+          city: postOffice.District || postOffice.Region || prev.city || '',
+          state: postOffice.State || prev.state || '',
+        }))
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setPincodeLoading(false)
+      })
+    return () => {
+      active = false
     }
   }, [form.pincode])
 
-  const cartItems = hydrated ? items : []
-  const subtotal = hydrated ? total() : 0
   const totalWeightGrams = useMemo(
     () => cartItems.reduce((sum, item) => sum + Number(item.weight_grams || 0) * Number(item.quantity || 1), 0) || 500,
     [cartItems]
   )
-  const rawShipping = shippingCost(subtotal, form.city, form.state, form.pincode)
-  const shipping = couponState.free_shipping ? 0 : rawShipping
-  const discount = couponState.discountAmount
-  const rawCodCharge = paymentMethod === 'cod' ? COD_CHARGE : 0
-  const codCharge = couponState.free_cod ? 0 : rawCodCharge
-  const rawSmallOrderFee = subtotal < 50000 ? SMALL_ORDER_FEE : 0
-  const smallOrderFee = couponState.free_handling ? 0 : rawSmallOrderFee
-  const walletApplied = (useCashback && siteSettings.enable_cashback_spending) ? Math.min(walletBalance, Math.max(0, subtotal - discount)) : 0
-  const orderTotal = Math.max(0, subtotal + shipping + codCharge + smallOrderFee - discount - walletApplied)
-  const cashbackPreview = siteSettings.enable_cashback_earning ? Math.round((orderTotal * 5) / 100) : 0
-
-  const normalizedPhone = useMemo(() => form.phone.replace(/\D/g, ''), [form.phone])
-  const isPhoneVerified = otpStatus === 'verified' && verifiedPhone === normalizedPhone
-  const loyaltyAutoApplied = customerType === 'returning' && couponState.code === 'LOYAL12' && couponState.valid
-
-  useEffect(() => {
-    if (normalizedPhone.length < 10) {
-      setWalletBalance(0)
-      setWalletEligible(false)
-      setUseCashback(false)
-      return
-    }
-
-    let active = true
-    setWalletLoading(true)
-    void fetch(`/api/wallet?phone=${normalizedPhone}`)
-      .then(res => res.json())
-      .then(data => {
-        if (!active) return
-        setWalletBalance(data.balance || 0)
-        setWalletEligible(Boolean(data.is_cashback_eligible))
-      })
-      .catch(() => {
-        if (!active) return
-        setWalletBalance(0)
-        setWalletEligible(false)
-      })
-      .finally(() => {
-        if (active) setWalletLoading(false)
-      })
-
-    return () => {
-      active = false
-    }
-  }, [normalizedPhone])
-
-  useEffect(() => {
-    if (!verifiedPhone) return
-    if (normalizedPhone === verifiedPhone) return
-
-    setOtpStatus('unverified')
-    setOtpCode('')
-    setVerifiedPhone('')
-    setVerifiedUserId(null)
-    setCustomerType(null)
-    setOtpHint('')
-    setCouponInput('')
-    setCouponState({ code: '', discountAmount: 0, valid: false })
-  }, [normalizedPhone, verifiedPhone])
 
   useEffect(() => {
     const pincode = form.pincode.trim()
@@ -223,31 +176,13 @@ export default function CheckoutPage() {
 
     let active = true
     setShippingCheckLoading(true)
-
-    if (!form.city || !form.state) {
-      fetch(`https://api.postalpincode.in/pincode/${pincode}`)
-        .then(res => res.json())
-        .then(data => {
-          if (active && data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
-             setForm(prev => ({
-               ...prev,
-               city: prev.city || data[0].PostOffice[0].District,
-               state: prev.state || data[0].PostOffice[0].State
-             }))
-          }
-        })
-        .catch(() => {})
-    }
-
     void fetch(`/api/shipping/serviceability?pincode=${pincode}&grams=${totalWeightGrams}&cod=1`)
       .then(res => res.json())
       .then(data => {
-        if (!active) return
-        setShippingCheck(data)
+        if (active) setShippingCheck(data)
       })
       .catch(() => {
-        if (!active) return
-        setShippingCheck(null)
+        if (active) setShippingCheck(null)
       })
       .finally(() => {
         if (active) setShippingCheckLoading(false)
@@ -256,7 +191,130 @@ export default function CheckoutPage() {
     return () => {
       active = false
     }
-  }, [form.pincode, totalWeightGrams, form.city, form.state])
+  }, [form.pincode, totalWeightGrams])
+
+  // ── Server quote: the authoritative price for exactly this cart ──
+  const quoteBody = useMemo(() => ({
+    items: cartItems.map(item => ({
+      product_id: item.product_id,
+      variant_id: item.variant_id || null,
+      weight_grams: item.weight_grams,
+      quantity: item.quantity,
+    })),
+    coupon_code: couponCode || null,
+    payment_method: paymentMethod,
+    use_wallet: useCashback,
+    city: form.city,
+    state: form.state,
+    pincode: /^\d{6}$/.test(form.pincode) ? form.pincode : '',
+  }), [cartItems, couponCode, paymentMethod, useCashback, form.city, form.state, form.pincode])
+  const quoteKey = `${JSON.stringify(quoteBody)}|${session.phone}|${quoteNonce}`
+
+  useEffect(() => {
+    if (!hydrated || session.status === 'loading') return
+    if (!quoteBody.items.length) {
+      setQuote(null)
+      setQuoteLoading(false)
+      return
+    }
+
+    let active = true
+    setQuoteLoading(true)
+    const timer = setTimeout(() => {
+      fetch('/api/checkout/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quoteBody),
+        cache: 'no-store',
+      })
+        .then(async res => {
+          const data = await res.json()
+          if (!res.ok) throw new Error(data?.error || 'Could not calculate your total.')
+          return data as QuoteResponse
+        })
+        .then(data => {
+          if (!active) return
+          setQuote({ ...data, key: quoteKey })
+          setQuoteError('')
+          setQuoteRetries(0)
+          syncPrices(data.lines)
+        })
+        .catch(err => {
+          if (active) setQuoteError(err.message || 'Could not calculate your total.')
+        })
+        .finally(() => {
+          if (active) setQuoteLoading(false)
+        })
+    }, 250)
+
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+    // quoteKey covers every input that changes the price.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteKey, hydrated, session.status])
+
+  // A failed price check (network blip, rate limit) would otherwise leave the
+  // pay button stuck on "Updating total…": retry a few times, then offer a button.
+  useEffect(() => {
+    if (!quoteError || quoteLoading || quoteRetries >= 3) return
+    const timer = setTimeout(() => {
+      setQuoteRetries(count => count + 1)
+      setQuoteNonce(n => n + 1)
+    }, 2000 * 2 ** quoteRetries)
+    return () => clearTimeout(timer)
+  }, [quoteError, quoteLoading, quoteRetries])
+
+  const quoteFresh = Boolean(quote && quote.key === quoteKey && !quoteLoading)
+  const settings = quote?.settings || DEFAULT_SETTINGS
+  const walletBalance = quote?.wallet.balance || 0
+  const couponInfo = couponCode && quote?.coupon?.code === couponCode ? quote.coupon : null
+  const couponRules = couponInfo?.rules || null
+
+  // Until the server answers, recompute locally with the same rules so the
+  // summary (and any coupon discount) follows the cart immediately.
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const totals: Totals = quoteFresh && quote
+    ? quote.totals
+    : computeTotals({
+        subtotal,
+        coupon: couponRules,
+        paymentMethod,
+        city: form.city,
+        state: form.state,
+        pincode: form.pincode,
+        walletBalance,
+        useWallet: useCashback && isPhoneVerified,
+        walletSpendingEnabled: settings.enable_cashback_spending,
+        cashbackEarningEnabled: settings.enable_cashback_earning,
+      })
+  const appliedRules = totals.couponApplied ? couponRules : null
+  const blockingErrors = quoteFresh && quote
+    ? [...quote.errors, ...(quote.coupon?.error ? [quote.coupon.error] : [])]
+    : []
+  const canSubmit = quoteFresh && !blockingErrors.length && cartItems.length > 0 && !loading
+
+  // Toast the outcome of a code the shopper just applied.
+  useEffect(() => {
+    if (!couponFeedbackFor || !quote || quote.key !== quoteKey || quote.coupon?.code !== couponFeedbackFor) return
+    setCouponFeedbackFor('')
+    if (quote.coupon.error) {
+      showToast(quote.coupon.error)
+      setCouponCode('')
+    } else if (quote.coupon.applied) {
+      showToast(`${quote.coupon.code} applied!`)
+    } else if (quote.coupon.message) {
+      showToast(quote.coupon.message)
+    }
+  }, [quote, quoteKey, couponFeedbackFor])
+
+  // An auto-applied loyalty code that turns out not to apply is dropped quietly.
+  useEffect(() => {
+    if (!loyaltyAutoApplied.current || !quoteFresh || quote?.coupon?.code !== LOYALTY_CODE || !quote.coupon.error) return
+    loyaltyAutoApplied.current = false
+    setCouponCode('')
+  }, [quote, quoteFresh])
 
   const sendOtp = async () => {
     if (normalizedPhone.length !== 10) {
@@ -266,16 +324,9 @@ export default function CheckoutPage() {
     setOtpLoading(true)
     setOtpCode('')
     try {
-      const res = await fetch('/api/auth/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: normalizedPhone }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Failed to send OTP')
-      setOtpStatus('code-sent')
-      setOtpHint('OTP sent via WhatsApp')
-      showToast('OTP sent successfully')
+      await requestOtp(normalizedPhone)
+      setOtpOpen(true)
+      showToast('OTP sent on WhatsApp')
     } catch (err: any) {
       showToast(err.message || 'Could not send OTP')
     } finally {
@@ -290,55 +341,10 @@ export default function CheckoutPage() {
     }
     setOtpLoading(true)
     try {
-      const res = await fetch('/api/auth/otp/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: normalizedPhone, otp: otpCode.trim() }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Invalid OTP')
-      setOtpStatus('verified')
-      setVerifiedPhone(normalizedPhone)
-      setVerifiedUserId(data.user_id || null)
-      showToast('Phone number verified successfully!')
-      
-      const ordersRes = await fetch(`/api/orders?phone=${normalizedPhone}`).then(r => r.json())
-      if (Array.isArray(ordersRes) && ordersRes.length > 0) {
-        const latest = ordersRes[0]
-        setForm(prev => ({
-          ...prev,
-          name: prev.name || latest.customer_name || '',
-          email: prev.email || latest.customer_email || '',
-          address: prev.address || latest.address || '',
-          city: prev.city || latest.city || '',
-          state: prev.state || latest.state || '',
-          pincode: prev.pincode || latest.pincode || '',
-        }))
-        setCustomerType('returning')
-        rememberAccountPhone(normalizedPhone)
-        
-        const autoCoupon = 'LOYAL12'
-        const cpRes = await fetch(`/api/coupons/validate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: autoCoupon, subtotal, phone: normalizedPhone, isReturning: true })
-        })
-        const cpData = await cpRes.json()
-        if (cpRes.ok && cpData.valid) {
-          setCouponState({
-            code: autoCoupon,
-            discountAmount: cpData.discount_amount,
-            valid: true,
-            free_shipping: cpData.free_shipping,
-            free_cod: cpData.free_cod,
-            free_handling: cpData.free_handling,
-          })
-          showToast('LOYAL12 coupon applied automatically!')
-        }
-      } else {
-        setCustomerType('new')
-        rememberAccountPhone(normalizedPhone)
-      }
+      const data = await confirmOtp(normalizedPhone, otpCode.trim())
+      setOtpOpen(false)
+      setOtpCode('')
+      showToast(data.customer_type === 'returning' ? `Welcome back! ${LOYALTY_CODE} applied.` : 'Phone number verified!')
     } catch (err: any) {
       showToast(err.message || 'OTP verification failed')
     } finally {
@@ -346,43 +352,30 @@ export default function CheckoutPage() {
     }
   }
 
-  const applyCoupon = async () => {
+  const changePhone = async () => {
+    await useSession.getState().signOut()
+    prefilledFor.current = ''
+    loyaltyAutoApplied.current = false
+    setForm(prev => ({ ...prev, phone: '' }))
+    setCouponCode('')
+    setUseCashback(false)
+  }
+
+  const applyCoupon = () => {
     const code = couponInput.trim().toUpperCase()
     if (!code) return
     if (!isPhoneVerified) {
       showToast('Please verify your phone number first')
       return
     }
-    setCouponLoading(true)
-    try {
-      const res = await fetch(`/api/coupons/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, subtotal, phone: normalizedPhone, isReturning: customerType === 'returning' })
-      })
-      const data = await res.json()
-      if (!res.ok || !data.valid) {
-        throw new Error(data.error || 'Invalid coupon code')
-      }
-      setCouponState({
-        code,
-        discountAmount: data.discount_amount,
-        valid: true,
-        free_shipping: data.free_shipping,
-        free_cod: data.free_cod,
-        free_handling: data.free_handling,
-      })
-      showToast('Coupon code applied!')
-    } catch (err: any) {
-      showToast(err.message || 'Could not apply coupon')
-      setCouponState({ code: '', discountAmount: 0, valid: false })
-    } finally {
-      setCouponLoading(false)
-    }
+    loyaltyAutoApplied.current = false
+    setCouponFeedbackFor(code)
+    setCouponCode(code)
   }
 
   const clearCoupon = () => {
-    setCouponState({ code: '', discountAmount: 0, valid: false })
+    loyaltyAutoApplied.current = false
+    setCouponCode('')
     setCouponInput('')
     showToast('Coupon removed')
   }
@@ -391,23 +384,50 @@ export default function CheckoutPage() {
     const { name, value } = e.target
     setForm(prev => ({
       ...prev,
-      [name]: name === 'phone' ? value.replace(/\D/g, '').slice(0, 10) : value,
+      [name]: name === 'phone' ? value.replace(/\D/g, '').slice(0, 10) : name === 'pincode' ? value.replace(/\D/g, '').slice(0, 6) : value,
     }))
   }
 
   const validate = () => {
     if (!form.name.trim()) { showToast('Name is required'); return false }
-    if (normalizedPhone.length !== 10) { showToast('Valid 10-digit number is required'); return false }
     if (!isPhoneVerified) { showToast('Please verify your phone number'); return false }
     if (!form.address.trim()) { showToast('Address is required'); return false }
     if (!form.city.trim()) { showToast('City is required'); return false }
     if (!form.state.trim()) { showToast('State is required'); return false }
     if (!/^\d{6}$/.test(form.pincode)) { showToast('6-digit pincode is required'); return false }
     if (shippingCheck && shippingCheck.serviceable === false) {
-      showToast('This pincode is currently not serviceable for delivery');
+      showToast('This pincode is currently not serviceable for delivery')
       return false
     }
+    if (!quoteFresh) { showToast('Updating your total — one moment'); return false }
+    if (blockingErrors.length) { showToast(blockingErrors[0]); return false }
     return true
+  }
+
+  const orderPayload = () => ({
+    items: quoteBody.items,
+    coupon_code: couponCode || null,
+    use_wallet: useCashback,
+    expected_total: totals.total,
+    customer: {
+      name: form.name,
+      email: form.email,
+      address: form.address,
+      city: form.city,
+      state: form.state,
+      pincode: form.pincode,
+    },
+  })
+
+  const completeOrder = (order: PlacedOrder) => {
+    setPlacedOrder(order)
+    clearCart()
+    loyaltyAutoApplied.current = false
+    setCouponCode('')
+    setCouponInput('')
+    setUseCashback(false)
+    setLoading(false)
+    window.scrollTo({ top: 0 })
   }
 
   // Dynamically loads the Razorpay checkout script if not already present.
@@ -437,27 +457,35 @@ export default function CheckoutPage() {
 
   const handlePayment = async () => {
     if (!validate()) return
-    if (cartItems.length === 0) { showToast('Your cart is empty'); return }
     setLoading(true)
 
     try {
-      // Ensure Razorpay SDK is loaded before proceeding
       await loadRazorpayScript()
+      // The server prices the cart, saves the order and opens a Razorpay
+      // order for exactly that amount.
       const orderRes = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: orderTotal }),
+        body: JSON.stringify(orderPayload()),
       })
-      const rzpOrder = await orderRes.json()
-      if (!orderRes.ok) throw new Error(rzpOrder?.error || 'Could not create payment session')
+      const data = await orderRes.json()
+      if (!orderRes.ok) {
+        if (data?.quote) setQuoteNonce(n => n + 1)
+        throw new Error(data?.error || 'Could not create payment session')
+      }
 
-      const options = {
-        key: (process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '').replace(/"/g, ''),
-        amount: rzpOrder.amount,
-        currency: 'INR',
+      if (data.paid) {
+        completeOrder({ id: data.order_id, ref: data.order_ref, cashback: 0 })
+        return
+      }
+
+      const rzp = new window.Razorpay({
+        key: data.key_id,
+        amount: data.amount,
+        currency: data.currency || 'INR',
         name: 'Mana Dry Fruits',
-        description: 'Order Payment',
-        order_id: rzpOrder.orderId,
+        description: `Order ${data.order_ref}`,
+        order_id: data.razorpay_order_id,
         prefill: {
           name: form.name,
           email: form.email || undefined,
@@ -472,129 +500,66 @@ export default function CheckoutPage() {
         },
         handler: async function (response: any) {
           try {
-            const saveRes = await fetch('/api/orders', {
+            const verifyRes = await fetch('/api/razorpay/verify-order', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                customer_name: form.name,
-                customer_phone: normalizedPhone,
-                customer_email: form.email,
-                address: form.address,
-                city: form.city,
-                state: form.state,
-                pincode: form.pincode,
-                user_id: verifiedUserId,
-                items: cartItems.map(i => ({
-                  product_id: i.product_id,
-                  product_name: i.product_name,
-                  variant_name: i.variant_name,
-                  quantity: i.quantity,
-                  weight_grams: i.weight_grams,
-                  price: i.price,
-                })),
-                subtotal,
-                shipping,
-                cod_charge: 0,
-                small_order_fee: smallOrderFee,
-                coupon_code: couponState.code || null,
-                wallet_amount: walletApplied,
-                payment_id: response.razorpay_payment_id,
-                payment_status: 'paid',
-                status: 'pending',
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
               }),
             })
-
-            const data = await saveRes.json()
-            if (!saveRes.ok) throw new Error(data?.error || 'Could not save order')
-
-            setOrderId(data.id)
-            clearCart()
-            clearCoupon()
-            setUseCashback(false)
-            setStep('success')
+            const result = await verifyRes.json()
+            if (!verifyRes.ok) throw new Error(result?.error || 'Could not confirm your payment')
+            completeOrder({ id: result.id, ref: result.order_ref, cashback: result.cashback_earned || 0 })
           } catch (err: any) {
-            showToast('Order saved with error: ' + (err.message || 'Please contact support'))
-          } finally {
+            showToast(`${err.message || 'Could not confirm your payment'} (Payment ID: ${response.razorpay_payment_id})`)
             setLoading(false)
           }
-        }
-      }
-
-      const rzp1 = new window.Razorpay(options)
-      rzp1.on('payment.failed', function (response: any) {
+        },
+      })
+      rzp.on('payment.failed', function (response: any) {
         showToast('Payment failed: ' + (response.error?.description || 'Please try again'))
         setLoading(false)
       })
-      rzp1.open()
-
+      rzp.open()
     } catch (err: any) {
-      showToast('Payment failed: ' + (err.message || 'Please try again'))
+      showToast(err.message || 'Payment failed. Please try again.')
       setLoading(false)
     }
   }
 
   const handleCashOnDelivery = async () => {
     if (!validate()) return
-    if (cartItems.length === 0) { showToast('Your cart is empty'); return }
     setLoading(true)
 
     try {
       const saveRes = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer_name: form.name,
-          customer_phone: normalizedPhone,
-          customer_email: form.email,
-          address: form.address,
-          city: form.city,
-          state: form.state,
-          pincode: form.pincode,
-          user_id: verifiedUserId,
-          items: cartItems.map(i => ({
-            product_id: i.product_id,
-            product_name: i.product_name,
-            variant_name: i.variant_name,
-            quantity: i.quantity,
-            weight_grams: i.weight_grams,
-            price: i.price,
-          })),
-          subtotal,
-          shipping,
-          cod_charge: COD_CHARGE,
-          small_order_fee: smallOrderFee,
-          coupon_code: couponState.code || null,
-          wallet_amount: walletApplied,
-          payment_status: 'pending',
-          status: 'pending',
-          notes: 'Cash on Delivery',
-        }),
+        body: JSON.stringify(orderPayload()),
       })
-
       const data = await saveRes.json()
-      if (!saveRes.ok) throw new Error(data?.error || 'Could not save COD order')
-
-      setOrderId(data.id)
-      clearCart()
-      clearCoupon()
-      setUseCashback(false)
-      setStep('success')
+      if (!saveRes.ok) {
+        if (data?.quote) setQuoteNonce(n => n + 1)
+        throw new Error(data?.error || 'Could not place COD order')
+      }
+      completeOrder({ id: data.id, ref: data.order_ref, cashback: data.cashback_earned || 0 })
     } catch (err: any) {
       showToast(err.message || 'Could not place COD order')
-    } finally {
       setLoading(false)
     }
   }
 
-  if (step === 'success') {
+  if (placedOrder) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-[5%] py-16" style={{ background: 'rgb(var(--c-ivory))' }}>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto mb-4" style={{ background: 'rgba(var(--c-green5), 0.1)', border: '2px solid var(--green)', color: 'var(--green)' }}>✓</div>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto mb-4" style={{ background: 'rgb(var(--c-green5) / 0.1)', border: '2px solid var(--green)', color: 'var(--green)' }}>✓</div>
           <h1 className="font-serif text-2xl font-light mb-2" style={{ color: 'var(--ink)' }}>Order Placed!</h1>
-          <p className="text-sm mb-1" style={{ color: 'var(--ink3)' }}>Order ID: <strong style={{ color: 'var(--ink)' }}>{orderId.slice(0, 8).toUpperCase()}</strong></p>
+          <p className="text-sm mb-1" style={{ color: 'var(--ink3)' }}>Order ID: <strong style={{ color: 'var(--ink)' }}>{placedOrder.ref || placedOrder.id.slice(0, 8).toUpperCase()}</strong></p>
           <p className="text-sm mb-2" style={{ color: 'var(--ink3)' }}>Thank you for shopping with us.</p>
-          {siteSettings.enable_cashback_earning && cashbackPreview > 0 && <p className="text-sm mb-6" style={{ color: 'var(--green)' }}>You will earn {formatPrice(cashbackPreview)} cashback to your wallet after delivery.</p>}
+          {settings.enable_cashback_earning && placedOrder.cashback > 0 && <p className="text-sm mb-6" style={{ color: 'var(--green)' }}>You will earn {formatPrice(placedOrder.cashback)} cashback to your wallet after delivery.</p>}
           <a
             href="/profile"
             className="btn-primary no-underline inline-flex mb-3"
@@ -617,36 +582,43 @@ export default function CheckoutPage() {
           <h2 className="font-serif text-lg font-normal mb-5" style={{ color: 'var(--ink)' }}>Delivery Details</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Full Name *</label>
-              <input name="name" value={form.name} onChange={handleChange} placeholder="Your full name" className="input" />
+              <label htmlFor="checkout-name" className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Full Name *</label>
+              <input id="checkout-name" name="name" value={form.name} onChange={handleChange} placeholder="Your full name" autoComplete="name" className="input" />
             </div>
             <div>
-              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>WhatsApp Number *</label>
+              <label htmlFor="checkout-phone" className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>WhatsApp Number *</label>
               <div className="flex">
                 <span className="inline-flex items-center px-3 border border-r-0 rounded-l-lg text-sm font-medium" style={{ background: 'rgb(var(--c-ivory3))', borderColor: 'rgb(var(--c-ivory3))', color: 'var(--ink3)' }}>
                   +91
                 </span>
-                <input 
-                  name="phone" 
-                  value={form.phone} 
-                  onChange={handleChange} 
-                  placeholder="9876543210" 
-                  type="tel" 
+                <input
+                  id="checkout-phone"
+                  name="phone"
+                  value={form.phone}
+                  onChange={handleChange}
+                  placeholder="9876543210"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
                   maxLength={10}
-                  className="input rounded-l-none" 
+                  readOnly={isPhoneVerified}
+                  className="input rounded-l-none"
                 />
               </div>
               <div className="mt-2 rounded-lg p-3" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory3))' }}>
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  {otpStatus === 'verified' ? (
-                    <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg w-full font-medium" style={{ background: 'rgba(var(--c-green5), 0.1)', border: '1px solid var(--green)', color: 'var(--green)' }}>
-                      <span className="text-lg leading-none">✓</span> Verified
+                  {isPhoneVerified ? (
+                    <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-lg w-full font-medium" style={{ background: 'rgb(var(--c-green5) / 0.1)', border: '1px solid var(--green)', color: 'var(--green)' }}>
+                      <span className="flex items-center gap-2"><span className="text-lg leading-none">✓</span> Verified</span>
+                      <button type="button" onClick={changePhone} className="text-xs underline bg-transparent border-none cursor-pointer" style={{ color: 'var(--green)' }}>
+                        Change number
+                      </button>
                     </div>
                   ) : (
                     <button
                       type="button"
                       onClick={sendOtp}
-                      disabled={otpLoading || normalizedPhone.length !== 10}
+                      disabled={otpLoading || normalizedPhone.length !== 10 || session.status === 'loading'}
                       className="btn-outline justify-center disabled:opacity-50 w-full"
                     >
                       <span>{otpLoading ? 'Sending OTP...' : 'Send Verification OTP'}</span>
@@ -655,32 +627,31 @@ export default function CheckoutPage() {
                 </div>
                 <p className="mt-2 text-xs" style={{ color: 'var(--ink4)' }}>
                   {isPhoneVerified
-                    ? customerType === 'returning'
-                      ? 'Verified returning customer. Your LOYAL12 discount is auto-applied.'
+                    ? session.customerType === 'returning'
+                      ? `Verified returning customer. Your ${LOYALTY_CODE} discount is auto-applied.`
                       : 'Verified new customer. You can enter an influencer code below for 10% off.'
                     : 'Verify your phone first. We will create your account automatically after OTP verification.'}
                 </p>
-                {otpHint && !isPhoneVerified && (
-                  <p className="mt-1 text-xs" style={{ color: 'var(--green)' }}>{otpHint}</p>
-                )}
               </div>
             </div>
             <div className="sm:col-span-2">
-              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Email (optional)</label>
-              <input name="email" value={form.email} onChange={handleChange} placeholder="your@email.com" type="email" className="input" />
+              <label htmlFor="checkout-email" className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Email (optional)</label>
+              <input id="checkout-email" name="email" value={form.email} onChange={handleChange} placeholder="your@email.com" type="email" autoComplete="email" className="input" />
             </div>
             <div className="sm:col-span-2">
-              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Full Address *</label>
-              <input name="address" value={form.address} onChange={handleChange} placeholder="House/Flat no., Street, Area" className="input" />
+              <label htmlFor="checkout-address" className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Full Address *</label>
+              <input id="checkout-address" name="address" value={form.address} onChange={handleChange} placeholder="House/Flat no., Street, Area" autoComplete="street-address" className="input" />
             </div>
             <div>
-              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>City *</label>
+              <label htmlFor="checkout-city" className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>City *</label>
               <div className="relative">
                 <input
+                  id="checkout-city"
                   name="city"
                   value={form.city}
                   onChange={handleChange}
                   placeholder={pincodeLoading ? 'Fetching...' : 'City'}
+                  autoComplete="address-level2"
                   className={`input pr-16 ${pincodeLoading ? 'opacity-60' : ''}`}
                   readOnly={pincodeLoading}
                 />
@@ -690,13 +661,15 @@ export default function CheckoutPage() {
               </div>
             </div>
             <div>
-              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>State</label>
+              <label htmlFor="checkout-state" className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>State *</label>
               <div className="relative">
                 <input
+                  id="checkout-state"
                   name="state"
                   value={form.state}
                   onChange={handleChange}
                   placeholder={pincodeLoading ? 'Fetching...' : 'State'}
+                  autoComplete="address-level1"
                   className={`input pr-16 ${pincodeLoading ? 'opacity-60' : ''}`}
                   readOnly={pincodeLoading}
                 />
@@ -706,18 +679,18 @@ export default function CheckoutPage() {
               </div>
             </div>
             <div>
-              <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Pincode *</label>
-              <input name="pincode" value={form.pincode} onChange={handleChange} placeholder="110001" className="input" maxLength={6} />
+              <label htmlFor="checkout-pincode" className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--ink3)' }}>Pincode *</label>
+              <input id="checkout-pincode" name="pincode" value={form.pincode} onChange={handleChange} placeholder="110001" inputMode="numeric" autoComplete="postal-code" className="input" maxLength={6} />
               {shippingCheckLoading ? (
                 <div className="mt-2 text-xs" style={{ color: 'var(--ink4)' }}>Checking delivery availability...</div>
               ) : shippingCheck ? (
                 <div className="mt-2 rounded-lg border px-3 py-2 text-xs" style={{
-                  borderColor: shippingCheck.serviceable ? 'rgba(var(--c-green5), 0.4)' : 'rgba(var(--c-terra3), 0.4)',
-                  background: shippingCheck.serviceable ? 'rgba(var(--c-green6), 0.2)' : 'rgba(var(--c-terra4), 0.2)',
+                  borderColor: shippingCheck.serviceable ? 'rgb(var(--c-green5) / 0.4)' : 'rgb(var(--c-terra3) / 0.4)',
+                  background: shippingCheck.serviceable ? 'rgb(var(--c-green6) / 0.2)' : 'rgb(var(--c-terra4) / 0.2)',
                   color: shippingCheck.serviceable ? 'var(--green)' : 'var(--terra)'
                 }}>
                   <div className="font-medium">
-                    {shippingCheck.serviceable ? 'Delivery available' : shippingCheck.configured ? 'Delivery unavailable' : 'NimbusPost check not configured'}
+                    {shippingCheck.serviceable ? 'Delivery available' : shippingCheck.configured ? 'Delivery unavailable' : 'Delivery check unavailable right now'}
                   </div>
                   {shippingCheck.serviceable && (
                     <div className="mt-1" style={{ color: 'var(--ink3)' }}>
@@ -737,43 +710,66 @@ export default function CheckoutPage() {
               <h3 className="font-sans text-sm font-medium mb-3" style={{ color: 'var(--ink)' }}>Discounts</h3>
               <p className="text-xs mb-2" style={{ color: 'var(--ink4)' }}>
                 {isPhoneVerified
-                  ? (customerType === 'returning' ? 'Welcome back! Your LOYAL12 discount is auto-applied if eligible, but you can use another code.' : 'Enter your discount or influencer code to apply your savings.')
+                  ? (session.customerType === 'returning' ? `Welcome back! Your ${LOYALTY_CODE} discount is auto-applied if eligible, but you can use another code.` : 'Enter your discount or influencer code to apply your savings.')
                   : 'You can enter a discount code now. Phone verification is required to apply it.'}
               </p>
-              {!couponState.valid ? (
+              {!couponCode ? (
                 <div className="flex gap-2">
-                  <input value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} className="input" placeholder="Enter influencer code" />
-                  <button type="button" onClick={applyCoupon} disabled={couponLoading} className="btn-primary justify-center px-5">
-                    <span>{couponLoading ? 'Checking...' : 'Apply'}</span>
+                  <input
+                    value={couponInput}
+                    onChange={e => setCouponInput(e.target.value.toUpperCase())}
+                    onKeyDown={e => { if (e.key === 'Enter') applyCoupon() }}
+                    className="input"
+                    placeholder="Enter influencer code"
+                    aria-label="Coupon code"
+                  />
+                  <button type="button" onClick={applyCoupon} className="btn-primary justify-center px-5">
+                    <span>Apply</span>
                   </button>
                 </div>
               ) : (
-                <div className="mt-2 flex flex-col gap-1 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'rgba(var(--c-green5), 0.4)', background: 'rgba(var(--c-green5), 0.1)', color: 'var(--green)' }}>
-                  <div className="flex items-center justify-between">
+                <div
+                  className="mt-2 flex flex-col gap-1 rounded-lg border px-3 py-2 text-sm"
+                  style={totals.couponApplied
+                    ? { borderColor: 'rgb(var(--c-green5) / 0.4)', background: 'rgb(var(--c-green5) / 0.1)', color: 'var(--green)' }
+                    : { borderColor: 'rgb(var(--c-terra3) / 0.4)', background: 'rgb(var(--c-terra4) / 0.15)', color: 'var(--terra)' }}
+                  aria-live="polite"
+                >
+                  <div className="flex items-center justify-between gap-3">
                     <div>
-                      <span className="font-medium">{couponState.code} applied.</span>
-                      {discount > 0 && <span className="ml-1">You saved {formatPrice(couponState.discountAmount)}.</span>}
+                      {totals.couponApplied ? (
+                        <>
+                          <span className="font-medium">{couponCode} applied.</span>
+                          {totals.discount > 0 && <span className="ml-1">You save {formatPrice(totals.discount)}.</span>}
+                        </>
+                      ) : couponInfo?.error ? (
+                        <span>{couponInfo.error}</span>
+                      ) : totals.couponMessage ? (
+                        <span>{totals.couponMessage}</span>
+                      ) : (
+                        <span style={{ color: 'var(--ink3)' }}>Checking {couponCode}…</span>
+                      )}
                     </div>
-                    <button type="button" onClick={clearCoupon} className="text-xs underline bg-transparent border-none cursor-pointer hover:text-terra" style={{ color: 'var(--green)' }}>Remove</button>
+                    <button type="button" onClick={clearCoupon} className="text-xs underline bg-transparent border-none cursor-pointer hover:text-terra shrink-0" style={{ color: 'inherit' }}>Remove</button>
                   </div>
-                  {(couponState.free_shipping || couponState.free_cod || couponState.free_handling) && (
+                  {appliedRules && (appliedRules.free_shipping || appliedRules.free_cod || appliedRules.free_handling) && (
                     <div className="flex gap-1.5 flex-wrap mt-1">
-                      {couponState.free_shipping && <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: 'var(--green)' }}>Free Delivery</span>}
-                      {couponState.free_cod && <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: 'var(--green)' }}>Free COD</span>}
-                      {couponState.free_handling && <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: 'var(--green)' }}>Free Handling</span>}
+                      {appliedRules.free_shipping && <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: 'var(--green)' }}>Free Delivery</span>}
+                      {appliedRules.free_cod && <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: 'var(--green)' }}>Free COD</span>}
+                      {appliedRules.free_handling && <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{ background: 'var(--green)' }}>Free Handling</span>}
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            {siteSettings.enable_cashback_spending && (
+            {settings.enable_cashback_spending && (
             <div>
               <h3 className="font-sans text-sm font-medium mb-3" style={{ color: 'var(--ink)' }}>Cashback Wallet</h3>
               <div className="rounded-xl p-4" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory3))' }}>
-                {normalizedPhone.length < 10 ? (
-                  <p className="text-sm" style={{ color: 'var(--ink3)' }}>Enter your WhatsApp number to check wallet balance and cashback eligibility.</p>
-                ) : walletLoading ? (
+                {!isPhoneVerified ? (
+                  <p className="text-sm" style={{ color: 'var(--ink3)' }}>Verify your WhatsApp number to check your wallet balance and cashback.</p>
+                ) : !quote ? (
                   <p className="text-sm" style={{ color: 'var(--ink3)' }}>Loading wallet...</p>
                 ) : (
                   <div className="space-y-3">
@@ -791,13 +787,13 @@ export default function CheckoutPage() {
                       />
                       Use cashback on this order
                     </label>
-                    {useCashback && walletApplied > 0 && (
-                      <div className="text-sm" style={{ color: 'var(--green)' }}>Using {formatPrice(walletApplied)} from wallet.</div>
+                    {useCashback && totals.walletUsed > 0 && (
+                      <div className="text-sm" style={{ color: 'var(--green)' }}>Using {formatPrice(totals.walletUsed)} from wallet.</div>
                     )}
-                    {siteSettings.enable_cashback_earning && (
+                    {settings.enable_cashback_earning && (
                       <div className="text-xs" style={{ color: 'var(--ink4)' }}>
                         You earn 5% cashback on every order.
-                        <br/>You will get {formatPrice(cashbackPreview)} credited to your wallet once this order is delivered.
+                        <br/>You will get {formatPrice(totals.cashback)} credited to your wallet once this order is delivered.
                       </div>
                     )}
                   </div>
@@ -809,13 +805,15 @@ export default function CheckoutPage() {
 
             <div>
               <h3 className="font-sans text-sm font-medium mb-3" style={{ color: 'var(--ink)' }}>Payment Method</h3>
-              <div className="flex gap-3 flex-wrap">
+              <div className="flex gap-3 flex-wrap" role="radiogroup" aria-label="Payment method">
                 <button
                   type="button"
+                  role="radio"
+                  aria-checked={paymentMethod === 'online'}
                   onClick={() => setPaymentMethod('online')}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border cursor-pointer transition-all"
                   style={{
-                    background: paymentMethod === 'online' ? 'rgba(var(--c-green5), 0.1)' : 'rgb(var(--c-ivory3))',
+                    background: paymentMethod === 'online' ? 'rgb(var(--c-green5) / 0.1)' : 'rgb(var(--c-ivory3))',
                     borderColor: paymentMethod === 'online' ? 'var(--green)' : 'rgb(var(--c-ivory3))',
                     color: paymentMethod === 'online' ? 'var(--green)' : 'var(--ink3)'
                   }}
@@ -825,10 +823,12 @@ export default function CheckoutPage() {
                 </button>
                 <button
                   type="button"
+                  role="radio"
+                  aria-checked={paymentMethod === 'cod'}
                   onClick={() => setPaymentMethod('cod')}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border cursor-pointer transition-all"
                   style={{
-                    background: paymentMethod === 'cod' ? 'rgba(var(--c-green5), 0.1)' : 'rgb(var(--c-ivory3))',
+                    background: paymentMethod === 'cod' ? 'rgb(var(--c-green5) / 0.1)' : 'rgb(var(--c-ivory3))',
                     borderColor: paymentMethod === 'cod' ? 'var(--green)' : 'rgb(var(--c-ivory3))',
                     color: paymentMethod === 'cod' ? 'var(--green)' : 'var(--ink3)'
                   }}
@@ -838,7 +838,9 @@ export default function CheckoutPage() {
                 </button>
               </div>
               {paymentMethod === 'cod' && (
-                <p className="text-xs mt-2" style={{ color: 'var(--terra)' }}>₹29 COD charge will be added to your order.</p>
+                <p className="text-xs mt-2" style={{ color: 'var(--terra)' }}>
+                  {appliedRules?.free_cod ? 'COD charge waived by your coupon.' : `${formatPrice(COD_CHARGE)} COD charge will be added to your order.`}
+                </p>
               )}
               <p className="text-xs mt-2" style={{ color: 'var(--ink4)' }}>Secure payment powered by Razorpay</p>
             </div>
@@ -848,9 +850,15 @@ export default function CheckoutPage() {
         <div className="rounded-xl p-5 shadow-soft lg:sticky lg:top-20" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-ivory3))' }}>
           <h2 className="font-serif text-lg font-normal mb-4" style={{ color: 'var(--ink)' }}>Order Summary</h2>
 
+          {hydrated && cartItems.length === 0 && (
+            <div className="text-sm py-6 text-center" style={{ color: 'var(--ink3)' }}>
+              Your cart is empty. <a href="/products" style={{ color: 'var(--green)' }}>Browse products</a>
+            </div>
+          )}
+
           <div className="flex flex-col gap-3 mb-4 max-h-[300px] overflow-y-auto pr-2">
-            {cartItems.map((item, i) => (
-              <div key={`${item.product_id}-${item.variant_id}-${i}`} className="flex gap-3">
+            {cartItems.map((item) => (
+              <div key={`${item.product_id}-${item.variant_id}-${item.weight_grams}`} className="flex gap-3">
                 <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0" style={{ background: 'rgb(var(--c-ivory3))' }}>
                   {item.product_image && <Image src={item.product_image} alt={item.product_name} width={64} height={64} className="object-cover w-full h-full" />}
                 </div>
@@ -862,10 +870,12 @@ export default function CheckoutPage() {
                       {(item.weight_grams * item.quantity) >= 1000 ? ((item.weight_grams * item.quantity) / 1000).toFixed(1) + 'kg total' : (item.weight_grams * item.quantity) + 'g total'}
                     </div>
                   )}
-                  
+
                   <div className="flex items-center gap-2 mt-2">
                     <button
-                      onClick={() => updateQty(item.product_id, item.variant_id, item.quantity - 1)}
+                      type="button"
+                      onClick={() => updateQty(item.product_id, item.variant_id, item.quantity - 1, item.weight_grams)}
+                      aria-label={`Decrease quantity of ${item.product_name}`}
                       className="w-6 h-6 rounded border bg-transparent text-base flex items-center justify-center cursor-pointer transition-colors"
                       style={{ color: 'var(--green)', borderColor: 'rgb(var(--c-ivory3))' }}
                     >−</button>
@@ -873,13 +883,16 @@ export default function CheckoutPage() {
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => updateQty(item.product_id, item.variant_id, Math.min(10, item.quantity + 1))}
+                      type="button"
+                      onClick={() => updateQty(item.product_id, item.variant_id, Math.min(10, item.quantity + 1), item.weight_grams)}
                       disabled={item.quantity >= 10}
+                      aria-label={`Increase quantity of ${item.product_name}`}
                       className="w-6 h-6 rounded border bg-transparent text-base flex items-center justify-center cursor-pointer transition-colors disabled:opacity-50"
                       style={{ color: 'var(--green)', borderColor: 'rgb(var(--c-ivory3))' }}
                     >+</button>
                     <button
-                      onClick={() => removeItem(item.product_id, item.variant_id)}
+                      type="button"
+                      onClick={() => removeItem(item.product_id, item.variant_id, item.weight_grams)}
                       className="text-xs underline bg-transparent border-none cursor-pointer hover:text-terra transition-colors ml-2"
                       style={{ color: 'var(--ink4)' }}
                     >Remove</button>
@@ -892,44 +905,44 @@ export default function CheckoutPage() {
             ))}
           </div>
 
-          <div className="pt-3 flex flex-col gap-2 mb-4" style={{ borderTop: '1px solid rgb(var(--c-ivory3))' }}>
+          <div className="pt-3 flex flex-col gap-2 mb-4" style={{ borderTop: '1px solid rgb(var(--c-ivory3))' }} aria-live="polite">
             <div className="flex justify-between text-sm" style={{ color: 'var(--ink3)' }}>
-              <span>Subtotal</span><span>{formatPrice(subtotal)}</span>
+              <span>Subtotal</span><span>{formatPrice(totals.subtotal)}</span>
             </div>
-            {discount > 0 && (
+            {totals.discount > 0 && (
               <div className="flex justify-between text-sm font-medium" style={{ color: 'var(--green)' }}>
-                <span>Discount ({couponState.code})</span><span>-{formatPrice(discount)}</span>
+                <span>Discount ({couponCode})</span><span>-{formatPrice(totals.discount)}</span>
               </div>
             )}
-            {walletApplied > 0 && (
+            {totals.walletUsed > 0 && (
               <div className="flex justify-between text-sm font-medium" style={{ color: 'var(--green)' }}>
-                <span>Wallet Cashback</span><span>-{formatPrice(walletApplied)}</span>
+                <span>Wallet Cashback</span><span>-{formatPrice(totals.walletUsed)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm" style={{ color: 'var(--ink3)' }}>
               <span>Shipping</span>
-              <span>{shipping === 0 ? <span className="font-medium" style={{ color: 'var(--green)' }}>{couponState.free_shipping ? 'FREE (Coupon)' : 'Free'}</span> : formatPrice(shipping)}</span>
+              <span>{totals.shipping === 0 ? <span className="font-medium" style={{ color: 'var(--green)' }}>{appliedRules?.free_shipping ? 'FREE (Coupon)' : 'Free'}</span> : formatPrice(totals.shipping)}</span>
             </div>
-            {(codCharge > 0 || (paymentMethod === 'cod' && couponState.free_cod)) && (
+            {paymentMethod === 'cod' && (
               <div className="flex justify-between text-sm" style={{ color: 'var(--ink3)' }}>
                 <span>COD Charge</span>
-                <span>{couponState.free_cod ? <span className="font-medium flex items-center gap-1" style={{ color: 'var(--green)' }}><span className="line-through text-xs" style={{ color: 'var(--ink4)' }}>₹29</span> FREE</span> : formatPrice(codCharge)}</span>
+                <span>{totals.codCharge === 0 ? <span className="font-medium flex items-center gap-1" style={{ color: 'var(--green)' }}><span className="line-through text-xs" style={{ color: 'var(--ink4)' }}>{formatPrice(COD_CHARGE)}</span> FREE</span> : formatPrice(totals.codCharge)}</span>
               </div>
             )}
-            {(smallOrderFee > 0 || (subtotal < 50000 && couponState.free_handling)) && (
+            {totals.subtotal < SMALL_ORDER_THRESHOLD && totals.subtotal > 0 && (
               <div className="flex justify-between text-sm" style={{ color: 'var(--ink3)' }}>
                 <span>Handling Fee</span>
-                <span>{couponState.free_handling ? <span className="font-medium flex items-center gap-1" style={{ color: 'var(--green)' }}><span className="line-through text-xs" style={{ color: 'var(--ink4)' }}>₹19</span> FREE</span> : formatPrice(smallOrderFee)}</span>
+                <span>{totals.smallOrderFee === 0 ? <span className="font-medium flex items-center gap-1" style={{ color: 'var(--green)' }}><span className="line-through text-xs" style={{ color: 'var(--ink4)' }}>{formatPrice(SMALL_ORDER_FEE)}</span> FREE</span> : formatPrice(totals.smallOrderFee)}</span>
               </div>
             )}
             <div className="flex justify-between font-medium pt-2 mt-1" style={{ borderTop: '1px solid rgb(var(--c-ivory3))', color: 'var(--ink)' }}>
               <span>Total</span>
-              <span className="font-serif text-xl" style={{ color: 'var(--green)' }}>{formatPrice(orderTotal)}</span>
+              <span className="font-serif text-xl" style={{ color: 'var(--green)' }}>{formatPrice(totals.total)}</span>
             </div>
-            {siteSettings.enable_cashback_earning && cashbackPreview > 0 && (
+            {settings.enable_cashback_earning && totals.cashback > 0 && (
               <div className="flex items-center justify-between font-medium mb-3 pt-3" style={{ borderTop: '1px solid rgb(var(--c-ivory3))', color: 'var(--green)' }}>
                 <span className="text-sm">
-                  Cashback preview: {formatPrice(cashbackPreview)}
+                  Cashback preview: {formatPrice(totals.cashback)}
                 </span>
               </div>
             )}
@@ -947,17 +960,34 @@ export default function CheckoutPage() {
             )}
           </div>
 
+          {(blockingErrors.length > 0 || quoteError) && (
+            <div className="mb-3 rounded-lg px-3 py-2 text-xs" role="alert" style={{ border: '1px solid rgb(var(--c-terra3) / 0.4)', background: 'rgb(var(--c-terra4) / 0.15)', color: 'var(--terra)' }}>
+              {(blockingErrors.length ? blockingErrors : [quoteError]).map(message => <div key={message}>{message}</div>)}
+              {!blockingErrors.length && quoteError && !quoteLoading && quoteRetries >= 3 && (
+                <button
+                  type="button"
+                  onClick={() => { setQuoteRetries(0); setQuoteNonce(n => n + 1) }}
+                  className="mt-1 underline bg-transparent border-none cursor-pointer p-0 text-xs"
+                  style={{ color: 'inherit' }}
+                >
+                  Try again
+                </button>
+              )}
+            </div>
+          )}
+
           {paymentMethod === 'online' ? (
-            <button onClick={handlePayment} disabled={loading || cartItems.length === 0} className="btn-primary w-full justify-center disabled:opacity-50">
-              <span>{loading ? 'Processing...' : `Pay ${formatPrice(orderTotal)}`}</span>
+            <button type="button" onClick={handlePayment} disabled={!canSubmit} className="btn-primary w-full justify-center disabled:opacity-50">
+              <span>{loading ? 'Processing...' : !quoteFresh && cartItems.length ? 'Updating total…' : `Pay ${formatPrice(totals.total)}`}</span>
             </button>
           ) : (
             <button
+              type="button"
               onClick={handleCashOnDelivery}
-              disabled={loading || cartItems.length === 0}
+              disabled={!canSubmit}
               className="btn-primary w-full justify-center disabled:opacity-50"
             >
-              <span>{loading ? 'Processing...' : `Place COD Order · ${formatPrice(orderTotal)}`}</span>
+              <span>{loading ? 'Processing...' : !quoteFresh && cartItems.length ? 'Updating total…' : `Place COD Order · ${formatPrice(totals.total)}`}</span>
             </button>
           )}
 
@@ -967,31 +997,36 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {otpStatus === 'code-sent' && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00000080] backdrop-blur-sm p-4">
+      {otpOpen && !isPhoneVerified && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00000080] backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="otp-title">
           <div className="rounded-2xl shadow-2xl w-full max-w-[360px] p-6 relative" style={{ background: 'rgb(var(--c-ivory2))' }}>
-            <button 
-              onClick={() => setOtpStatus('unverified')} 
+            <button
+              type="button"
+              onClick={() => setOtpOpen(false)}
+              aria-label="Close"
               className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full transition-colors border-none cursor-pointer"
               style={{ background: 'rgb(var(--c-ivory3))', color: 'var(--ink3)' }}
             >
               ✕
             </button>
-            <h3 className="font-serif text-xl mb-1 text-center" style={{ color: 'var(--ink)' }}>OTP Verification</h3>
+            <h3 id="otp-title" className="font-serif text-xl mb-1 text-center" style={{ color: 'var(--ink)' }}>OTP Verification</h3>
             <p className="text-sm text-center mb-6" style={{ color: 'var(--ink3)' }}>
-              Code sent to <strong style={{ color: 'var(--ink)' }}>+91 {normalizedPhone}</strong>
+              Code sent to <strong style={{ color: 'var(--ink)' }}>+91 {normalizedPhone}</strong> on WhatsApp
             </p>
-            
+
             <input
               value={otpCode}
               onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onKeyDown={e => { if (e.key === 'Enter') void verifyOtp() }}
               placeholder="123456"
+              aria-label="One-time password"
+              autoComplete="one-time-code"
               className="input w-full text-center tracking-[0.5em] text-2xl font-bold mb-4 py-3 placeholder:tracking-normal placeholder:font-normal placeholder:text-base outline-none focus:ring-2 focus:ring-green-4"
               style={{ border: '2px solid rgb(var(--c-ivory3))' }}
               inputMode="numeric"
               autoFocus
             />
-            
+
             <button
               type="button"
               onClick={verifyOtp}
@@ -1000,24 +1035,18 @@ export default function CheckoutPage() {
             >
               <span>{otpLoading ? 'Verifying...' : 'Verify Code'}</span>
             </button>
-            
+
             <div className="mt-4 text-center">
-              <button 
-                type="button" 
-                onClick={sendOtp} 
+              <button
+                type="button"
+                onClick={sendOtp}
                 disabled={otpLoading}
                 className="text-xs font-medium underline bg-transparent border-none cursor-pointer p-0"
                 style={{ color: 'var(--green)' }}
               >
-                Didn't receive it? Resend
+                Didn&apos;t receive it? Resend
               </button>
             </div>
-            
-            {otpHint && (
-              <div className="mt-5 p-3 rounded-lg text-xs text-center font-medium" style={{ border: '1px solid var(--green)', background: 'rgba(var(--c-green5), 0.1)', color: 'var(--green)' }}>
-                {otpHint}
-              </div>
-            )}
           </div>
         </div>
       )}

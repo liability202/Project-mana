@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { LOYALTY_CODE, LOYALTY_DISCOUNT_PCT } from '@/lib/commerce'
 import { rangeStartISO } from '@/lib/date-ranges'
+import { isAdminRequest, unauthorized } from '@/lib/admin-auth'
 
 /**
  * Analytics for the built-in loyalty code.
@@ -14,10 +15,7 @@ import { rangeStartISO } from '@/lib/date-ranges'
  * separately, matching how the coupon table treats them.
  */
 export async function GET(req: Request) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAdminRequest(req)) return unauthorized()
 
   try {
     const since = rangeStartISO(new URL(req.url).searchParams.get('range'))

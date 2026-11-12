@@ -40,7 +40,14 @@ export function Navbar() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.key === '/' || (e.ctrlKey && e.key === 'k')) && !searchOpen) {
+      // Never steal keystrokes from a field the shopper is typing in
+      // (e.g. "12/4 MG Road" in the checkout address).
+      const target = e.target as HTMLElement | null
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
+
+      const slash = e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey
+      const commandK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'
+      if ((slash || commandK) && !searchOpen) {
         e.preventDefault()
         setSearchOpen(true)
       }

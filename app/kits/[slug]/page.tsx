@@ -9,6 +9,7 @@ import { showToast } from '@/components/ui/Toaster'
 import { BuyNowPopup } from '@/components/product/BuyNowPopup'
 import type { Product, Variant } from '@/lib/supabase'
 import { breadcrumbJsonLd, productJsonLd } from '@/lib/seo'
+import { buildKitVariantId, getKitSizeDisplayName, kitItemBasePrice, priceKitSelection } from '@/lib/pricing'
 
 type KitItem = {
   id: string
@@ -51,28 +52,13 @@ type ItemState = {
   ratio: number
 }
 
-const CREATIVE_SIZE_NAMES = ['Essential', 'Signature', 'Reserve']
-
-function getSizeDisplayName(name: string | undefined, index: number) {
-  if (!name) return CREATIVE_SIZE_NAMES[index] || `Kit Size ${index + 1}`
-  const normalized = name.trim().toLowerCase()
-  if (['small', 'mini', 'mini ritual'].includes(normalized)) return 'Essential'
-  if (['medium', 'regular', 'daily bhandar'].includes(normalized)) return 'Signature'
-  if (['large', 'family', 'family reserve'].includes(normalized)) return 'Reserve'
-  return name
-}
+// Pricing and naming come from lib/pricing so the price shown here is exactly
+// what checkout charges.
+const getSizeDisplayName = getKitSizeDisplayName
+const getBasePrice = kitItemBasePrice
 
 function roundToStep(value: number, step = 25) {
   return Math.max(step, Math.round(value / step) * step)
-}
-
-function pricePerGram(item: KitItem) {
-  if (item.price_per_gram && item.price_per_gram > 0) return item.price_per_gram
-  return (item.price || 0) / 500
-}
-
-function getBasePrice(item: KitItem, grams: number) {
-  return Math.round(pricePerGram(item) * grams)
 }
 
 function normalizeVariants(kit: KitProduct): KitVariant[] {
@@ -226,7 +212,9 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
         return {
           id: item.id,
           selected: previous?.selected ?? true,
-          grams: previous?.selected === false ? 0 : roundToStep(recommended * ratio),
+          // Untouched items keep the exact recipe amount, so the default kit
+          // costs exactly the tier price; only scaled items snap to 25g.
+          grams: previous?.selected === false ? 0 : ratio === 1 ? recommended : roundToStep(recommended * ratio),
           ratio,
         }
       })
@@ -253,9 +241,8 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
   const defaultRawTotal = activeItems.reduce((sum, item) => (
     sum + getBasePrice(item, item.grams || activeVar?.grams_each || 100)
   ), 0)
-  const dynamicRawTotal = selectedItems.reduce((sum, item) => sum + getBasePrice(item, item.grams), 0)
   const kitFactor = defaultRawTotal > 0 ? (activeVar?.price || kit.price || defaultRawTotal) / defaultRawTotal : 1
-  const price = Math.max(0, Math.round(dynamicRawTotal * kitFactor))
+  const price = activeVar ? priceKitSelection(activeVar, kit.price, selectedItems.map(item => ({ item, grams: item.grams }))) : 0
   const totalWeight = selectedItems.reduce((sum, item) => sum + item.grams, 0)
   const totalWeightLabel = totalWeight >= 1000
     ? `${(totalWeight / 1000).toFixed(totalWeight % 1000 === 0 ? 0 : 1)}kg`
@@ -291,7 +278,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
       product_id: kit.id,
       product_name: kit.name,
       product_image: image,
-      variant_id: `${activeVar?.id || 'kit'}-${form}-${selectedItems.map(item => `${item.id}:${item.grams}`).join('|')}`,
+      variant_id: buildKitVariantId(activeVar?.id || 'kit', form, selectedItems.map(item => ({ id: item.id, grams: item.grams }))),
       variant_name: `${tierNamePart}${sizeLabel} - ${form === 'powder' ? 'Powder' : 'Whole'} - ${selectedItems.map(item => `${item.name} ${item.grams}g`).join(', ')}`,
       weight_grams: totalWeight,
       price,
@@ -327,7 +314,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
               <div className="h-full w-full flex items-center justify-center" style={{ color: 'var(--ink4)' }}>No image</div>
             )}
           </div>
-          <div className="mt-5 rounded-[20px] p-5" style={{ border: '1px solid rgba(var(--c-green5), 0.4)', background: 'rgba(var(--c-green6), 0.5)' }}>
+          <div className="mt-5 rounded-[20px] p-5" style={{ border: '1px solid rgb(var(--c-green5) / 0.4)', background: 'rgb(var(--c-green6) / 0.5)' }}>
             <div className="text-[.62rem] tracking-[.2em] uppercase mb-2" style={{ color: 'var(--ink4)' }}>Description</div>
             <p className="text-[.9rem] leading-[1.8]" style={{ color: 'var(--ink3)' }}>{kit.description}</p>
           </div>
@@ -390,7 +377,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
             {activeVar?.size_desc && <div className="text-[.72rem] mt-2" style={{ color: 'var(--ink3)' }}>{activeVar.size_desc}</div>}
           </div>
 
-          <div className="rounded-2xl p-4" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgba(var(--c-ivory), 0.7)' }}>
+          <div className="rounded-2xl p-4" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory) / 0.7)' }}>
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
                 <div className="text-[.62rem] tracking-[.2em] uppercase" style={{ color: 'var(--ink4)' }}>Selected configuration</div>
@@ -445,7 +432,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
           )}
 
           {isCustomizing && (
-              <div className="rounded-2xl p-4" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgba(var(--c-ivory), 0.7)' }}>
+              <div className="rounded-2xl p-4" style={{ border: '1px solid rgb(var(--c-ivory3))', background: 'rgb(var(--c-ivory) / 0.7)' }}>
                 <div className="flex items-center justify-between gap-3 mb-3">
               <div className="text-[.62rem] tracking-[.2em] uppercase" style={{ color: 'var(--ink4)' }}>Adjust individual products</div>
                   <div className="text-[.68rem]" style={{ color: 'var(--ink3)' }}>{selectedItems.length}/{activeItems.length} selected</div>
@@ -523,8 +510,8 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
             </div>
           )}
 
-          <div className="rounded-2xl p-4" style={{ border: '1px solid rgba(var(--c-green5), 0.4)', background: 'rgba(var(--c-green6), 0.6)' }}>
-            <div className="space-y-1.5 pb-3 mb-3" style={{ borderBottom: '1px solid rgba(var(--c-green5), 0.3)' }}>
+          <div className="rounded-2xl p-4" style={{ border: '1px solid rgb(var(--c-green5) / 0.4)', background: 'rgb(var(--c-green6) / 0.6)' }}>
+            <div className="space-y-1.5 pb-3 mb-3" style={{ borderBottom: '1px solid rgb(var(--c-green5) / 0.3)' }}>
               {selectedItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between gap-3 text-[.78rem]" style={{ color: 'var(--ink3)' }}>
                   <span>{item.name} ({item.grams}g)</span>

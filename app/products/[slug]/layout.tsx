@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { BRAND_NAME, SITE_URL } from '@/lib/seo'
+import { findProductBySlug } from '@/lib/product-lookup'
 
 // The product page itself is a client component, so it cannot export metadata.
 // This server layout wraps it purely to give each product a real <title>,
@@ -10,33 +12,24 @@ export const revalidate = 3600
 
 type Props = { params: { slug: string } }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const client = supabaseAdmin || supabase
-  let { data: product } = await client
-    .from('products')
-    .select('name, description, category, images, price, in_stock')
-    .ilike('slug', params.slug)
-    .maybeSingle()
+type ProductMeta = {
+  slug: string
+  name: string
+  description: string | null
+  category: string | null
+  images: string[] | null
+}
 
-  if (!product && params.slug) {
-    const kw = params.slug.split('-')[0]
-    if (kw && kw.length >= 3) {
-      const { data: kwMatch } = await client
-        .from('products')
-        .select('name, description, category, images, price, in_stock')
-        .or(`slug.ilike.%${kw}%,name.ilike.%${kw}%`)
-        .limit(1)
-      if (kwMatch && kwMatch[0]) product = kwMatch[0]
-    }
-  }
+const META_COLUMNS = 'slug, name, description, category, images'
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { product } = await findProductBySlug<ProductMeta>(supabaseAdmin || supabase, params.slug, META_COLUMNS)
 
   if (!product) {
-    return {
-      title: 'Product Not Found',
-      alternates: { canonical: `/products/${params.slug}` },
-    }
+    return { title: 'Product Not Found', robots: { index: false } }
   }
 
+  const path = product.category === 'kits' ? `/kits/${product.slug}` : `/products/${product.slug}`
   const category = String(product.category || '').replace(/-/g, ' ')
   const title = `Buy ${product.name} Online${category ? ` – Premium ${category}` : ''}`
   const description = (product.description || '')
@@ -50,12 +43,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
-    alternates: { canonical: `/products/${params.slug}` },
+    alternates: { canonical: path },
     openGraph: {
       type: 'website',
       title: `${product.name} | ${BRAND_NAME}`,
       description,
-      url: `${SITE_URL}/products/${params.slug}`,
+      url: `${SITE_URL}${path}`,
       siteName: BRAND_NAME,
       ...(image ? { images: [{ url: image, alt: product.name }] } : {}),
     },
@@ -68,6 +61,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default function ProductLayout({ children }: { children: React.ReactNode }) {
+export default async function ProductLayout({ children, params }: { children: React.ReactNode; params: { slug: string } }) {
+  const { product, error } = await findProductBySlug<ProductMeta>(supabaseAdmin || supabase, params.slug, 'slug, category')
+
+  // A database hiccup must not be cached as a 404; let the page handle it.
+  if (error) return <>{children}</>
+  if (!product) notFound()
+
+  // One URL per product: kits live under /kits (their builder prices them
+  // correctly), and near-miss slugs go to the real one.
+  if (product.category === 'kits') permanentRedirect(`/kits/${product.slug}`)
+  if (product.slug !== params.slug) permanentRedirect(`/products/${product.slug}`)
+
   return <>{children}</>
 }

@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { handleIncomingMessage } from '@/lib/whatsapp/bot'
 
@@ -7,16 +8,38 @@ export async function GET(req: NextRequest) {
   const token = searchParams.get('hub.verify_token')
   const challenge = searchParams.get('hub.challenge')
 
-  if (mode === 'subscribe' && token === process.env.WEBHOOK_VERIFY_TOKEN) {
+  if (mode === 'subscribe' && process.env.WEBHOOK_VERIFY_TOKEN && token === process.env.WEBHOOK_VERIFY_TOKEN) {
     return new NextResponse(challenge || '', { status: 200 })
   }
 
   return new NextResponse('Forbidden', { status: 403 })
 }
 
+/**
+ * Meta signs each delivery with the app secret (X-Hub-Signature-256). Without
+ * this check anyone could post fake messages "from" any customer's number.
+ * Set WHATSAPP_APP_SECRET (Meta app → Settings → Basic → App secret).
+ */
+function hasValidSignature(rawBody: string, header: string | null) {
+  const secret = process.env.WHATSAPP_APP_SECRET
+  if (!secret) {
+    // Deliberately fail open until the secret is configured: failing closed
+    // would silently stop the bot replying to every customer.
+    console.error('[whatsapp] WHATSAPP_APP_SECRET is not set; anyone can post fake messages to this webhook.')
+    return true
+  }
+  const expected = Buffer.from(`sha256=${crypto.createHmac('sha256', secret).update(rawBody).digest('hex')}`)
+  const received = Buffer.from(header || '')
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received)
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const rawBody = await req.text()
+    if (!hasValidSignature(rawBody, req.headers.get('x-hub-signature-256'))) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+    const body = JSON.parse(rawBody)
     const entry = body.entry?.[0]
     const changes = entry?.changes?.[0]
     const value = changes?.value

@@ -1,15 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { isAdminToken } from '@/lib/admin-auth'
 
 const BUCKET = process.env.SUPABASE_INVOICE_BUCKET || 'order-invoices'
 const MAX_BYTES = 10 * 1024 * 1024
 const ALLOWED_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp']
 
 function isAuthorised(req: Request, formSecret?: string) {
-  const adminSecret = (process.env.ADMIN_SECRET || '').trim()
-  if (!adminSecret) return false
-
   const token = (
     req.headers.get('x-admin-secret') ||
     req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
@@ -17,7 +15,7 @@ function isAuthorised(req: Request, formSecret?: string) {
     ''
   ).trim()
 
-  return token === adminSecret
+  return isAdminToken(token)
 }
 
 /** Missing-column errors mean the SQL patch hasn't been applied yet. */

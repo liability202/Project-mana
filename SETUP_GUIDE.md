@@ -1,187 +1,106 @@
 # Mana Website — Setup Guide
 
 ## What's built
-- Next.js 14 fullstack app (frontend + API routes)
-- Supabase database (products, orders, appointments)
-- Cashfree payments (UPI, cards, net banking, COD)
-- Vercel hosting (free)
-- Admin panel at /admin
+- Next.js 14 app (storefront, checkout, admin at `/admin`, creator portal at `/creator`)
+- Supabase database
+- Razorpay online payments + Cash on Delivery
+- WhatsApp Cloud API: OTP sign-in, order updates and a shopping/support bot
+- NimbusPost shipping, Resend email
+- Hosted on Vercel
+
+All money values in the code and database are **paise** (₹1 = 100).
 
 ---
 
-## Step 1 — Install Node.js
+## 1. Install and run locally
 
-Download from nodejs.org → install version 18 or higher.
-
----
-
-## Step 2 — Set up Supabase (free database)
-
-1. Go to supabase.com → create account → New Project
-2. Name it "mana-web", choose a password, pick region: South Asia (Mumbai)
-3. Wait ~2 min for project to start
-4. Go to SQL Editor → paste the entire contents of `lib/supabase-schema.sql` → Run
-   - This creates all tables AND adds 6 sample products automatically
-5. Go to Settings → API → copy:
-   - Project URL → paste into .env.local as NEXT_PUBLIC_SUPABASE_URL
-   - anon/public key → NEXT_PUBLIC_SUPABASE_ANON_KEY
-   - service_role key → SUPABASE_SERVICE_ROLE_KEY
-
----
-
-## Step 3 — Set up Cashfree
-
-1. Go to cashfree.com → create a merchant account
-2. Complete merchant activation / KYC in the Cashfree dashboard
-3. In Cashfree Dashboard → Developers → API Keys:
-   - copy App ID → CASHFREE_APP_ID
-   - copy Secret Key → CASHFREE_SECRET_KEY
-4. In Cashfree Dashboard → Developers → Domain Whitelisting:
-   - add http://localhost:3000 for local testing
-   - add your live site domain later, for example https://your-site.vercel.app
-5. Choose mode:
-   - testing → CASHFREE_ENV=sandbox
-   - live → CASHFREE_ENV=production
-6. When you are ready to go live, replace sandbox credentials with production credentials and keep the live domain whitelisted
-
----
-
-## Step 4 — Fill in .env.local
-
-Open `.env.local` and replace all placeholder values:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxx
-SUPABASE_SERVICE_ROLE_KEY=eyJxxx
-CASHFREE_APP_ID=your_cashfree_app_id
-CASHFREE_SECRET_KEY=your_cashfree_secret_key
-CASHFREE_ENV=sandbox
-CASHFREE_API_VERSION=2025-01-01
-NEXT_PUBLIC_CASHFREE_ENV=sandbox
-NEXT_PUBLIC_WHATSAPP_NUMBER=919876543210   ← your number, no + or spaces
-NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD=999
-ADMIN_SECRET=pick-a-strong-password
-NEXT_PUBLIC_SITE_URL=https://your-site.vercel.app
-WHATSAPP_TOKEN=your_meta_whatsapp_token
-WHATSAPP_PHONE_NUMBER_ID=your_meta_phone_number_id
-WEBHOOK_VERIFY_TOKEN=choose-a-random-secret
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
----
-
-## Step 5 — Run locally
+Node.js 18.17 or newer.
 
 ```bash
-cd mana-web
 npm install
-npm run dev
+cp .env.example .env.local   # then fill it in (see step 3)
+npm run dev                  # http://localhost:3000
+npm test                     # pricing tests
 ```
 
-Open http://localhost:3000 — your site is live!
+---
+
+## 2. Supabase
+
+1. Create a project (region: Mumbai).
+2. SQL Editor → run these files from `lib/`, in order:
+   1. `supabase-schema.sql` (tables + sample products)
+   2. `orders-schema-patch.sql`, `razorpay-schema-patch.sql`, `coupons-schema-patch.sql`,
+      `creator-schema.sql`, `referral-visits-schema.sql`, `invoices-schema-patch.sql`,
+      `supabase-whatsapp-schema.sql`, `support-tickets-schema.sql`, `products-badge-schema-patch.sql`
+   3. `security-hardening-patch.sql` — **required**: removes public access to orders,
+      coupons and reviewer phone numbers
+   4. `checkout-hardening-patch.sql`
+3. Settings → API → copy the URL, anon key and service-role key into `.env.local`.
+
+The service-role key can read and change everything. It belongs only in `.env.local`
+(never committed) and in Vercel's environment variables.
 
 ---
 
-## Step 6 — Deploy to Vercel (free hosting)
+## 3. Environment variables
 
-1. Push your code to GitHub (create a repo, push all files)
-2. Go to vercel.com → Import Project → select your GitHub repo
-3. Vercel auto-detects Next.js
-4. Add all your .env.local variables in Vercel → Settings → Environment Variables
-5. Click Deploy — takes 2 minutes
-6. Your site is live at yourproject.vercel.app
+`.env.example` lists every variable with comments. The ones people miss:
 
-### Connect your domain:
-1. Vercel → Settings → Domains → Add your domain
-2. Go to your domain registrar → update DNS to point to Vercel
-3. Done — SSL/HTTPS is automatic
+| Variable | Why |
+|---|---|
+| `SESSION_SECRET`, `OTP_SECRET`, `ADMIN_SECRET` | Three different long random strings (`openssl rand -hex 32`). |
+| `RAZORPAY_WEBHOOK_SECRET` | Confirms payments even if the customer closes the tab. |
+| `WHATSAPP_APP_SECRET` | Lets the bot reject fake webhook calls. |
+| `SUPPORT_ALERT_PHONE` | A staffed number for support-ticket alerts. |
+| `RESEND_FROM_EMAIL` | Emails are skipped until this is set to a verified domain. |
 
 ---
 
-## Step 7 — Add your real products
+## 4. Razorpay
 
-Option A — Through Admin panel:
-1. Go to yoursite.com/admin
-2. Login with your ADMIN_SECRET password
-3. Products tab → Add Product
+1. Dashboard → API Keys → `NEXT_PUBLIC_RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`.
+2. Dashboard → Settings → Webhooks → add `https://<your-site>/api/razorpay/webhook`
+   with events **order.paid**, **payment.captured** and **payment_link.paid**, and a
+   secret → `RAZORPAY_WEBHOOK_SECRET`.
 
-Option B — Through Supabase dashboard:
-1. supabase.com → your project → Table Editor → products
-2. Click Insert Row → fill in details
+How checkout works: the server prices the cart, saves the order as an unpaid attempt
+(shown as *payment not completed* in the admin), and opens a Razorpay order for exactly
+that amount. The order becomes *pending / paid* only after the payment signature is
+verified (by the checkout page or the webhook). Prices, coupons and fees sent by the
+browser are never trusted.
 
-### Product fields to fill:
-- **name**: e.g. "Mamra Almonds"
-- **slug**: e.g. "mamra-almonds" (URL-friendly, no spaces)
-- **description**: your product description
-- **category**: dry-fruits / herbs / spices / pansari / kits
-- **price**: in paise (₹1 = 100 paise, so ₹1200 = 120000)
-- **images**: Supabase Storage URLs (upload in Storage → product-images bucket)
-- **tags**: ["bestseller","organic"] etc.
-- **vendor**: origin e.g. "Kashmir, India"
-- **variants**: JSON array of variant objects
-
-### Upload product images:
-1. Supabase → Storage → Create bucket "product-images" (set to public)
-2. Upload your JPG/PNG photos
-3. Copy the public URL → paste into product images array
+Refunds for cancelled online orders are done by hand in the Razorpay dashboard; the
+admin panel tells you when one is needed.
 
 ---
 
-## Pages available
+## 5. WhatsApp (Meta Cloud API)
 
-| URL | Page |
-|-----|------|
-| / | Homepage |
-| /products | All products |
-| /products?category=dry-fruits | Category filter |
-| /products/mamra-almonds | Product detail |
-| /kits | Kit builder |
-| /cart | Cart (auto-opens drawer) |
-| /checkout | Checkout + Cashfree |
-| /about | About Us |
-| /appointment | Video booking |
-| /search?q=almonds | Search results |
-| /admin | Admin panel |
+1. `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` from the Meta app.
+2. An approved authentication template for OTPs → `WHATSAPP_OTP_TEMPLATE_NAME`.
+3. Webhook URL `https://<your-site>/api/whatsapp/webhook`, verify token =
+   `WEBHOOK_VERIFY_TOKEN`; app secret → `WHATSAPP_APP_SECRET`.
+
+Customers and creators sign in with a WhatsApp OTP; the site then keeps them signed in
+with a secure cookie (180 days for customers, 30 for creators).
 
 ---
 
-## Customise your content
+## 6. Deploy on Vercel
 
-### Change hero text:
-Open `app/page.tsx` → find the hero section → edit the text directly.
-
-### Change colors:
-Open `app/globals.css` → edit the CSS variables at the top.
-Or open `tailwind.config.js` → edit the colors object.
-
-### Change WhatsApp number:
-Edit `NEXT_PUBLIC_WHATSAPP_NUMBER` in `.env.local`
-
-### Add coupon codes:
-Open `lib/store.ts` → find the COUPONS object → add your codes.
-
-### Change footer links:
-Open `components/layout/Footer.tsx` → edit the link arrays at top.
+1. Import the GitHub repo; add every variable from `.env.example` under
+   Settings → Environment Variables (Production and Preview).
+2. Deploy. Pushing to `main` deploys to the live site.
 
 ---
 
-## Tech stack summary
+## 7. Day to day
 
-| Part | Technology | Cost |
-|------|-----------|------|
-| Frontend | Next.js 14 (React) | Free |
-| Styling | Tailwind CSS | Free |
-| Database | Supabase | Free (500MB) |
-| Auth | Supabase Auth | Free |
-| Images | Supabase Storage | Free (1GB) |
-| Payments | Cashfree | As per your Cashfree plan |
-| Hosting | Vercel | Free |
-| Domain | Your existing domain | Already have |
-| **Total** | | **₹0 + 2% transaction fee** |
-
-Upgrade path when you scale:
-- Supabase Pro: ~₹1,700/month (8GB DB, more storage)
-- Vercel Pro: ~₹1,700/month (more bandwidth)
-- Total at scale: ~₹3,400/month — within your ₹5,000/yr budget with the free tier lasting a long time
-
+- **Products:** `/admin` → Products, or Supabase Table Editor → `products`.
+  Product images go in the public `product-images` storage bucket.
+- **Coupons:** `/admin` → Coupons. Fixed discounts are entered in rupees.
+  A coupon linked to a creator pays that creator commission.
+- **Orders:** delivered and cancelled are final. Delivering credits 5% cashback
+  and confirms creator commission; cancelling returns any wallet credit used.
+- **Creators:** add them in `/admin` → Creators; they sign in at `/creator`.

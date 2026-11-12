@@ -125,41 +125,14 @@ const organizationSchema = {
     postalCode: '201014',
     addressCountry: 'IN',
   },
+  // Shipping is described per product (lib/seo.ts); returns match the terms
+  // page: a 7-day window for wrong or damaged items, no blanket free returns.
   hasMerchantReturnPolicy: {
     '@type': 'MerchantReturnPolicy',
     applicableCountry: 'IN',
     returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
     merchantReturnDays: 7,
     returnMethod: 'https://schema.org/ReturnByMail',
-    returnFees: 'https://schema.org/FreeReturn',
-    refundType: 'https://schema.org/FullRefund',
-  },
-  shippingDetails: {
-    '@type': 'OfferShippingDetails',
-    shippingRate: {
-      '@type': 'MonetaryAmount',
-      value: '0',
-      currency: 'INR',
-    },
-    shippingDestination: {
-      '@type': 'DefinedRegion',
-      addressCountry: 'IN',
-    },
-    deliveryTime: {
-      '@type': 'ShippingDeliveryTime',
-      handlingTime: {
-        '@type': 'QuantitativeValue',
-        minValue: 1,
-        maxValue: 2,
-        unitCode: 'DAY',
-      },
-      transitTime: {
-        '@type': 'QuantitativeValue',
-        minValue: 2,
-        maxValue: 5,
-        unitCode: 'DAY',
-      },
-    },
   },
   sameAs: ['https://www.instagram.com/manadryfruits'],
 }

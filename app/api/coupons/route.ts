@@ -5,12 +5,10 @@ import {
   type CommissionRow,
   type CommissionableOrder,
 } from '@/lib/commissions'
+import { isAdminRequest, unauthorized } from '@/lib/admin-auth'
 
 export async function GET(req: Request) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAdminRequest(req)) return unauthorized()
 
   const { data, error } = await supabaseAdmin
     .from('coupons')
@@ -159,10 +157,7 @@ const OPTIONAL_COLUMNS = [
 ]
 
 export async function POST(req: Request) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAdminRequest(req)) return unauthorized()
 
   try {
     const body = await req.json()
@@ -228,10 +223,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAdminRequest(req)) return unauthorized()
 
   try {
     const body = await req.json()
@@ -317,10 +309,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAdminRequest(req)) return unauthorized()
 
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
@@ -328,7 +317,9 @@ export async function DELETE(req: Request) {
 
   if (id.startsWith('creator-')) {
     const realCreatorId = id.replace('creator-', '')
-    const { error } = await supabaseAdmin.from('creators').delete().eq('id', realCreatorId)
+    // Removing a creator's code from the coupon list deactivates the code; it
+    // must not delete the creator (and orphan their commissions and payouts).
+    const { error } = await supabaseAdmin.from('creators').update({ active: false }).eq('id', realCreatorId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true })
   }

@@ -178,7 +178,7 @@ export default function AdminPage() {
   const loadData = async (secret: string) => {
     setLoading(true)
     const [oRes, pRes, cRes, rRes, crRes, pyRes, sRes] = await Promise.all([
-      fetch('/api/orders', { headers: { authorization: `Bearer ${secret}` } }),
+      fetch('/api/orders?limit=500', { headers: { authorization: `Bearer ${secret}` } }),
       fetch(`/api/products?include_all=1&limit=500`, { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/coupons', { headers: { authorization: `Bearer ${secret}` } }),
       fetch('/api/reviews?pending=1', { headers: { authorization: `Bearer ${secret}` } }),
@@ -218,6 +218,13 @@ export default function AdminPage() {
   }, [])
 
   const updateOrderStatus = async (id: string, status: string) => {
+    const order = orders.find(o => o.id === id)
+    if (order && order.status === status) return
+    // Delivered pays cashback and creator commission; cancelled refunds the
+    // wallet. Neither can be undone, so make the click deliberate.
+    if (status === 'delivered' && !confirm(`Mark ${order?.order_ref || 'this order'} as DELIVERED?\n\nThis credits the customer's cashback and confirms any creator commission. It cannot be undone.`)) return
+    if (status === 'cancelled' && !confirm(`CANCEL ${order?.order_ref || 'this order'}?\n\nAny wallet credit used is returned to the customer. It cannot be undone.`)) return
+
     const secret = localStorage.getItem('mana_admin') || ''
     const res = await fetch('/api/orders', {
       method: 'PUT',
@@ -225,8 +232,13 @@ export default function AdminPage() {
       body: JSON.stringify({ id, status }),
     })
     const updated = await res.json()
-    if (res.ok) {
-      setOrders(prev => prev.map(order => order.id === id ? updated : order))
+    if (!res.ok) {
+      alert(updated?.error || 'Could not update this order.')
+      return
+    }
+    setOrders(prev => prev.map(o => o.id === id ? updated : o))
+    if (updated.online_refund_needed > 0) {
+      alert(`Order cancelled. This order was paid online — refund ${formatPrice(updated.online_refund_needed)} from the Razorpay dashboard (Payments → find the payment → Refund).`)
     }
   }
 
@@ -393,7 +405,10 @@ export default function AdminPage() {
       body: JSON.stringify({
         code: couponForm.code,
         discount_type: couponForm.discount_type,
-        discount_value: Number(couponForm.discount_value || 0),
+        // Fixed discounts are typed in rupees; pricing works in paise.
+        discount_value: couponForm.discount_type === 'fixed'
+          ? Math.round(Number(couponForm.discount_value || 0) * 100)
+          : Number(couponForm.discount_value || 0),
         influencer_name: couponForm.influencer_name || null,
         influencer_phone: couponForm.influencer_phone || null,
         creator_id: couponForm.creator_id || null,
@@ -440,7 +455,13 @@ export default function AdminPage() {
       setCustomerMessage('Enter a valid phone number.')
       return
     }
-    const data = await fetch(`/api/wallet?phone=${phone}`).then(res => res.json())
+    const secret = localStorage.getItem('mana_admin') || ''
+    const res = await fetch(`/api/wallet?phone=${phone}`, { headers: { authorization: `Bearer ${secret}` } })
+    const data = await res.json()
+    if (!res.ok) {
+      setCustomerMessage(data?.error || 'Could not load this customer.')
+      return
+    }
     setCustomerData(data)
     setCustomerMessage('')
   }
@@ -512,6 +533,24 @@ export default function AdminPage() {
     }
   }
 
+  // Asks Razorpay whether an unfinished online checkout was actually paid
+  // (e.g. the customer closed the tab right after paying).
+  const recheckPayment = async (id: string) => {
+    const secret = localStorage.getItem('mana_admin') || ''
+    const res = await fetch('/api/admin/orders/reconcile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ id }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      alert(data?.error || 'Could not check this payment.')
+      return
+    }
+    if (data.order) setOrders(prev => prev.map(o => o.id === id ? data.order : o))
+    alert(data.message || (data.paid ? 'Payment found.' : 'Not paid.'))
+  }
+
   const updatePayoutStatus = async (id: string, status: string) => {
     const secret = localStorage.getItem('mana_admin') || ''
     const res = await fetch('/api/admin/payouts', {
@@ -523,6 +562,9 @@ export default function AdminPage() {
     if (res.ok) {
       setPayouts(prev => prev.map(p => p.id === id ? { ...p, status } : p))
       // Reload creator data to reflect updated paid totals
+      loadData(secret)
+    } else {
+      alert(data?.error || 'Could not update this payout.')
       loadData(secret)
     }
   }
@@ -577,6 +619,9 @@ export default function AdminPage() {
       </div>
     )
   }
+
+  // Online checkouts are saved before payment; these never got paid.
+  const isUnpaidAttempt = (order: any) => order.notes === 'Awaiting online payment' && order.payment_status !== 'paid'
 
   const paidRevenue = orders.filter(order => order.payment_status === 'paid' && order.status !== 'cancelled').reduce((sum, order) => sum + (order.final_amount || order.total), 0)
   const filteredOrders = orders.filter(order => orderFilter === 'all' ? true : order.status === orderFilter).sort((a, b) => {
@@ -695,8 +740,8 @@ export default function AdminPage() {
                     <div className="text-right">
                       <div className="font-serif text-xl text-green">{formatPrice(order.final_amount || order.total)}</div>
                       <div className="text-xs text-ink-4 mt-0.5">{new Date(order.created_at).toLocaleDateString('en-IN')}</div>
-                      <span className={`inline-block text-xs px-2 py-0.5 rounded border mt-1 ${STATUS_COLORS[order.status] || ''}`}>
-                        {order.status}
+                      <span className={`inline-block text-xs px-2 py-0.5 rounded border mt-1 ${isUnpaidAttempt(order) ? 'bg-ivory-2 text-ink-4 border-ivory-3' : STATUS_COLORS[order.status] || ''}`}>
+                        {isUnpaidAttempt(order) ? 'payment not completed' : order.status}
                       </span>
                     </div>
                   </div>
@@ -737,7 +782,7 @@ export default function AdminPage() {
                     </div>
                     <div className="rounded-lg bg-ivory-2 p-3">
                       <div className="text-ink-4 mb-1">Payment</div>
-                      <div className="font-medium text-ink">{order.payment_status}</div>
+                      <div className="font-medium text-ink">{isUnpaidAttempt(order) ? 'not completed' : order.payment_status}</div>
                     </div>
                   </div>
 
@@ -796,7 +841,18 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex gap-2 flex-wrap">
-                    {['pending', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled'].map(status => (
+                    {isUnpaidAttempt(order) && (
+                      <>
+                        <span className="text-xs text-ink-4">The customer started an online payment but it was not confirmed. Nothing to ship unless a re-check finds the payment.</span>
+                        <button
+                          onClick={() => recheckPayment(order.id)}
+                          className="text-xs px-3 py-1 rounded-md border transition-all cursor-pointer bg-transparent text-ink-3 border-ivory-3 hover:border-green-4 hover:text-green"
+                        >
+                          Re-check payment
+                        </button>
+                      </>
+                    )}
+                    {!isUnpaidAttempt(order) && ['pending', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled'].map(status => (
                       <button
                         key={status}
                         onClick={() => status === 'shipped' ? openShipOrder(order) : updateOrderStatus(order.id, status)}
@@ -1293,6 +1349,7 @@ export default function AdminPage() {
                               onClick={() => {
                                 setEditingCoupon({
                                   ...coupon,
+                                  discount_value: coupon.discount_type === 'fixed' ? (coupon.discount_value || 0) / 100 : coupon.discount_value,
                                   min_order_amount: coupon.min_order_amount ? (coupon.min_order_amount / 100) : '',
                                   max_discount: coupon.max_discount ? (coupon.max_discount / 100) : '',
                                 })
@@ -2188,7 +2245,9 @@ on conflict (key) do nothing;`}</pre>
                     
                     const payload = {
                       ...editingCoupon,
-                      discount_value: Number(editingCoupon.discount_value || 0),
+                      discount_value: editingCoupon.discount_type === 'fixed'
+                        ? Math.round(Number(editingCoupon.discount_value || 0) * 100)
+                        : Number(editingCoupon.discount_value || 0),
                       min_order_amount: editingCoupon.min_order_amount ? Math.round(Number(editingCoupon.min_order_amount) * 100) : 0,
                       max_discount: editingCoupon.max_discount ? Math.round(Number(editingCoupon.max_discount) * 100) : null,
                       commission_rate: editingCoupon.commission_rate ? Number(editingCoupon.commission_rate) : null,

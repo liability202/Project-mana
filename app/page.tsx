@@ -281,11 +281,11 @@ export default async function HomePage() {
         <div className="overflow-hidden">
           <div className="flex gap-4 w-max" style={{ animation: 'scroll-left 28s linear infinite' }}>
             {[...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
-              <div key={i} className="w-[290px] flex-shrink-0 rounded-xl p-5" style={{ background: 'rgb(var(--c-ivory3))', border: '1px solid rgba(var(--c-green5), 0.15)', boxShadow: 'var(--shadow-soft)' }}>
+              <div key={i} className="w-[290px] flex-shrink-0 rounded-xl p-5" style={{ background: 'rgb(var(--c-ivory3))', border: '1px solid rgb(var(--c-green5) / 0.15)', boxShadow: 'var(--shadow-soft)' }}>
                 <div className="text-[.78rem] mb-2.5" style={{ color: 'var(--terra)' }}>{'★'.repeat(t.stars)}</div>
                 <p className="text-[.8rem] leading-[1.7] mb-3.5 italic" style={{ color: 'var(--ink3)' }}>"{t.text}"</p>
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-[.7rem] font-medium flex-shrink-0" style={{ background: 'rgba(var(--c-green6), 1)', border: '1px solid rgba(var(--c-green5), 0.3)', color: 'var(--green)' }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-[.7rem] font-medium flex-shrink-0" style={{ background: 'rgb(var(--c-green6) / 1)', border: '1px solid rgb(var(--c-green5) / 0.3)', color: 'var(--green)' }}>
                     {t.name[0]}
                   </div>
                   <div>
@@ -302,9 +302,9 @@ export default async function HomePage() {
       {/* ── CHAT & BUY ── */}
       <section className="section fade-in bg-green-6 dark:bg-[rgb(var(--c-ivory))]">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div className="rounded-2xl p-5 max-w-md mx-auto w-full" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgba(var(--c-green5), 0.2)', boxShadow: 'var(--shadow-soft)' }}>
-            <div className="flex items-center gap-2.5 pb-3.5 mb-3.5" style={{ borderBottom: '1px solid rgba(var(--c-green5), 0.15)' }}>
-              <div className="w-9 h-9 rounded-full overflow-hidden" style={{ border: '2px solid rgba(var(--c-green5), 0.4)' }}>
+          <div className="rounded-2xl p-5 max-w-md mx-auto w-full" style={{ background: 'rgb(var(--c-ivory2))', border: '1px solid rgb(var(--c-green5) / 0.2)', boxShadow: 'var(--shadow-soft)' }}>
+            <div className="flex items-center gap-2.5 pb-3.5 mb-3.5" style={{ borderBottom: '1px solid rgb(var(--c-green5) / 0.15)' }}>
+              <div className="w-9 h-9 rounded-full overflow-hidden" style={{ border: '2px solid rgb(var(--c-green5) / 0.4)' }}>
                 <Image src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&q=80" alt="assistant" width={36} height={36} className="object-cover" />
               </div>
               <div>
@@ -323,12 +323,12 @@ export default async function HomePage() {
                 How should I pick them?
                 <div className="flex flex-wrap gap-2 mt-2">
                   {['⭐ Highest Quality', '🔥 Most Selling', '💰 Best Price'].map(c => (
-                    <span key={c} className="px-2.5 py-1 rounded-full text-[.62rem] cursor-pointer" style={{ background: 'rgba(var(--c-green6), 1)', border: '1px solid rgba(var(--c-green5), 0.3)', color: 'var(--green2)' }}>{c}</span>
+                    <span key={c} className="px-2.5 py-1 rounded-full text-[.62rem] cursor-pointer" style={{ background: 'rgb(var(--c-green6) / 1)', border: '1px solid rgb(var(--c-green5) / 0.3)', color: 'var(--green2)' }}>{c}</span>
                   ))}
                 </div>
               </div>
             </div>
-            <div className="flex gap-2 items-center rounded-lg px-3 py-2" style={{ background: 'rgb(var(--c-ivory3))', border: '1px solid rgba(var(--c-green5), 0.15)' }}>
+            <div className="flex gap-2 items-center rounded-lg px-3 py-2" style={{ background: 'rgb(var(--c-ivory3))', border: '1px solid rgb(var(--c-green5) / 0.15)' }}>
               <span className="text-[.76rem] flex-1" style={{ color: 'var(--ink4)' }}>Type or upload your list…</span>
               <div className="w-7 h-7 rounded-md flex items-center justify-center text-ivory text-sm cursor-pointer" style={{ background: 'var(--green)' }}>↑</div>
             </div>
@@ -346,7 +346,7 @@ export default async function HomePage() {
                 ['4', 'Remaining at dispatch', 'Or pay in full anytime before delivery'],
               ].map(([n, t, d]) => (
                 <div key={n} className="flex gap-4">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-[.66rem] font-medium flex-shrink-0 mt-0.5" style={{ background: 'rgba(var(--c-green6), 1)', border: '1px solid rgba(var(--c-green4), 0.4)', color: 'var(--green)' }}>{n}</div>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-[.66rem] font-medium flex-shrink-0 mt-0.5" style={{ background: 'rgb(var(--c-green6) / 1)', border: '1px solid rgb(var(--c-green4) / 0.4)', color: 'var(--green)' }}>{n}</div>
                   <div>
                     <div className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{t}</div>
                     <div className="text-[.8rem] mt-0.5" style={{ color: 'var(--ink3)' }}>{d}</div>
@@ -368,7 +368,7 @@ export default async function HomePage() {
 
       {/* ── NEWSLETTER ── */}
       <section className="section text-center relative overflow-hidden fade-in" style={{ background: 'rgb(var(--c-ivory2))' }}>
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full pointer-events-none" style={{ background: 'rgba(var(--c-green6), 0.4)' }} />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full pointer-events-none" style={{ background: 'rgb(var(--c-green6) / 0.4)' }} />
         <div className="relative">
           <div className="eyebrow justify-center">Stay Connected</div>
           <h2 className="section-title mb-2">Get <em className="not-italic" style={{ color: 'var(--green)' }}>10% off</em> your first order</h2>

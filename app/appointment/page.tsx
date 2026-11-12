@@ -22,6 +22,7 @@ export default function AppointmentPage() {
   const [interests, setInterests] = useState<string[]>([])
   const [form, setForm]   = useState({ name: '', phone: '', notes: '', platform: 'whatsapp' })
   const [done, setDone]   = useState(false)
+  const [whatsappLink, setWhatsappLink] = useState('')
   const [loading, setLoading] = useState(false)
 
   const today = new Date(); today.setHours(0,0,0,0)
@@ -43,11 +44,20 @@ export default function AppointmentPage() {
     if (!selSlot) { showToast('Please select a time slot'); return }
     setLoading(true)
     try {
-      await supabase.from('appointments').insert({
-        name: form.name, phone: form.phone, notes: form.notes,
-        date: selDate.toISOString().split('T')[0],
+      // The chosen day as the shopper sees it. toISOString() is UTC, which is
+      // the previous day for a local-midnight date in India.
+      const localDate = [
+        selDate.getFullYear(),
+        String(selDate.getMonth() + 1).padStart(2, '0'),
+        String(selDate.getDate()).padStart(2, '0'),
+      ].join('-')
+      const { error } = await supabase.from('appointments').insert({
+        name: form.name.trim().slice(0, 80), phone: form.phone.trim().slice(0, 20), notes: form.notes.slice(0, 500),
+        date: localDate,
         time_slot: selSlot, interests, platform: form.platform,
       })
+      // WhatsApp is the real channel; a failed save is logged, not fatal.
+      if (error) console.error('Appointment save failed', error)
       const msg = `Hi Mana Team! I want to book a video appointment:\n\n`
         + `👤 Name: ${form.name}\n📞 Phone: ${form.phone}\n`
         + `📅 Date: ${selDateStr}\n🕐 Time: ${selSlot}\n`
@@ -55,7 +65,9 @@ export default function AppointmentPage() {
         + (interests.length ? `🛍 Interested in: ${interests.join(', ')}\n` : '')
         + (form.notes ? `💬 Note: ${form.notes}\n` : '')
         + '\nPlease confirm. Thank you!'
-      window.open(`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank')
+      const link = `https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`
+      setWhatsappLink(link)
+      window.open(link, '_blank')
       setDone(true)
     } catch (e) { showToast('Error saving appointment. Please try WhatsApp directly.') }
     setLoading(false)
@@ -66,7 +78,13 @@ export default function AppointmentPage() {
       <div className="text-center max-w-md">
         <div className="w-16 h-16 rounded-full bg-green-6 border-2 border-green-4 flex items-center justify-center text-2xl text-green mx-auto mb-4">✓</div>
         <h1 className="font-serif text-2xl font-light text-ink mb-2">Appointment Requested!</h1>
-        <p className="text-sm text-ink-3 mb-6">Your appointment for {summaryText} has been sent. We'll confirm on WhatsApp within 1 hour.</p>
+        <p className="text-sm text-ink-3 mb-4">Your request for {summaryText} is ready. Send the WhatsApp message that opened and we'll confirm your slot there.</p>
+        {whatsappLink && (
+          <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="btn-outline no-underline inline-flex mb-3">
+            <span>WhatsApp didn't open? Tap to send</span>
+          </a>
+        )}
+        <br />
         <a href="/" className="btn-primary no-underline inline-flex"><span>Back to Home</span></a>
       </div>
     </div>

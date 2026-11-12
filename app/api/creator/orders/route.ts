@@ -1,17 +1,25 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getActiveCreatorId } from '@/lib/creator-auth'
 import { commissionableAmount, estimateCommission } from '@/lib/commissions'
 import { rangeStartISO } from '@/lib/date-ranges'
+
+/** Creators see "Priya S.", never a customer's full name. */
+function maskCustomerName(name?: string | null) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return 'Customer'
+  return [parts[0], ...parts.slice(1).map(part => `${part[0].toUpperCase()}.`)].join(' ')
+}
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
-    const creatorId = searchParams.get('creatorId')
+    const creatorId = await getActiveCreatorId()
     const status = searchParams.get('status')
     const since = rangeStartISO(searchParams.get('range'))
 
     if (!creatorId) {
-      return NextResponse.json({ error: 'Creator ID is required.' }, { status: 400 })
+      return NextResponse.json({ error: 'Please sign in to the creator portal.' }, { status: 401 })
     }
 
     // Fetch creator's code (needed for fallback)
@@ -64,7 +72,10 @@ export async function GET(req: Request) {
       const { data: commissionData, error: commissionError } = await query
       if (commissionError) throw commissionError
 
-      return NextResponse.json(commissionData || [])
+      return NextResponse.json((commissionData || []).map((row: any) => ({
+        ...row,
+        orders: row.orders ? { ...row.orders, customer_name: maskCustomerName(row.orders.customer_name) } : row.orders,
+      })))
     }
 
     // If commissions table is missing or empty, fall back to orders table
@@ -97,7 +108,7 @@ export async function GET(req: Request) {
         created_at: o.created_at,
         orders: {
           order_ref: o.order_ref,
-          customer_name: o.customer_name,
+          customer_name: maskCustomerName(o.customer_name),
           items: o.items,
           total: o.final_amount || o.total,
           status: o.status,

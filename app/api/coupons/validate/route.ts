@@ -1,94 +1,56 @@
 import { NextResponse } from 'next/server'
-import {
-  getAppliedCouponDiscount,
-  getCouponByCode,
-  validateCouponRules,
-  LOYALTY_CODE,
-  LOYALTY_DISCOUNT_PCT,
-} from '@/lib/commerce'
 import { supabaseAdmin } from '@/lib/supabase'
+import { countCompletedOrders, priceCart, resolveCoupon } from '@/lib/checkout'
+import { couponDiscount, couponIneligibility } from '@/lib/pricing'
+import { getSessionPhone } from '@/lib/session'
+import { clientIp, rateLimit } from '@/lib/rate-limit'
 
+export const dynamic = 'force-dynamic'
+
+/**
+ * Checks a coupon against the current cart. Checkout uses /api/checkout/quote;
+ * this stays for callers that only need a yes/no and the coupon's rules.
+ * Returns the rules (not a frozen amount) so the discount can follow the cart.
+ */
 export async function POST(req: Request) {
+  // Slow down anyone trying to guess codes.
+  const limit = rateLimit(`coupon:${clientIp(req)}`, 20, 60 * 1000)
+  if (!limit.ok) return NextResponse.json({ error: 'Too many attempts. Please wait a minute.' }, { status: 429 })
+
   try {
     const body = await req.json()
-    const subtotal = Number(body.subtotal || 0)
-    const code = String(body.code || '')
-    const phone = String(body.phone || '').replace(/\D/g, '')
+    const code = String(body.code || '').trim().toUpperCase()
+    if (!code) return NextResponse.json({ error: 'Coupon code is required.' }, { status: 400 })
 
-    if (!code.trim()) return NextResponse.json({ error: 'Coupon code is required.' }, { status: 400 })
-    if (subtotal <= 0) return NextResponse.json({ error: 'Subtotal must be greater than 0.' }, { status: 400 })
+    const phone = getSessionPhone()
+    const subtotal = Array.isArray(body.items)
+      ? (await priceCart(supabaseAdmin, body.items)).subtotal
+      : Math.max(0, Math.round(Number(body.subtotal) || 0))
+    if (subtotal <= 0) return NextResponse.json({ error: 'Add something to your cart first.' }, { status: 400 })
 
-    let orderCount = 0
-    if (phone) {
-      const { count, error: countError } = await supabaseAdmin
-        .from('orders')
-        .select('id', { count: 'exact', head: true })
-        .eq('customer_phone', phone)
+    const result = await resolveCoupon(supabaseAdmin, code, phone)
+    if ('error' in result) return NextResponse.json({ error: result.error }, { status: 400 })
 
-      if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
-      orderCount = count || 0
-    }
+    const { rules } = result.coupon
+    const ineligible = couponIneligibility(subtotal, rules)
+    if (ineligible) return NextResponse.json({ error: ineligible, rules }, { status: 400 })
 
-    const normalizedCode = code.trim().toUpperCase()
+    const discountAmount = couponDiscount(subtotal, rules)
+    const customerType = phone ? ((await countCompletedOrders(supabaseAdmin, phone)) > 0 ? 'returning' : 'new') : null
 
-    if (normalizedCode === LOYALTY_CODE) {
-      if (!phone) {
-        return NextResponse.json({ error: 'Phone verification is required for loyalty discount.' }, { status: 400 })
-      }
-      if (orderCount < 1) {
-        return NextResponse.json({ error: `${LOYALTY_CODE} is available only for returning customers.` }, { status: 400 })
-      }
-
-      const loyaltyCoupon = {
-        id: 'loyal12',
-        code: LOYALTY_CODE,
-        discount_type: 'percentage' as const,
-        discount_value: LOYALTY_DISCOUNT_PCT,
-        influencer_name: null,
-        min_order_amount: 0,
-        max_discount: null,
-        usage_limit: null,
-        usage_count: 0,
-        total_orders: 0,
-        total_revenue: 0,
-        total_discount_given: 0,
-        is_active: true,
-        free_shipping: false,
-        free_cod: false,
-        free_handling: false,
-      }
-
-      const discountAmount = getAppliedCouponDiscount(subtotal, loyaltyCoupon)
-      return NextResponse.json({
-        valid: true,
-        coupon: loyaltyCoupon,
-        discount_amount: discountAmount,
-        final_subtotal: subtotal - discountAmount,
-        free_shipping: false,
-        free_cod: false,
-        free_handling: false,
-        customer_type: 'returning',
-      })
-    }
-
-    const coupon = await getCouponByCode(supabaseAdmin, normalizedCode)
-    if (!coupon) return NextResponse.json({ error: 'Invalid or inactive coupon code.' }, { status: 404 })
-
-    const ruleError = validateCouponRules(subtotal, coupon)
-    if (ruleError) return NextResponse.json({ error: ruleError }, { status: 400 })
-
-    const discountAmount = getAppliedCouponDiscount(subtotal, coupon)
     return NextResponse.json({
       valid: true,
-      coupon,
+      rules,
+      coupon: { code: rules.code, discount_type: rules.discount_type, discount_value: rules.discount_value },
       discount_amount: discountAmount,
       final_subtotal: subtotal - discountAmount,
-      free_shipping: Boolean(coupon.free_shipping),
-      free_cod: Boolean(coupon.free_cod),
-      free_handling: Boolean(coupon.free_handling),
-      customer_type: orderCount > 0 ? 'returning' : 'new',
+      free_shipping: Boolean(rules.free_shipping),
+      free_cod: Boolean(rules.free_cod),
+      free_handling: Boolean(rules.free_handling),
+      customer_type: customerType,
     })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err) {
+    console.error('Coupon validation failed', err)
+    return NextResponse.json({ error: 'Could not check this coupon right now.' }, { status: 500 })
   }
 }

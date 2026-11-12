@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { isAdminRequest, unauthorized } from '@/lib/admin-auth'
 
 const DEFAULTS: Record<string, boolean> = {
   enable_cashback_earning: true,
@@ -43,10 +44,7 @@ export async function GET() {
 
 export async function PUT(req: Request) {
   try {
-    const authHeader = req.headers.get('authorization')
-    if (authHeader !== `Bearer ${process.env.ADMIN_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!isAdminRequest(req)) return unauthorized()
 
     const body = await req.json()
     const { key, value } = body

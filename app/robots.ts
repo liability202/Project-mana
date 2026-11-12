@@ -43,6 +43,8 @@ export default function robots(): MetadataRoute.Robots {
           '/profile',
           '/account',
           '/checkout',
+          '/test-bot',
+          '/ref/',
         ],
       },
     ],

@@ -2,10 +2,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
+import { confirmOtp, requestOtp, useSession, useSessionLoader } from '@/lib/use-session'
 import type { Order } from '@/lib/supabase'
-
-const ACCOUNT_PHONE_KEY = 'mana_account_phone'
-const ACCOUNT_COOKIE_KEY = 'mana_account_phone'
 
 const STATUS_STEPS = [
   { key: 'pending', label: 'Placed' },
@@ -35,26 +33,6 @@ function cleanPhone(value: string) {
   return value.replace(/\D/g, '').slice(-10)
 }
 
-function saveAccountPhone(phone: string) {
-  localStorage.setItem(ACCOUNT_PHONE_KEY, phone)
-  document.cookie = `${ACCOUNT_COOKIE_KEY}=${phone}; path=/; max-age=${60 * 60 * 24 * 180}; SameSite=Lax`
-}
-
-function readAccountPhone() {
-  const stored = localStorage.getItem(ACCOUNT_PHONE_KEY)
-  if (stored) return stored
-
-  return document.cookie
-    .split('; ')
-    .find((row) => row.startsWith(`${ACCOUNT_COOKIE_KEY}=`))
-    ?.split('=')[1] || ''
-}
-
-function clearAccountPhone() {
-  localStorage.removeItem(ACCOUNT_PHONE_KEY)
-  document.cookie = `${ACCOUNT_COOKIE_KEY}=; path=/; max-age=0; SameSite=Lax`
-}
-
 function getOrderCode(order: TrackingOrder) {
   return order.order_ref || order.id.slice(0, 8).toUpperCase()
 }
@@ -75,71 +53,94 @@ function formatDate(value?: string | null) {
 }
 
 export default function AccountPage() {
+  const session = useSessionLoader()
   const [phone, setPhone] = useState('')
-  const [savedPhone, setSavedPhone] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
   const [instagramHandle, setInstagramHandle] = useState('')
-  const [entered, setEntered] = useState(false)
   const [balance, setBalance] = useState(0)
   const [eligible, setEligible] = useState(false)
   const [requestStatus, setRequestStatus] = useState<'none' | 'requested' | 'approved'>('none')
   const [txns, setTxns] = useState<Transaction[]>([])
   const [orders, setOrders] = useState<TrackingOrder[]>([])
   const [loading, setLoading] = useState(false)
-  const [initializing, setInitializing] = useState(true)
 
+  const entered = session.status === 'authenticated'
+  const savedPhone = session.phone
+  const initializing = session.status === 'loading'
   const latestOrder = useMemo(() => orders[0], [orders])
 
-  const loadAccount = async (rawPhone: string, options?: { remember?: boolean; quiet?: boolean }) => {
-    const clean = cleanPhone(rawPhone)
-    if (clean.length !== 10) {
-      showToast('Enter a valid 10-digit number')
-      return
-    }
-
+  // Everything below is read for the signed-in number only (session cookie).
+  const loadAccount = async (options?: { quiet?: boolean }) => {
     setLoading(true)
     try {
       const [walletRes, orderRes] = await Promise.all([
-        fetch(`/api/wallet?phone=${clean}`),
-        fetch(`/api/orders?phone=${clean}`),
+        fetch('/api/wallet', { cache: 'no-store' }),
+        fetch('/api/orders', { cache: 'no-store' }),
       ])
+      if (walletRes.status === 401 || orderRes.status === 401) {
+        await useSession.getState().signOut()
+        return
+      }
       const [walletData, orderData] = await Promise.all([walletRes.json(), orderRes.json()])
 
       if (!walletRes.ok) throw new Error(walletData?.error || 'Could not load wallet')
       if (!orderRes.ok) throw new Error(orderData?.error || 'Could not load orders')
 
-      setPhone(clean)
-      setSavedPhone(clean)
       setBalance(walletData.balance || 0)
       setEligible(Boolean(walletData.is_cashback_eligible))
       setRequestStatus(walletData.profile?.cashback_request_status || 'none')
       setInstagramHandle(walletData.profile?.instagram_handle || '')
       setTxns(walletData.transactions || [])
       setOrders(Array.isArray(orderData) ? orderData : [])
-      setEntered(true)
-
-      if (options?.remember !== false) {
-        saveAccountPhone(clean)
-      }
       if (!options?.quiet) showToast('Account loaded')
     } catch (err: any) {
       showToast(err.message || 'Could not open account')
     } finally {
       setLoading(false)
-      setInitializing(false)
     }
   }
 
   useEffect(() => {
-    const rememberedPhone = readAccountPhone()
-    if (rememberedPhone) {
-      void loadAccount(rememberedPhone, { remember: false, quiet: true })
+    if (session.status === 'authenticated') void loadAccount({ quiet: true })
+    // loadAccount only depends on the session cookie.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.status, session.phone])
+
+  const sendOtp = async () => {
+    const clean = cleanPhone(phone)
+    if (clean.length !== 10) {
+      showToast('Enter a valid 10-digit number')
       return
     }
-    setInitializing(false)
-  }, [])
+    setLoading(true)
+    try {
+      await requestOtp(clean)
+      setOtpSent(true)
+      setOtpCode('')
+      showToast('OTP sent on WhatsApp')
+    } catch (err: any) {
+      showToast(err.message || 'Could not send OTP')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const lookup = async () => {
-    await loadAccount(phone)
+  const verifyOtp = async () => {
+    if (otpCode.trim().length < 4) {
+      showToast('Enter the OTP you received')
+      return
+    }
+    setLoading(true)
+    try {
+      await confirmOtp(cleanPhone(phone), otpCode.trim())
+      setOtpSent(false)
+      setOtpCode('')
+    } catch (err: any) {
+      showToast(err.message || 'OTP verification failed')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const refreshAccount = async () => {
@@ -147,16 +148,15 @@ export default function AccountPage() {
     if (latestOrder?.order_ref) {
       await fetch(`/api/shipping/track?orderRef=${latestOrder.order_ref}&phone=${savedPhone}`).catch(() => null)
     }
-    await loadAccount(savedPhone, { remember: false, quiet: true })
+    await loadAccount({ quiet: true })
     showToast('Order tracking refreshed')
   }
 
   const requestCashback = async () => {
-    const clean = cleanPhone(savedPhone || phone)
     const res = await fetch('/api/wallet/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: clean, instagram_handle: instagramHandle }),
+      body: JSON.stringify({ instagram_handle: instagramHandle }),
     })
     const data = await res.json()
     if (!res.ok) {
@@ -167,11 +167,11 @@ export default function AccountPage() {
     showToast('Cashback request submitted')
   }
 
-  const logout = () => {
-    clearAccountPhone()
+  const logout = async () => {
+    await useSession.getState().signOut()
     setPhone('')
-    setSavedPhone('')
-    setEntered(false)
+    setOtpSent(false)
+    setOtpCode('')
     setBalance(0)
     setEligible(false)
     setRequestStatus('none')
@@ -213,19 +213,49 @@ export default function AccountPage() {
       {!entered ? (
         <div className="bg-white border border-ivory-3 rounded-xl p-8 shadow-soft max-w-md">
           <div className="text-2xl mb-4">Phone</div>
-          <h2 className="font-serif text-xl text-ink mb-1">Enter your WhatsApp number</h2>
-          <p className="text-sm text-ink-3 mb-5">We will remember this profile on this device, so you will not need to login again every time.</p>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && lookup()}
-            placeholder="98765 43210"
-            className="input mb-4"
-          />
-          <button onClick={lookup} disabled={loading} className="btn-primary w-full justify-center disabled:opacity-50">
-            <span>{loading ? 'Loading...' : 'Open My Account'}</span>
-          </button>
+          <h2 className="font-serif text-xl text-ink mb-1">Sign in with WhatsApp</h2>
+          <p className="text-sm text-ink-3 mb-5">We will send a one-time code to your WhatsApp. This device stays signed in afterwards.</p>
+          {!otpSent ? (
+            <>
+              <input
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel-national"
+                aria-label="WhatsApp number"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendOtp()}
+                placeholder="98765 43210"
+                className="input mb-4"
+              />
+              <button onClick={sendOtp} disabled={loading} className="btn-primary w-full justify-center disabled:opacity-50">
+                <span>{loading ? 'Sending...' : 'Send OTP'}</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                aria-label="One-time password"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onKeyDown={(e) => e.key === 'Enter' && verifyOtp()}
+                placeholder="123456"
+                className="input mb-4 text-center tracking-[0.4em]"
+              />
+              <button onClick={verifyOtp} disabled={loading} className="btn-primary w-full justify-center disabled:opacity-50">
+                <span>{loading ? 'Verifying...' : 'Verify & Open My Account'}</span>
+              </button>
+              <button
+                onClick={() => setOtpSent(false)}
+                className="mt-3 text-xs text-ink-3 underline bg-transparent border-none cursor-pointer w-full"
+              >
+                Use a different number
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-5">
@@ -233,7 +263,7 @@ export default function AccountPage() {
             <div className="text-center">
               <div className="text-xs tracking-widest uppercase text-green-4 mb-2">Logged In As</div>
               <div className="font-serif text-2xl text-ivory">+91 {savedPhone}</div>
-              <div className="text-xs text-green-4 mt-1">Saved on this device</div>
+              <div className="text-xs text-green-4 mt-1">Verified via WhatsApp</div>
             </div>
             <div className="text-center">
               <div className="text-xs tracking-widest uppercase text-green-4 mb-2">Wallet Balance</div>

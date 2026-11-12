@@ -4,13 +4,12 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/lib/store'
+import { confirmOtp, requestOtp, useSession, useSessionLoader } from '@/lib/use-session'
 import { formatPrice } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 import { Package, Wallet, Clock, ChevronRight, Star, Download, MessageCircle, PhoneCall, Headphones } from 'lucide-react'
 import Link from 'next/link'
 
-const ACCOUNT_PHONE_KEY = 'mana_account_phone'
-const ACCOUNT_COOKIE_KEY = 'mana_account_phone'
 const STATUS_STEPS = [
   { key: 'pending', label: 'Placed' },
   { key: 'confirmed', label: 'Confirmed' },
@@ -18,26 +17,6 @@ const STATUS_STEPS = [
   { key: 'shipped', label: 'Shipping' },
   { key: 'delivered', label: 'Delivered' },
 ]
-
-function saveAccountPhone(phone: string) {
-  localStorage.setItem(ACCOUNT_PHONE_KEY, phone)
-  document.cookie = `${ACCOUNT_COOKIE_KEY}=${phone}; path=/; max-age=${60 * 60 * 24 * 180}; SameSite=Lax`
-}
-
-function readAccountPhone() {
-  const stored = localStorage.getItem(ACCOUNT_PHONE_KEY)
-  if (stored) return stored
-
-  return document.cookie
-    .split('; ')
-    .find((row) => row.startsWith(`${ACCOUNT_COOKIE_KEY}=`))
-    ?.split('=')[1] || ''
-}
-
-function clearAccountPhone() {
-  localStorage.removeItem(ACCOUNT_PHONE_KEY)
-  document.cookie = `${ACCOUNT_COOKIE_KEY}=; path=/; max-age=0; SameSite=Lax`
-}
 
 function getStatusIndex(status: string) {
   if (status === 'cancelled') return -1
@@ -48,7 +27,7 @@ function getStatusIndex(status: string) {
 function TrackingTimeline({ status }: { status: string }) {
   if (status === 'cancelled') {
     return (
-      <div className="mt-4 rounded-lg px-3 py-2 text-sm" style={{ border: '1px solid rgba(var(--c-terra), 0.3)', background: 'rgba(var(--c-terra), 0.1)', color: 'var(--terra)' }}>
+      <div className="mt-4 rounded-lg px-3 py-2 text-sm" style={{ border: '1px solid rgb(var(--c-terra) / 0.3)', background: 'rgb(var(--c-terra) / 0.1)', color: 'var(--terra)' }}>
         This order has been cancelled.
       </div>
     )
@@ -134,22 +113,24 @@ export default function ProfilePage() {
   const router = useRouter()
 
   const normalizedPhone = phone.replace(/\D/g, '').slice(-10)
+  const session = useSessionLoader()
 
+  // The signed session cookie decides who is logged in.
   useEffect(() => {
-    const rememberedPhone = readAccountPhone().replace(/\D/g, '').slice(-10)
-
-    if (rememberedPhone.length === 10) {
-      setPhone(rememberedPhone)
-      setVerifiedPhone(rememberedPhone)
+    if (session.status === 'loading') return
+    if (session.status === 'authenticated') {
+      setPhone(session.phone)
+      setVerifiedPhone(session.phone)
       setStep('dashboard')
-      void fetchDashboardData(rememberedPhone)
-      setInitializing(false)
-      return
+      void fetchDashboardData()
+    } else {
+      setStep(current => (current === 'verify' ? current : 'login'))
+      setDataLoading(false)
     }
-
-    setDataLoading(false)
     setInitializing(false)
-  }, [])
+    // fetchDashboardData only depends on the session cookie.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.status, session.phone])
 
   const sendOtp = async () => {
     if (normalizedPhone.length !== 10) {
@@ -159,13 +140,7 @@ export default function ProfilePage() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: normalizedPhone }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Could not send OTP')
+      await requestOtp(normalizedPhone)
 
       setStep('verify')
       setOtpCode('')
@@ -191,22 +166,9 @@ export default function ProfilePage() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/otp/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: normalizedPhone,
-          otp: otpCode.trim(),
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'OTP verification failed')
-
-      saveAccountPhone(normalizedPhone)
-      setVerifiedPhone(normalizedPhone)
-      setStep('dashboard')
+      // Sets the session cookie; the session effect then opens the dashboard.
+      await confirmOtp(normalizedPhone, otpCode.trim())
       showToast('Successfully logged in')
-      fetchDashboardData(normalizedPhone)
     } catch (err: any) {
       showToast(err.message || 'OTP verification failed')
     } finally {
@@ -214,21 +176,27 @@ export default function ProfilePage() {
     }
   }
 
-  const fetchDashboardData = async (userPhone: string) => {
+  const fetchDashboardData = async () => {
     setDataLoading(true)
     try {
-      // Fetch Wallet
-      const walletRes = await fetch(`/api/wallet?phone=${userPhone}`)
+      const [walletRes, orderRes] = await Promise.all([
+        fetch('/api/wallet', { cache: 'no-store' }),
+        fetch('/api/orders', { cache: 'no-store' }),
+      ])
+      if (walletRes.status === 401 || orderRes.status === 401) {
+        // Session expired or was revoked.
+        await useSession.getState().signOut()
+        return
+      }
+
       const walletData = await walletRes.json()
       if (walletRes.ok && walletData.wallet) {
         setWalletBalance(walletData.balance || walletData.wallet.balance || 0)
       }
 
-      // Fetch Orders
-      const orderRes = await fetch(`/api/orders?phone=${userPhone}`)
       const orderData = await orderRes.json()
       if (orderRes.ok) {
-        setOrders(orderData || [])
+        setOrders(Array.isArray(orderData) ? orderData : [])
       }
     } catch (err) {
       console.error('Failed to load dashboard data', err)
@@ -244,13 +212,15 @@ export default function ProfilePage() {
     clearCart()
     let count = 0
     order.items.forEach((item: any) => {
+      if (!item?.product_id) return
+      // Prices shown here are refreshed from the catalogue at checkout.
       addItem({
         product_id: item.product_id,
         product_name: item.product_name,
-        product_image: item.product_image || '', // Fallback if missing
-        variant_id: item.variant_id,
-        variant_name: item.variant_name,
-        weight_grams: item.weight_grams || 500, // Fallback
+        product_image: item.product_image || '',
+        variant_id: item.variant_id || undefined,
+        variant_name: item.variant_name || undefined,
+        weight_grams: item.weight_grams || 500,
         price: item.price,
         quantity: item.quantity || 1,
       })
@@ -276,8 +246,8 @@ export default function ProfilePage() {
     }
   }
 
-  const logout = () => {
-    clearAccountPhone()
+  const logout = async () => {
+    await useSession.getState().signOut()
     setStep('login')
     setVerifiedPhone('')
     setPhone('')
@@ -405,7 +375,7 @@ export default function ProfilePage() {
                 {/* Left Column: Wallet (only rendered if cashback spending is enabled) */}
                 {siteSettings.enable_cashback_spending && (
                   <div className="space-y-6">
-                    <div className="rounded-2xl p-6 relative overflow-hidden shadow-sm border" style={{ background: 'rgba(var(--c-green5), 0.1)', borderColor: 'rgba(var(--c-green5), 0.3)' }}>
+                    <div className="rounded-2xl p-6 relative overflow-hidden shadow-sm border" style={{ background: 'rgb(var(--c-green5) / 0.1)', borderColor: 'rgb(var(--c-green5) / 0.3)' }}>
                       <div className="absolute -right-6 -top-6 opacity-30" style={{ color: 'var(--green)' }}>
                         <Wallet size={120} strokeWidth={1} />
                       </div>
@@ -493,7 +463,7 @@ export default function ProfilePage() {
                             </div>
 
                             {/* Order Action */}
-                            <div className="px-5 py-3 border-t flex flex-wrap items-center justify-between gap-3" style={{ background: 'rgba(var(--c-ivory), 0.3)', borderColor: 'rgb(var(--c-ivory3))' }}>
+                            <div className="px-5 py-3 border-t flex flex-wrap items-center justify-between gap-3" style={{ background: 'rgb(var(--c-ivory) / 0.3)', borderColor: 'rgb(var(--c-ivory3))' }}>
                               {order.invoice_url ? (
                                 <a
                                   href={order.invoice_url}
@@ -531,7 +501,7 @@ export default function ProfilePage() {
                   <div className="rounded-2xl p-6 sm:p-8 shadow-sm border" style={{ background: 'rgb(var(--c-ivory2))', borderColor: 'rgb(var(--c-ivory3))' }}>
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                       <div className="flex items-start gap-4 flex-1 min-w-0">
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(var(--c-green5), 0.25)' }}>
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgb(var(--c-green5) / 0.25)' }}>
                           <Headphones style={{ color: 'var(--green)' }} size={24} />
                         </div>
                         <div className="min-w-0">

@@ -34,10 +34,20 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
     }, 260)
   }, [query])
 
+  // Product names are escaped before highlighting: this string is rendered as
+  // HTML, and the admin password lives in localStorage on this origin.
+  const escapeHtml = (value: string) => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
   const highlight = (text: string) => {
-    if (!query) return text
-    const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-    return text.replace(re, '<mark class="bg-green-6 text-green not-italic rounded-sm px-0.5">$1</mark>')
+    const safeText = escapeHtml(text)
+    if (!query) return safeText
+    const re = new RegExp(`(${escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    return safeText.replace(re, '<mark class="bg-green-6 text-green not-italic rounded-sm px-0.5">$1</mark>')
   }
 
   return (
@@ -55,7 +65,7 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
               ref={inputRef}
               value={query}
               onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && query) window.location.href = `/search?q=${encodeURIComponent(query)}` }}
+              onKeyDown={e => { if (e.key === 'Enter' && query.trim()) window.location.href = `/products?q=${encodeURIComponent(query.trim())}` }}
               placeholder="Search dry fruits, herbs, spices, kits…"
               className="flex-1 border-none outline-none font-sans text-base text-ink bg-transparent placeholder:text-ink-4"
             />
@@ -109,7 +119,7 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
                 {results.map(product => (
                   <Link
                     key={product.id}
-                    href={`/products/${product.slug}`}
+                    href={product.category === 'kits' ? `/kits/${product.slug}` : `/products/${product.slug}`}
                     onClick={onClose}
                     className="bg-white border border-ivory-3 rounded-mana overflow-hidden hover:border-green-5 hover:shadow-soft transition-all no-underline group"
                   >

@@ -12,11 +12,18 @@ export default function CreatorLoginPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    // If already logged in, redirect to dashboard
-    const creator = localStorage.getItem('mana_creator')
-    if (creator) {
-      router.push('/creator/dashboard')
-    }
+    // Already signed in (valid session cookie)? Go straight to the dashboard.
+    fetch('/api/creator/auth', { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (data?.creator) {
+          localStorage.setItem('mana_creator', JSON.stringify(data.creator))
+          router.push('/creator/dashboard')
+        } else {
+          localStorage.removeItem('mana_creator')
+        }
+      })
+      .catch(() => {})
   }, [router])
 
   const handleSendOtp = async () => {

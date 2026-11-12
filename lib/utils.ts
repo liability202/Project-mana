@@ -46,9 +46,11 @@ export function shippingCost(subtotalPaise: number, city?: string, state?: strin
   if (subtotalPaise >= FREE_SHIPPING_THRESHOLD) return 0
   
   const pin = (pincode || '').trim()
+  // A valid pincode decides the zone on its own. Typed city/state can't be
+  // verified, so they only matter before a pincode is entered.
   // Delhi NCR pincode prefixes: 110 (Delhi), 201 (Noida/Ghaziabad), 121 (Faridabad), 122 (Gurugram)
-  if (/^(110|201|121|122)\d{3}$/.test(pin)) {
-    return 3900
+  if (/^\d{6}$/.test(pin)) {
+    return /^(110|201|121|122)\d{3}$/.test(pin) ? 3900 : 5900
   }
 
   const c = (city || '').toLowerCase()

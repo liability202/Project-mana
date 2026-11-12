@@ -1,14 +1,18 @@
 import { razorpay } from '@/lib/razorpay'
 
+const LINK_LIFETIME_SECONDS = 24 * 60 * 60
+
 export async function createRazorpayPaymentLink({
   amount,
   description,
   orderId,
+  orderRef,
   phone,
 }: {
   amount: number
   description: string
   orderId: string
+  orderRef?: string
   phone: string
 }) {
   try {
@@ -18,7 +22,10 @@ export async function createRazorpayPaymentLink({
       amount: amount, // amount in paise
       currency: 'INR',
       accept_partial: false,
-      description: description,
+      description: description.slice(0, 2048),
+      // Links expire so a stale one can't be paid long after the order is gone.
+      expire_by: Math.floor(Date.now() / 1000) + LINK_LIFETIME_SECONDS,
+      ...(orderRef ? { reference_id: orderRef } : {}),
       customer: {
         contact: normalizedPhone,
       },

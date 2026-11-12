@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getActiveCreatorId } from '@/lib/creator-auth'
 import { commissionableAmount, estimateCommission, isLiveCommissionStatus } from '@/lib/commissions'
 import { bucketByRange, isDateRange, rangeStartISO, type DateRange } from '@/lib/date-ranges'
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
-    const creatorId = searchParams.get('creatorId')
+    const creatorId = await getActiveCreatorId()
 
     if (!creatorId) {
-      return NextResponse.json({ error: 'Creator ID is required.' }, { status: 400 })
+      return NextResponse.json({ error: 'Please sign in to the creator portal.' }, { status: 401 })
     }
 
     // Chart range only — the stat cards stay lifetime/this-month figures.

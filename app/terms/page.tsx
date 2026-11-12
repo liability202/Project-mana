@@ -30,7 +30,7 @@ const sections = [
     title: '3. Pricing & Payment',
     body: [
       'All prices on the website are listed in Indian Rupees and are inclusive or exclusive of taxes as indicated at checkout. Prices may change without notice, but confirmed orders will be billed at the price shown at the time of purchase.',
-      'Online payments are processed through Cashfree and may include UPI, debit cards, credit cards, net banking, wallets, and other supported methods. Cash on Delivery may be available on eligible orders and pincodes, and a COD handling surcharge may apply.',
+      'Online payments are processed through Razorpay and may include UPI, debit cards, credit cards, net banking, wallets, and other supported methods. Cash on Delivery may be available on eligible orders and pincodes, and a COD handling surcharge may apply.',
       'If a payment is declined, flagged, or reversed, we may place the order on hold, request alternate payment, or cancel the order.'
     ]
   },

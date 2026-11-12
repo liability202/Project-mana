@@ -51,17 +51,20 @@ function calculateOrderWeightGrams(items: any[] = []) {
   return total || 500
 }
 
-function normalizeDateOnly(value?: string | null) {
-  if (!value) return null
-  let dateStr = value
-  if (/^\d{2}-\d{2}-\d{4}$/.test(value)) {
-    const [d, m, y] = value.split('-')
-    dateStr = `${y}-${m}-${d}`
-  }
-  const date = new Date(dateStr)
+// Returns YYYY-MM-DD. Date-only strings are taken as written (no Date object,
+// so no timezone shift — the old "+1 day" fudge made every date a day late);
+// timestamps become the calendar date in India. Plain numbers are ETD day
+// counts, not dates, and are left to parseEtdDays.
+function normalizeDateOnly(value?: unknown) {
+  if (value === null || value === undefined || value === '' || typeof value === 'number') return null
+  const text = String(value).trim()
+  const dayFirst = text.match(/^(\d{2})-(\d{2})-(\d{4})/)
+  if (dayFirst) return `${dayFirst[3]}-${dayFirst[2]}-${dayFirst[1]}`
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text
+  if (/^\d+$/.test(text)) return null
+  const date = new Date(text)
   if (Number.isNaN(date.getTime())) return null
-  date.setDate(date.getDate() + 1)
-  return date.toISOString().slice(0, 10)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(date)
 }
 
 function sanitizeCode(value: string) {

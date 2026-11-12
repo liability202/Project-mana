@@ -1,26 +1,29 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase'
-import { sendCashbackCredited, sendOrderConfirmation, sendOrderShipped } from '@/lib/email'
+import { sendCashbackCredited, sendOrderShipped } from '@/lib/email'
 import { hasNimbusPostConfig, trackNimbusAwb } from '@/lib/nimbuspost'
-import { estimateCommission } from '@/lib/commissions'
-import { shippingCost } from '@/lib/utils'
+import { getWalletSnapshot } from '@/lib/commerce'
 import {
-  creditCashback,
-  debitWallet,
-  ensureUserProfile,
-  getAppliedCouponDiscount,
-  getCouponByCode,
-  getWalletSnapshot,
-  normalizePhone,
-  validateCouponRules,
-} from '@/lib/commerce'
+  CheckoutConflictError,
+  ORDER_NOTE,
+  adjustWallet,
+  buildQuote,
+  createOrder,
+  isVisibleToCustomer,
+  publicQuote,
+  readReferralCode,
+  releaseAbandonedAttempts,
+  releaseWalletForOrder,
+  runOrderSideEffects,
+  toCustomerOrder,
+  validateCustomer,
+} from '@/lib/checkout'
+import { isAdminRequest, unauthorized } from '@/lib/admin-auth'
+import { getSessionPhone, phoneVariants } from '@/lib/session'
+import { rateLimit } from '@/lib/rate-limit'
 import { sendWhatsAppMessage } from '@/lib/whatsapp/sender'
 
-function isMissingSchemaError(error: any) {
-  const message = String(error?.message || '')
-  return message.includes('schema cache') || message.includes('does not exist')
-}
+export const dynamic = 'force-dynamic'
 
 async function syncNimbusPostForOrder(order: any) {
   if (!hasNimbusPostConfig()) return null
@@ -56,305 +59,158 @@ async function syncNimbusPostForOrder(order: any) {
   }
 }
 
+/**
+ * Places a Cash-on-Delivery order for the signed-in customer. Online orders go
+ * through /api/razorpay/create-order + verify-order instead, so nothing sent
+ * here can mark an order as paid.
+ */
 export async function POST(req: Request) {
+  let body: any
   try {
-    const body = await req.json()
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 400 })
+  }
 
-    const { data: settingRow } = await supabaseAdmin
-      .from('site_settings')
-      .select('value')
-      .eq('key', 'enable_cashback_earning')
-      .single()
-    const enableEarning = settingRow ? settingRow.value !== false : true
+  // Checkout pages from before this change sent `payment_status: 'paid'` after
+  // a client-side payment. Never trust it; ask them to refresh instead.
+  if (body?.payment_id || body?.razorpay_order_id || body?.payment_status === 'paid') {
+    console.error('Rejected legacy paid-order request', { payment_id: body?.payment_id, phone: body?.customer_phone })
+    return NextResponse.json(
+      { error: 'This page is out of date. Please refresh and try again. If you were charged, contact us with your payment ID.' },
+      { status: 409 }
+    )
+  }
 
-    const normalizedPhone = normalizePhone(body.customer_phone || '')
-    if (!normalizedPhone) {
-      return NextResponse.json({ error: 'Customer phone is required.' }, { status: 400 })
-    }
+  const phone = getSessionPhone()
+  if (!phone) {
+    return NextResponse.json({ error: 'Please verify your phone number to continue.' }, { status: 401 })
+  }
 
-    const normalizedCouponCode = String(body.coupon_code || '').trim().toUpperCase()
+  const limit = rateLimit(`checkout:${phone}`, 10, 10 * 60 * 1000)
+  if (!limit.ok) return NextResponse.json({ error: 'Too many attempts. Please wait a few minutes.' }, { status: 429 })
 
-    const profile = await ensureUserProfile(supabaseAdmin, {
-      userId: body.user_id || null,
-      phone: normalizedPhone,
-      name: body.customer_name,
-      email: body.customer_email,
-    })
+  try {
+    const parsed = validateCustomer(body.customer)
+    if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 })
+    const { customer } = parsed
 
-    let coupon = null
-    let discountAmount = 0
+    await releaseAbandonedAttempts(supabaseAdmin, phone)
 
-    const { count: priorOrderCount, error: countError } = await supabaseAdmin
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .eq('customer_phone', normalizedPhone)
-
-    if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
-
-    if (normalizedCouponCode) {
-      if (normalizedCouponCode === 'LOYAL12') {
-        if ((priorOrderCount || 0) < 1) {
-          return NextResponse.json({ error: 'LOYAL12 is available only for returning customers.' }, { status: 400 })
-        }
-
-        coupon = {
-          id: 'loyal12',
-          code: 'LOYAL12',
-          discount_type: 'percentage' as const,
-          discount_value: 12,
-          influencer_name: null,
-          min_order_amount: 0,
-          max_discount: null,
-          usage_limit: null,
-          usage_count: 0,
-          total_orders: 0,
-          total_revenue: 0,
-          total_discount_given: 0,
-          is_active: true,
-        }
-      } else {
-        coupon = await getCouponByCode(supabaseAdmin, normalizedCouponCode)
-        if (!coupon) return NextResponse.json({ error: 'Invalid or inactive coupon code.' }, { status: 400 })
-      }
-
-      const ruleError = validateCouponRules(body.subtotal, coupon)
-      if (ruleError) return NextResponse.json({ error: ruleError }, { status: 400 })
-      discountAmount = getAppliedCouponDiscount(body.subtotal, coupon)
-    }
-
-    const walletSnapshot = await getWalletSnapshot(supabaseAdmin, {
-      userId: profile.user_id || null,
-      phone: normalizedPhone,
-    })
-    const walletRequested = Math.max(0, Number(body.wallet_amount || 0))
-    const walletUsed = Math.min(walletRequested, walletSnapshot.wallet.balance || 0, Math.max(0, body.subtotal - discountAmount))
-
-    // Backend fee recalculation and validation
-    const rawShipping = shippingCost(body.subtotal, body.city, body.state, body.pincode)
-    const shipping = (coupon && coupon.free_shipping) ? 0 : rawShipping
-
-    const isCod = !body.razorpay_order_id && !body.payment_id
-    const rawCodCharge = isCod ? 2900 : 0
-    const codCharge = (coupon && coupon.free_cod) ? 0 : rawCodCharge
-
-    const rawSmallOrderFee = body.subtotal < 50000 ? 1900 : 0
-    const smallOrderFee = (coupon && coupon.free_handling) ? 0 : rawSmallOrderFee
-
-    const finalAmount = Math.max(0, body.subtotal + shipping + codCharge + smallOrderFee - discountAmount - walletUsed)
-    const cashbackEarned = enableEarning ? Math.round((finalAmount * 5) / 100) : 0
-    const orderRef = body.order_ref || `MANA${Date.now().toString().slice(-6)}`
-
-    const refCookie = cookies().get('mana_ref')?.value
-    const potentialCreatorCode = normalizedCouponCode || refCookie
-    let creatorMatch = null
-
-    if (potentialCreatorCode) {
-      const { data: creator } = await supabaseAdmin
-        .from('creators')
-        .select('id, code, commission_pct')
-        .eq('code', potentialCreatorCode)
-        .eq('active', true)
-        .maybeSingle()
-      creatorMatch = creator
-    }
-
-    const insertPayload = {
-      order_ref: orderRef,
-      user_id: profile.user_id || null,
-      customer_name: body.customer_name,
-      customer_phone: normalizedPhone,
-      customer_email: body.customer_email || null,
-      address: body.address,
-      city: body.city,
-      state: body.state || null,
-      pincode: body.pincode,
+    const quote = await buildQuote(supabaseAdmin, {
       items: body.items,
-      subtotal: body.subtotal,
-      discount: discountAmount,
-      discount_amount: discountAmount,
-      shipping,
-      cod_charge: codCharge,
-      small_order_fee: smallOrderFee,
-      total: finalAmount,
-      final_amount: finalAmount,
-      wallet_used: walletUsed,
-      cashback_earned: cashbackEarned,
-      coupon_code: coupon?.code || null,
-      payment_id: body.payment_id || null,
-      razorpay_order_id: body.razorpay_order_id || null,
-      payment_status: body.payment_status || 'pending',
-      status: body.status || 'pending',
-      notes: body.notes || null,
+      couponCode: typeof body.coupon_code === 'string' ? body.coupon_code : null,
+      paymentMethod: 'cod',
+      useWallet: Boolean(body.use_wallet),
+      city: customer.city,
+      state: customer.state || '',
+      pincode: customer.pincode,
+    }, phone)
+
+    if (quote.errors.length || !quote.lines.length) {
+      return NextResponse.json({ error: quote.errors[0] || 'Your cart is empty.', quote: publicQuote(quote) }, { status: 400 })
+    }
+    if (quote.coupon?.error) {
+      return NextResponse.json({ error: quote.coupon.error, quote: publicQuote(quote) }, { status: 400 })
+    }
+    const expectedTotal = Number(body.expected_total)
+    if (Number.isFinite(expectedTotal) && expectedTotal !== quote.totals.total) {
+      return NextResponse.json(
+        { error: 'Your order total has changed. Please review it and try again.', quote: publicQuote(quote) },
+        { status: 409 }
+      )
     }
 
-    let { data, error } = await supabaseAdmin
-      .from('orders')
-      .insert(insertPayload)
-      .select('*')
-      .single()
-
-    if (error && isMissingSchemaError(error)) {
-      const legacyPayload = {
-        order_ref: orderRef,
-        user_id: profile.user_id || null,
-        customer_name: body.customer_name,
-        customer_phone: normalizedPhone,
-        customer_email: body.customer_email || null,
-        address: body.address,
-        city: body.city,
-        state: body.state || null,
-        pincode: body.pincode,
-        items: body.items,
-        subtotal: body.subtotal,
-        discount: discountAmount,
-        shipping,
-        total: finalAmount,
-        coupon_code: coupon?.code || null,
-        payment_id: body.payment_id || null,
-        payment_status: body.payment_status || 'pending',
-        status: body.status || 'pending',
-        notes: body.notes || null,
-      }
-
-      const fallbackInsert = await supabaseAdmin
-        .from('orders')
-        .insert(legacyPayload)
-        .select('*')
-        .single()
-
-      data = fallbackInsert.data
-      error = fallbackInsert.error
-    }
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    if ((priorOrderCount || 0) === 0 && !profile.is_cashback_eligible && enableEarning) {
-      await supabaseAdmin.from('user_profiles').update({ is_cashback_eligible: true }).eq('phone', normalizedPhone)
-    }
-
-    if (walletUsed > 0) {
-      await debitWallet(supabaseAdmin, {
-        walletId: walletSnapshot.wallet.id,
-        userId: profile.user_id || null,
-        phone: normalizedPhone,
-        amount: walletUsed,
-        orderId: data.id,
-        description: `Cashback used on order ${data.id.slice(0, 8).toUpperCase()}`,
-      })
-    }
-
-    // Only update real coupons table rows — skip 'loyal12' (virtual) and creator-* (virtual IDs from creators table)
-    if (coupon && coupon.id !== 'loyal12' && !String(coupon.id).startsWith('creator-')) {
-      const { error: couponUpdateError } = await supabaseAdmin
-        .from('coupons')
-        .update({
-          usage_count: (coupon.usage_count || 0) + 1,
-          total_orders: (coupon.total_orders || 0) + 1,
-          total_revenue: (coupon.total_revenue || 0) + finalAmount,
-          total_discount_given: (coupon.total_discount_given || 0) + discountAmount,
-        })
-        .eq('id', coupon.id)
-      if (couponUpdateError && !isMissingSchemaError(couponUpdateError)) {
-        throw couponUpdateError
-      }
-    }
-
-    if (creatorMatch && data) {
-      const commPct = creatorMatch.commission_pct || 10
-      const commissionAmt = estimateCommission(body.subtotal, commPct)
-
-      await supabaseAdmin.from('commissions').insert({
-        creator_id: creatorMatch.id,
-        order_id: data.id,
-        order_total: body.subtotal,
-        commission_pct: commPct,
-        commission_amount: commissionAmt,
-        status: 'pending',
-      })
-    }
-
-    if (data.customer_email && (data.payment_status === 'paid' || data.payment_status === 'pending')) {
-      sendOrderConfirmation({
-        customerEmail: data.customer_email,
-        customerName: data.customer_name,
-        orderId: data.id,
-        items: data.items || [],
-        subtotal: data.subtotal || 0,
-        shipping: data.shipping || 0,
-        discount: data.discount_amount || data.discount || 0,
-        total: data.final_amount || data.total || 0,
-        address: data.address,
-        city: data.city,
-        state: data.state || undefined,
-        pincode: data.pincode,
-      }).catch(console.error)
-    }
+    const order = await createOrder(supabaseAdmin, {
+      quote, customer, phone, status: 'pending', paymentStatus: 'pending', notes: ORDER_NOTE.cod,
+    })
+    await runOrderSideEffects(supabaseAdmin, order, { refCode: readReferralCode(), settings: quote.settings })
 
     return NextResponse.json({
-      id: data.id,
-      order_ref: data.order_ref || orderRef,
+      id: order.id,
+      order_ref: order.order_ref,
       success: true,
-      final_amount: finalAmount,
-      discount_amount: discountAmount,
-      wallet_used: walletUsed,
-      cashback_earned: cashbackEarned,
+      final_amount: order.final_amount ?? order.total,
+      discount_amount: order.discount_amount ?? order.discount ?? 0,
+      wallet_used: order.wallet_used || 0,
+      cashback_earned: order.cashback_earned || 0,
     })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err) {
+    if (err instanceof CheckoutConflictError) {
+      return NextResponse.json({ error: err.message, quote: true }, { status: 409 })
+    }
+    console.error('COD order failed', err)
+    return NextResponse.json({ error: 'Could not place your order. Please try again.' }, { status: 500 })
   }
 }
 
+/**
+ * Admin (Bearer ADMIN_SECRET): latest orders across all customers.
+ * Customer (session cookie): their own orders only.
+ */
 export async function GET(req: Request) {
-  const auth = req.headers.get('authorization')
   const { searchParams } = new URL(req.url)
-  const phone = normalizePhone(searchParams.get('phone') || '')
-  const orderRef = String(searchParams.get('orderRef') || '').trim().toUpperCase()
 
-  if (phone && orderRef) {
+  if (req.headers.get('authorization')) {
+    // Someone presenting a token is asking for admin data; a customer session
+    // in the same browser must not make a wrong password "work".
+    if (!isAdminRequest(req)) return unauthorized()
+
+    const requested = Number(searchParams.get('limit'))
+    const limit = Number.isInteger(requested) && requested > 0 ? Math.min(requested, 500) : 100
     const { data, error } = await supabaseAdmin
       .from('orders')
       .select('*')
-      .eq('customer_phone', phone)
-      .eq('order_ref', orderRef)
-      .single()
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(data)
-  }
-
-  if (phone) {
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .select('*')
-      .eq('customer_phone', phone)
       .order('created_at', { ascending: false })
-      .limit(50)
+      .limit(limit)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error('Admin orders load failed', error)
+      return NextResponse.json({ error: 'Could not load orders.' }, { status: 500 })
+    }
     return NextResponse.json(data)
   }
 
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const phone = getSessionPhone()
+  if (!phone) return NextResponse.json({ error: 'Please sign in to see your orders.' }, { status: 401 })
 
-  const { data, error } = await supabaseAdmin
+  const orderRef = String(searchParams.get('orderRef') || '').trim().toUpperCase()
+  let query = supabaseAdmin
     .from('orders')
     .select('*')
+    .in('customer_phone', phoneVariants(phone))
     .order('created_at', { ascending: false })
-    .limit(100)
+    .limit(50)
+  if (orderRef) query = query.eq('order_ref', orderRef)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  const { data, error } = await query
+  if (error) {
+    console.error('Customer orders load failed', error)
+    return NextResponse.json({ error: 'Could not load your orders.' }, { status: 500 })
+  }
+  return NextResponse.json((data || []).filter(isVisibleToCustomer).map(toCustomerOrder))
+}
+
+const PROGRESS_STATUSES = ['pending', 'confirmed', 'packed', 'shipped', 'delivered']
+
+/**
+ * Delivered and cancelled are final: delivery pays cashback and confirms the
+ * creator's commission, cancellation refunds the wallet. Allowing either to be
+ * undone (or reached by a stray click from the other) is how money went wrong.
+ */
+function statusChangeError(from: string, to: string) {
+  if (from === to) return null
+  if (from === 'delivered' || from === 'cancelled') return `This order is already ${from}; its status can no longer be changed.`
+  if (to !== 'cancelled' && !PROGRESS_STATUSES.includes(to)) return `Unknown status "${to}".`
+  return null
+}
+
+function rupees(paise: number) {
+  return '₹' + (Math.round(paise) / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })
 }
 
 export async function PUT(req: Request) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!isAdminRequest(req)) return unauthorized()
 
   try {
     const body = await req.json()
@@ -368,7 +224,17 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: existingError?.message || 'Order not found.' }, { status: 404 })
     }
 
-    const nextStatus = body.status || existing.status
+    if (existing.notes === ORDER_NOTE.awaitingPayment && existing.payment_status !== 'paid') {
+      return NextResponse.json(
+        { error: 'This online order was never paid. It cannot be confirmed or shipped.' },
+        { status: 409 }
+      )
+    }
+
+    const nextStatus = String(body.status || existing.status)
+    const transitionError = statusChangeError(existing.status, nextStatus)
+    if (transitionError) return NextResponse.json({ error: transitionError }, { status: 409 })
+
     const nextPaymentStatus = nextStatus === 'delivered' ? 'paid' : existing.payment_status
 
     const updatePayload: Record<string, any> = {
@@ -381,15 +247,22 @@ export async function PUT(req: Request) {
     if ('courier_name' in body) updatePayload.courier_name = body.courier_name || null
     if ('expected_delivery' in body) updatePayload.expected_delivery = body.expected_delivery || null
 
-    const { data: updated, error: updateError } = await supabaseAdmin
+    // Only apply if nobody changed the status since we read it, so the
+    // one-time effects below can't run twice for a double click.
+    const { data: updatedRows, error: updateError } = await supabaseAdmin
       .from('orders')
       .update(updatePayload)
       .eq('id', body.id)
+      .eq('status', existing.status)
       .select('*')
-      .single()
 
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+    const updated = updatedRows?.[0]
+    if (!updated) {
+      return NextResponse.json({ error: 'This order was just updated by someone else. Please refresh.' }, { status: 409 })
+    }
 
+    const statusChanged = existing.status !== nextStatus
     let latestOrder = updated
 
     if (nextStatus === 'shipped' && updated.tracking_number) {
@@ -397,11 +270,12 @@ export async function PUT(req: Request) {
       if (synced) latestOrder = synced
     }
 
-    if (nextStatus === 'shipped' && existing.status !== 'shipped' && latestOrder.customer_email) {
+    if (nextStatus === 'shipped' && statusChanged && latestOrder.customer_email) {
       sendOrderShipped({
         customerEmail: latestOrder.customer_email,
         customerName: latestOrder.customer_name,
         orderId: latestOrder.id,
+        orderRef: latestOrder.order_ref,
         trackingNumber: body.tracking_number || latestOrder.tracking_number || undefined,
         courierName: body.courier_name || latestOrder.courier_name || undefined,
         trackingLink: body.tracking_link || latestOrder.tracking_link || undefined,
@@ -410,36 +284,30 @@ export async function PUT(req: Request) {
       }).catch(console.error)
     }
 
-    if (
-      nextStatus === 'delivered' &&
-      existing.status !== 'delivered' &&
-      (latestOrder.cashback_earned || 0) > 0 &&
-      latestOrder.customer_phone
-    ) {
-      const walletSnapshot = await getWalletSnapshot(supabaseAdmin, {
-        userId: latestOrder.user_id || null,
-        phone: latestOrder.customer_phone,
-      })
+    const orderCode = latestOrder.order_ref || latestOrder.id.slice(0, 8).toUpperCase()
+    const paidOnline = existing.payment_status === 'paid' && existing.notes !== ORDER_NOTE.cod
+    let cashbackCredited = 0
 
+    if (nextStatus === 'delivered' && statusChanged && (latestOrder.cashback_earned || 0) > 0 && latestOrder.customer_phone) {
       const { data: alreadyCredited } = await supabaseAdmin
         .from('wallet_transactions')
         .select('id')
-        .eq('wallet_id', walletSnapshot.wallet.id)
         .eq('order_id', latestOrder.id)
         .eq('reason', 'cashback')
         .limit(1)
 
       if (!alreadyCredited?.length) {
-        await creditCashback(supabaseAdmin, {
-          walletId: walletSnapshot.wallet.id,
-          userId: latestOrder.user_id || null,
+        const credited = await adjustWallet(supabaseAdmin, {
           phone: latestOrder.customer_phone,
-          amount: latestOrder.cashback_earned || 0,
+          amount: latestOrder.cashback_earned,
+          type: 'credit',
+          reason: 'cashback',
           orderId: latestOrder.id,
-          description: `5% cashback for delivered order ${latestOrder.id.slice(0, 8).toUpperCase()}`,
+          description: `5% cashback for delivered order ${orderCode}`,
         })
+        if (credited) cashbackCredited = latestOrder.cashback_earned
 
-        if (latestOrder.customer_email) {
+        if (credited && latestOrder.customer_email) {
           const refreshedWallet = await getWalletSnapshot(supabaseAdmin, {
             userId: latestOrder.user_id || null,
             phone: latestOrder.customer_phone,
@@ -455,9 +323,14 @@ export async function PUT(req: Request) {
       }
     }
 
-    if (latestOrder.customer_phone && existing.status !== nextStatus) {
-      const orderCode = latestOrder.order_ref || latestOrder.id.slice(0, 8).toUpperCase()
+    // Return exactly what the wallet ledger says this order took — never
+    // credit that was never debited.
+    let walletRefunded = 0
+    if (nextStatus === 'cancelled' && statusChanged && latestOrder.customer_phone) {
+      walletRefunded = await releaseWalletForOrder(supabaseAdmin, latestOrder, `Wallet credit returned for cancelled order ${orderCode}`)
+    }
 
+    if (latestOrder.customer_phone && statusChanged) {
       if (nextStatus === 'confirmed') {
         sendWhatsAppMessage(
           latestOrder.customer_phone,
@@ -475,14 +348,22 @@ export async function PUT(req: Request) {
 
       if (nextStatus === 'delivered') {
         let message = `Order ${orderCode} delivered.\n\nThank you for shopping with MANA.`
-        if ((latestOrder.cashback_earned || 0) > 0) {
-          message += `\n\nRs. ${latestOrder.cashback_earned} cashback has been credited to your MANA account.\n\nTo avail this on your next purchase, simply checkout using your number +91 ${latestOrder.customer_phone}. This cashback is valid for 2 months.`
+        if (cashbackCredited > 0) {
+          // cashback_earned is stored in paise.
+          message += `\n\n${rupees(cashbackCredited)} cashback has been credited to your MANA account.\n\nTo use it on your next purchase, simply check out with your number +91 ${String(latestOrder.customer_phone).slice(-10)}.`
         }
+        sendWhatsAppMessage(latestOrder.customer_phone, message).catch(console.error)
+      }
+
+      if (nextStatus === 'cancelled') {
+        let message = `Order ${orderCode} has been cancelled.`
+        if (walletRefunded > 0) message += `\n\n${rupees(walletRefunded)} has been returned to your MANA wallet.`
+        if (paidOnline) message += `\n\nYour online payment will be refunded to the original payment method.`
         sendWhatsAppMessage(latestOrder.customer_phone, message).catch(console.error)
       }
     }
 
-    if (nextStatus === 'delivered' && existing.status !== 'delivered') {
+    if (nextStatus === 'delivered' && statusChanged) {
       const { data: comm } = await supabaseAdmin
         .from('commissions')
         .select('*')
@@ -491,32 +372,36 @@ export async function PUT(req: Request) {
         .maybeSingle()
 
       if (comm) {
-        await supabaseAdmin
+        const { data: confirmedRows } = await supabaseAdmin
           .from('commissions')
           .update({ status: 'confirmed' })
           .eq('id', comm.id)
+          .eq('status', 'pending')
+          .select('id')
 
-        const { data: creator } = await supabaseAdmin
-          .from('creators')
-          .select('total_earned, phone')
-          .eq('id', comm.creator_id)
-          .single()
-
-        if (creator) {
-          await supabaseAdmin
+        if (confirmedRows?.length) {
+          const { data: creator } = await supabaseAdmin
             .from('creators')
-            .update({ total_earned: (creator.total_earned || 0) + comm.commission_amount })
+            .select('total_earned, phone')
             .eq('id', comm.creator_id)
+            .single()
 
-          sendWhatsAppMessage(
-            creator.phone,
-            `Congratulations! You've earned Rs. ${comm.commission_amount / 100} commission for order ${latestOrder.order_ref || latestOrder.id.slice(0, 8).toUpperCase()}.\n\nCheck your balance: manadryfruits.com/creator`
-          ).catch(console.error)
+          if (creator) {
+            await supabaseAdmin
+              .from('creators')
+              .update({ total_earned: (creator.total_earned || 0) + comm.commission_amount })
+              .eq('id', comm.creator_id)
+
+            sendWhatsAppMessage(
+              creator.phone,
+              `Congratulations! You've earned ${rupees(comm.commission_amount)} commission for order ${orderCode}.\n\nCheck your balance: manadryfruits.com/creator`
+            ).catch(console.error)
+          }
         }
       }
     }
 
-    if (nextStatus === 'cancelled' && existing.status !== 'cancelled') {
+    if (nextStatus === 'cancelled' && statusChanged) {
       // Void both pending and confirmed rows. Only voiding `pending` left a
       // delivered-then-cancelled order with a live commission attached to a
       // dead sale, which then counted towards the creator's earnings and the
@@ -555,7 +440,14 @@ export async function PUT(req: Request) {
       }
     }
 
-    return NextResponse.json(latestOrder)
+    return NextResponse.json({
+      ...latestOrder,
+      wallet_refunded: walletRefunded,
+      // The card/UPI payment still has to be refunded by hand in Razorpay.
+      online_refund_needed: nextStatus === 'cancelled' && statusChanged && paidOnline
+        ? (latestOrder.final_amount ?? latestOrder.total)
+        : 0,
+    })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

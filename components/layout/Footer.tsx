@@ -22,7 +22,7 @@ const COMPANY_LINKS = [
   { label: 'FAQ', href: '/faq' },
   { label: 'Terms & Conditions', href: '/terms' },
   { label: 'Privacy Policy', href: '/privacy' },
-  { label: 'Return Policy', href: '/returns' },
+  { label: 'Return Policy', href: '/faq#returns-refunds' },
   { label: 'Creator Portal', href: '/creator' },
 ]
 
