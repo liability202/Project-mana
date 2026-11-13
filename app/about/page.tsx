@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: 'Our Story',
   description: 'Discover how MK and Sons brings decades of direct farm relationships to offer the finest, visually graded, lab tested dry fruits, herbs, and spices.',
   alternates: {
-    canonical: 'https://manadryfruits.com/about',
+    canonical: '/about',
   },
 }
 

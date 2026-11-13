@@ -1,7 +1,10 @@
 import type { Product } from '@/lib/supabase'
 import { shippingCost } from '@/lib/utils'
 
-export const SITE_URL = 'https://manadryfruits.com'
+// Vercel serves the site on www (the bare domain redirects there), so every
+// canonical, sitemap and schema URL must use www too, or Google sees each page
+// pointing at an address that redirects away.
+export const SITE_URL = 'https://www.manadryfruits.com'
 export const BRAND_NAME = 'Mana Dry Fruits'
 
 type ProductSchemaInput = {

@@ -4,7 +4,7 @@ export const metadata: Metadata = {
   title: 'Custom Wellness Kits',
   description: 'Build your customized health and wellness kit with premium dry fruits, natural churnas, and single-origin spices. Pick your own ingredients and quantities.',
   alternates: {
-    canonical: 'https://manadryfruits.com/kits',
+    canonical: '/kits',
   },
 }
 
