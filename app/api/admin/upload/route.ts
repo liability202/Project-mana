@@ -1,6 +1,33 @@
 import { NextResponse } from 'next/server'
+import sharp from 'sharp'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isAdminToken } from '@/lib/admin-auth'
+
+export const runtime = 'nodejs'
+
+// Product photos are shown at most ~700px wide (1400px on retina screens), so
+// 1600px keeps full zoom quality. WebP at q82 turns a 2 MB PNG into ~150-250 KB.
+const MAX_DIMENSION = 1600
+const WEBP_QUALITY = 82
+
+async function compressImage(input: Buffer, type: string): Promise<{ buffer: Buffer; contentType: string; extension: string }> {
+  const originalExtension = (type.split('/')[1] || 'png').replace('jpeg', 'jpg')
+  // GIFs may be animated; SVGs are vectors. Store those untouched.
+  if (type === 'image/gif' || type === 'image/svg+xml') {
+    return { buffer: input, contentType: type, extension: originalExtension === 'svg+xml' ? 'svg' : originalExtension }
+  }
+  try {
+    const output = await sharp(input)
+      .rotate() // apply the phone's EXIF orientation before metadata is stripped
+      .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: WEBP_QUALITY })
+      .toBuffer()
+    return { buffer: output, contentType: 'image/webp', extension: 'webp' }
+  } catch {
+    // An image sharp can't read is still better uploaded as-is than rejected.
+    return { buffer: input, contentType: type || 'application/octet-stream', extension: originalExtension }
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -24,11 +51,12 @@ export async function POST(req: Request) {
     }
 
     const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
+    const { buffer, contentType, extension } = await compressImage(Buffer.from(bytes), file.type)
 
-    // Generate safe unique filename
-    const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const fileName = `admin-products/${Date.now()}-${cleanName}`
+    // Keep the descriptive part of the original name (it becomes the image's
+    // alt text — see lib/image-utils.ts); only the extension changes.
+    const baseName = file.name.replace(/\.[a-z0-9]{2,5}$/i, '').replace(/[^a-zA-Z0-9.-]/g, '_') || 'image'
+    const fileName = `admin-products/${Date.now()}-${baseName}.${extension}`
 
     const bucketCandidates = [
       process.env.SUPABASE_PRODUCT_IMAGE_BUCKET,
@@ -43,7 +71,7 @@ export async function POST(req: Request) {
       const { error } = await supabaseAdmin.storage
         .from(bucket)
         .upload(fileName, buffer, {
-          contentType: file.type || 'application/octet-stream',
+          contentType,
           upsert: false,
         })
 
@@ -72,7 +100,7 @@ export async function POST(req: Request) {
       const { error } = await supabaseAdmin.storage
         .from(fallbackBucket)
         .upload(fileName, buffer, {
-          contentType: file.type || 'application/octet-stream',
+          contentType,
           upsert: false,
         })
 

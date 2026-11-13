@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ImageManager } from '@/components/admin/ImageManager'
 
 export type AdminVariant = {
   id: string
@@ -26,9 +27,11 @@ function genId() {
 interface Props {
   value: AdminVariant[]
   onChange: (variants: AdminVariant[]) => void
+  /** Product name, for previewing photo descriptions. */
+  productName?: string
 }
 
-export function VariantEditor({ value, onChange }: Props) {
+export function VariantEditor({ value, onChange, productName = '' }: Props) {
   const [expanded, setExpanded] = useState<string | null>(value[0]?.id ?? null)
 
   const update = (id: string, patch: Partial<AdminVariant>) => {
@@ -171,14 +174,13 @@ export function VariantEditor({ value, onChange }: Props) {
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs text-ink-3 block mb-1">
-                    Variant Images <span className="text-ink-4">(one URL per line)</span>
-                  </label>
-                  <textarea
+                  {/* Variant photos replace the product photos when this variant is selected. */}
+                  <ImageManager
+                    label={`Photos for "${v.name || 'this variant'}" (shown when it is selected)`}
                     value={(v.images ?? []).join('\n')}
-                    onChange={e => update(v.id, { images: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
-                    className="input text-xs font-mono min-h-[72px]"
-                    placeholder="https://..."
+                    onChange={val => update(v.id, { images: val.split('\n').map(s => s.trim()).filter(Boolean) })}
+                    productName={[productName, v.name].filter(Boolean).join(' ')}
+                    recommended={0}
                   />
                 </div>
               </div>

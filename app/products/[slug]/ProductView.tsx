@@ -14,6 +14,7 @@ import { ProductRecommendations } from '@/components/product/ProductRecommendati
 import { BuyNowPopup } from '@/components/product/BuyNowPopup'
 import type { Product, Variant } from '@/lib/supabase'
 import { getDefaultWeight, getPresetWeights } from './weights'
+import { imageAlt } from '@/lib/image-utils'
 
 export type RatingSummary = { avg: number; count: number }
 
@@ -316,7 +317,7 @@ export default function ProductView({ slug, initialProduct, initialRating, aka, 
             onTouchEnd={onTouchEndHandler}
           >
             {galleryImages?.[activeImg] ? (
-              <Image src={galleryImages[activeImg]} alt={product.name} width={700} height={700} className="object-cover w-full aspect-square" priority />
+              <Image src={galleryImages[activeImg]} alt={imageAlt(product.name, galleryImages[activeImg], activeImg)} width={700} height={700} className="object-cover w-full aspect-square" priority />
             ) : (
               <div className="w-full aspect-square bg-ivory-2 flex items-center justify-center text-ink-4">No image</div>
             )}
@@ -363,6 +364,7 @@ export default function ProductView({ slug, initialProduct, initialRating, aka, 
                 <button
                   key={i}
                   onClick={() => setActiveImg(i)}
+                  aria-label={`Show photo ${i + 1}: ${imageAlt(product.name, img, i)}`}
                   className={`w-[68px] h-[68px] flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${activeImg === i ? 'border-green' : 'border-transparent hover:border-green-4'}`}
                 >
                   <Image src={img} alt="" width={68} height={68} className="object-cover w-full h-full" />

@@ -697,7 +697,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                   </div>
 
                   <div className="md:col-span-2">
-                    <ImageManager label="Main Kit Images (Fallback)" value={imagesInput} onChange={setImagesInput} />
+                    <ImageManager label="Main Kit Images (Fallback)" value={imagesInput} onChange={setImagesInput} productName={name} />
                   </div>
 
                   <div className="md:col-span-2">
@@ -763,7 +763,7 @@ export default function EditAdminKitPage({ params }: { params: { id: string } })
                       
                       <div>
                         <ImageManager 
-                          label="Version-Specific Images (Optional overrides)" 
+                          label="Version-Specific Images (Optional overrides)" recommended={0} productName={name} 
                           value={activeTier.imagesInput} 
                           onChange={val => updateActiveTier(t => ({ ...t, imagesInput: val }))} 
                         />

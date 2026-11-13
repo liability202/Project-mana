@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/utils'
+import { MIN_PRODUCT_IMAGES, photoStatus } from '@/lib/image-utils'
 import { LoyaltyPanel } from '@/components/admin/LoyaltyPanel'
 import type { Coupon, Order, Product, Review } from '@/lib/supabase'
 
@@ -90,6 +91,7 @@ export default function AdminPage() {
   const [prodSearch, setProdSearch] = useState('')
   const [prodCategoryFilter, setProdCategoryFilter] = useState('all')
   const [prodStockFilter, setProdStockFilter] = useState('all')
+  const [prodNeedsPhotos, setProdNeedsPhotos] = useState(false)
   const [prodSortBy, setProdSortBy] = useState<'newest' | 'oldest' | 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc'>('newest')
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
@@ -639,6 +641,10 @@ export default function AdminPage() {
       if (prodCategoryFilter !== 'all' && p.category !== prodCategoryFilter) return false
       if (prodStockFilter === 'in_stock' && !p.in_stock) return false
       if (prodStockFilter === 'out_of_stock' && p.in_stock) return false
+      if (prodNeedsPhotos) {
+        const photos = photoStatus(p)
+        if (!photos.needsMore && !photos.variantsWithoutPhotos.length) return false
+      }
 
       if (prodSearch.trim()) {
         const q = prodSearch.toLowerCase().trim()
@@ -997,7 +1003,7 @@ export default function AdminPage() {
               </div>
 
               {/* Active Filter Indicators & Reset Button */}
-              {(prodSearch || prodCategoryFilter !== 'all' || prodStockFilter !== 'all' || prodSortBy !== 'newest') && (
+              {(prodSearch || prodCategoryFilter !== 'all' || prodStockFilter !== 'all' || prodSortBy !== 'newest' || prodNeedsPhotos) && (
                 <div className="flex items-center justify-between border-t border-ivory-3 pt-2 text-xs text-ink-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span>Active Filters:</span>
@@ -1013,6 +1019,7 @@ export default function AdminPage() {
                       setProdCategoryFilter('all')
                       setProdStockFilter('all')
                       setProdSortBy('newest')
+                      setProdNeedsPhotos(false)
                     }}
                     className="text-xs text-green-3 hover:text-green font-medium cursor-pointer underline bg-transparent border-none ml-auto"
                   >
@@ -1022,11 +1029,38 @@ export default function AdminPage() {
               )}
             </div>
 
+            {(() => {
+              // Photo shortfall across the whole catalogue (not just the current filter).
+              const catalogue = products.filter(p => p.category !== 'kits')
+              const noPhotos = catalogue.filter(p => photoStatus(p).count === 0).length
+              const fewPhotos = catalogue.filter(p => photoStatus(p).needsMore).length
+              const variantGaps = catalogue.filter(p => photoStatus(p).variantsWithoutPhotos.length > 0).length
+              if (!fewPhotos && !variantGaps) return null
+              return (
+                <div className="bg-[#fff6ef] border border-terra/30 rounded-xl px-4 py-3 mb-4 flex flex-wrap items-center gap-3 text-xs text-ink-2">
+                  <span className="text-base" aria-hidden>📷</span>
+                  <span>
+                    <strong className="text-terra">{fewPhotos} product{fewPhotos === 1 ? '' : 's'}</strong> have fewer than {MIN_PRODUCT_IMAGES} photos
+                    {noPhotos > 0 && <> ({noPhotos} with <strong>none</strong>)</>}
+                    {variantGaps > 0 && <>, and {variantGaps} have varieties without their own photos</>}.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setProdNeedsPhotos(v => !v)}
+                    className="ml-auto text-xs font-medium px-3 py-1.5 rounded-md border border-terra/40 text-terra hover:bg-terra hover:text-white transition-colors cursor-pointer bg-white"
+                  >
+                    {prodNeedsPhotos ? 'Show all products' : 'Show products needing photos'}
+                  </button>
+                </div>
+              )
+            })()}
+
             <div className="bg-white border border-ivory-3 rounded-xl overflow-hidden shadow-sm">
               <table className="w-full text-sm">
                 <thead className="bg-ivory-2 border-b border-ivory-3">
                   <tr>
                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Product</th>
+                    <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Photos</th>
                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Category</th>
                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Price</th>
                     <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-ink-4 font-normal">Stock</th>
@@ -1047,6 +1081,26 @@ export default function AdminPage() {
                         </div>
                         <div className="text-xs text-ink-4 font-mono mt-0.5">{product.slug}</div>
                       </td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const photos = photoStatus(product)
+                          return (
+                            <div>
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded border font-medium ${photos.count === 0 ? 'bg-red-50 text-red-600 border-red-200' : photos.needsMore ? 'bg-[#fff6ef] text-terra border-terra/30' : 'bg-green-6 text-green-2 border-green-5'}`}
+                                title={photos.needsMore ? `Add ${MIN_PRODUCT_IMAGES - photos.count} more: close-up, scale shot, back-of-pack label` : 'Enough photos'}
+                              >
+                                {photos.count === 0 ? 'No photos' : `${photos.count} photo${photos.count === 1 ? '' : 's'}`}
+                              </span>
+                              {photos.variantsWithoutPhotos.length > 0 && (
+                                <div className="text-[10px] text-ink-4 mt-1 max-w-[180px] leading-snug" title={photos.variantsWithoutPhotos.join(', ')}>
+                                  {photos.variantsWithoutPhotos.length} variet{photos.variantsWithoutPhotos.length === 1 ? 'y' : 'ies'} without own photos
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </td>
                       <td className="px-4 py-3 text-ink-3 capitalize">{product.category.replace('-', ' ')}</td>
                       <td className="px-4 py-3 font-serif text-green font-semibold">{formatPrice(product.price)}</td>
                       <td className="px-4 py-3">
@@ -1063,7 +1117,7 @@ export default function AdminPage() {
                   ))}
                   {filteredProducts.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-sm text-ink-3">
+                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-ink-3">
                         No products match your search or filter criteria.
                         <button
                           type="button"
@@ -1072,6 +1126,7 @@ export default function AdminPage() {
                             setProdCategoryFilter('all')
                             setProdStockFilter('all')
                             setProdSortBy('newest')
+                            setProdNeedsPhotos(false)
                           }}
                           className="block mx-auto mt-2 text-xs text-green underline bg-transparent border-none cursor-pointer"
                         >

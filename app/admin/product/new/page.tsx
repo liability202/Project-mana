@@ -183,7 +183,7 @@ export default function NewAdminProductPage() {
               </div>
 
               <div className="md:col-span-2">
-                <ImageManager label="Product Images" value={imagesInput} onChange={setImagesInput} />
+                <ImageManager label="Product Images" value={imagesInput} onChange={setImagesInput} productName={name} />
               </div>
 
               <div className="md:col-span-2">
@@ -203,7 +203,7 @@ export default function NewAdminProductPage() {
 
               <div className="md:col-span-2">
                 <label className="text-xs text-ink-3 block mb-1.5">Variants</label>
-                <VariantEditor value={variants} onChange={setVariants} />
+                <VariantEditor value={variants} onChange={setVariants} productName={name} />
                 <div className="text-xs text-ink-4 mt-2">Each variant can have its own images, price, quality tag and stock status.</div>
               </div>
             </div>

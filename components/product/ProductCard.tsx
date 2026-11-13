@@ -6,6 +6,7 @@ import { useCart } from '@/lib/store'
 import { calcPriceForWeight, formatPrice, parseBaseWeightGrams } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 import type { Product } from '@/lib/supabase'
+import { imageAlt } from '@/lib/image-utils'
 
 export function ProductCard({ product }: { product: Product }) {
   const addItem = useCart(s => s.addItem)
@@ -39,7 +40,7 @@ export function ProductCard({ product }: { product: Product }) {
         {product.images?.[0] ? (
           <Image
             src={product.images[0]}
-            alt={product.name}
+            alt={imageAlt(product.name, product.images[0], 0)}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-500"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
