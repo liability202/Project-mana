@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { supabase } from '@/lib/supabase'
+import { findProductBySlug } from '@/lib/product-lookup'
 import { BRAND_NAME, SITE_URL } from '@/lib/seo'
 
 // See app/products/[slug]/layout.tsx — same reason: the kit page is a client
@@ -9,11 +10,12 @@ export const revalidate = 3600
 type Props = { params: { slug: string } }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { data: kit } = await supabase
-    .from('products')
-    .select('name, description, images')
-    .eq('slug', params.slug)
-    .maybeSingle()
+  // Same lookup as the page, so a renamed kit's old URL still gets metadata.
+  const { product: kit } = await findProductBySlug<{ slug: string; name: string; description: string | null; images: string[] | null }>(
+    supabase,
+    params.slug,
+    'slug, name, description, images'
+  )
 
   if (!kit) {
     return {
@@ -34,12 +36,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
-    alternates: { canonical: `/kits/${params.slug}` },
+    alternates: { canonical: `/kits/${kit.slug}` },
     openGraph: {
       type: 'website',
       title: `${kit.name} | ${BRAND_NAME}`,
       description,
-      url: `${SITE_URL}/kits/${params.slug}`,
+      url: `${SITE_URL}/kits/${kit.slug}`,
       siteName: BRAND_NAME,
       ...(image ? { images: [{ url: image, alt: kit.name }] } : {}),
     },

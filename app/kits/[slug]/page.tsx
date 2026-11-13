@@ -1,3 +1,4 @@
+import { permanentRedirect } from 'next/navigation'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { findProductBySlug } from '@/lib/product-lookup'
 import { breadcrumbJsonLd, productJsonLd } from '@/lib/seo'
@@ -18,6 +19,8 @@ export default async function KitPage({ params }: Props) {
   const kit = product && product.category === 'kits' ? product : null
 
   if (!kit) return <KitView slug={params.slug} initialKit={null} />
+  // One URL per kit: old or misspelled slugs go to the current one.
+  if (kit.slug !== params.slug) permanentRedirect(`/kits/${kit.slug}`)
 
   const variants = kit.variants?.length ? kit.variants : []
   // Lowest price across sizes — what "from ₹X" means in the schema offer.

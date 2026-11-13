@@ -8,6 +8,17 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export const RENAMED_SLUGS: Record<string, string> = {
   'bhrami-powder': 'brahmi-powder',
   'satavari-powder': 'shatavari-powder',
+  'koch-beej': 'kaunch-beej',
+  'black-current': 'black-currant',
+  'blue-berry': 'blueberry',
+  'craneberry-craneberry': 'cranberry',
+  'flex-seeds': 'flax-seeds',
+  'protien-beans': 'protein-beans',
+  'protien-booster': 'protein-booster',
+  'munnaka': 'munakka',
+  'star-anais': 'star-anise',
+  'pepali': 'pippali',
+  'sugar-managment-kit': 'sugar-management-kit',
 }
 
 const RENAMED_SLUGS_REVERSE = Object.fromEntries(Object.entries(RENAMED_SLUGS).map(([oldSlug, newSlug]) => [newSlug, oldSlug]))
