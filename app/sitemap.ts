@@ -15,7 +15,7 @@ const STATIC_ROUTES: Array<{
   { path: '/products', changeFrequency: 'daily', priority: 0.9 },
   { path: '/kits', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/products?category=dry-fruits', changeFrequency: 'weekly', priority: 0.8 },
-  { path: '/products?category=herbs', changeFrequency: 'weekly', priority: 0.8 },
+  { path: '/ayurvedic-herbs', changeFrequency: 'weekly', priority: 0.9 },
   { path: '/products?category=spices', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/products?category=pansari', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/blog', changeFrequency: 'weekly', priority: 0.7 },

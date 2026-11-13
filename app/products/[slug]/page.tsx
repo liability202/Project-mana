@@ -1,7 +1,9 @@
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import type { Product, Variant } from '@/lib/supabase'
 import { findProductBySlug } from '@/lib/product-lookup'
-import { breadcrumbJsonLd, productJsonLd } from '@/lib/seo'
+import { breadcrumbJsonLd, faqJsonLd, productJsonLd } from '@/lib/seo'
+import { getHerbContent } from '@/lib/herb-content'
+import { HerbDetails } from '@/components/product/HerbDetails'
 import { calcPriceForWeight, extractBadgeConfig } from '@/lib/utils'
 import ProductView, { type RatingSummary } from './ProductView'
 import { getDefaultWeight } from './weights'
@@ -47,6 +49,11 @@ export default async function ProductPage({ params }: Props) {
   const defaultPrice = calcPriceForWeight(defaultVariant?.price || product.price, product.price_per_unit, getDefaultWeight(product.category))
   const images = defaultVariant?.images?.length ? defaultVariant.images : product.images
   const category = String(product.category || '')
+  const herb = getHerbContent(product.slug)
+  const alternateName = herb ? [herb.hindi, herb.botanical, ...herb.aka] : undefined
+  const categoryCrumb = category === 'herbs'
+    ? { name: 'Ayurvedic herbs', path: '/ayurvedic-herbs' }
+    : { name: category.replace(/-/g, ' '), path: `/products?category=${category}` }
 
   return (
     <>
@@ -59,20 +66,33 @@ export default async function ProductPage({ params }: Props) {
             price: defaultPrice,
             images,
             aggregateRating: rating ? { ratingValue: rating.avg, reviewCount: rating.count } : null,
+            alternateName,
           })),
         }}
       />
+      {herb && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(herb.faqs)) }}
+        />
+      )}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(breadcrumbJsonLd([
             { name: 'Home', path: '/' },
-            { name: category.replace(/-/g, ' '), path: `/products?category=${category}` },
+            categoryCrumb,
             { name: product.name, path: `/products/${product.slug}` },
           ])),
         }}
       />
-      <ProductView slug={params.slug} initialProduct={product} initialRating={rating} />
+      <ProductView
+        slug={params.slug}
+        initialProduct={product}
+        initialRating={rating}
+        aka={herb ? [herb.hindi, ...herb.aka] : undefined}
+        details={herb ? <HerbDetails herb={herb} productName={herb.title} /> : undefined}
+      />
     </>
   )
 }

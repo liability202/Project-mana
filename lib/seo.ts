@@ -16,6 +16,8 @@ type ProductSchemaInput = {
     ratingValue: number
     reviewCount: number
   } | null
+  /** Other names the product is known by (Hindi, regional, botanical). */
+  alternateName?: string[]
 }
 
 function absoluteUrl(pathOrUrl: string) {
@@ -28,7 +30,7 @@ function priceInRupees(priceInPaise: number) {
   return value.toFixed(2)
 }
 
-export function productJsonLd({ product, path, price, images, aggregateRating }: ProductSchemaInput) {
+export function productJsonLd({ product, path, price, images, aggregateRating, alternateName }: ProductSchemaInput) {
   const productImages = (images?.length ? images : product.images || []).filter(Boolean).map(absoluteUrl)
   const url = absoluteUrl(path)
   const offerPrice = typeof price === 'number' ? price : product.price
@@ -37,6 +39,7 @@ export function productJsonLd({ product, path, price, images, aggregateRating }:
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
+    ...(alternateName?.length ? { alternateName } : {}),
     description: product.description || '',
     image: productImages,
     brand: {
@@ -100,6 +103,18 @@ export function productJsonLd({ product, path, price, images, aggregateRating }:
         { '@type': 'PropertyValue', name: 'Organic', value: 'Yes' },
       ],
     } : {}),
+  }
+}
+
+export function faqJsonLd(faqs: Array<{ q: string; a: string }>) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map(f => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
   }
 }
 

@@ -1,6 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
+ * Misspelled slugs that were corrected, old → new. Looked up in both
+ * directions, so links work whether the database row has been renamed yet or
+ * not; the product layout then redirects to whatever slug the row has.
+ */
+export const RENAMED_SLUGS: Record<string, string> = {
+  'bhrami-powder': 'brahmi-powder',
+  'satavari-powder': 'shatavari-powder',
+}
+
+const RENAMED_SLUGS_REVERSE = Object.fromEntries(Object.entries(RENAMED_SLUGS).map(([oldSlug, newSlug]) => [newSlug, oldSlug]))
+
+/**
  * Finds a product for a URL slug: exact match first, then singular/plural,
  * then the first product whose slug or name contains the slug's first word
  * (old links and typos). Callers should redirect to `product.slug` when it
@@ -22,6 +34,13 @@ export async function findProductBySlug<T extends { slug: string } = any>(
   const exact = await client.from('products').select(select).ilike('slug', slug).limit(1)
   if (exact.error) return { product: null, error: true }
   if (exact.data?.length) return { product: exact.data[0] as unknown as T, error: false }
+
+  const renamed = RENAMED_SLUGS[slug] || RENAMED_SLUGS_REVERSE[slug]
+  if (renamed) {
+    const counterpart = await client.from('products').select(select).ilike('slug', renamed).limit(1)
+    if (counterpart.error) return { product: null, error: true }
+    if (counterpart.data?.length) return { product: counterpart.data[0] as unknown as T, error: false }
+  }
 
   const altSlug = slug.endsWith('s') ? slug.slice(0, -1) : `${slug}s`
   const alt = await client.from('products').select(select).ilike('slug', altSlug).limit(1)

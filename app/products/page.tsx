@@ -33,9 +33,12 @@ export function generateMetadata({ searchParams }: Props): Metadata {
 
   // Filtered/searched listings canonicalise to the clean category (or root)
   // URL so Google doesn't index dozens of near-duplicate permutations.
-  const canonical = searchParams?.category
-    ? `/products?category=${searchParams.category}`
-    : '/products'
+  // The herbs filter's canonical page is the /ayurvedic-herbs A–Z hub.
+  const canonical = searchParams?.category === 'herbs'
+    ? '/ayurvedic-herbs'
+    : searchParams?.category
+      ? `/products?category=${searchParams.category}`
+      : '/products'
 
   return {
     title: meta?.title || 'Shop All Products – Dry Fruits, Herbs & Spices',

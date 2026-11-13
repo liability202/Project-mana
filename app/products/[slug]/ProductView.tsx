@@ -24,10 +24,14 @@ function firstInStockVariant(product: Product | null): Variant | null {
 // Rendered by the server page with the product already loaded, so the HTML
 // carries the full product for crawlers; it refetches on mount for live
 // price/stock. `initialProduct` is null only if the server lookup failed.
-export default function ProductView({ slug, initialProduct, initialRating }: {
+export default function ProductView({ slug, initialProduct, initialRating, aka, details }: {
   slug: string
   initialProduct: Product | null
   initialRating: RatingSummary | null
+  /** Other names the product is searched by, shown under the heading. */
+  aka?: string[]
+  /** Server-rendered long-form content (e.g. HerbDetails), shown below the buy box. */
+  details?: React.ReactNode
 }) {
   const params = { slug }
   const [product, setProduct]       = useState<Product | null>(initialProduct)
@@ -297,7 +301,7 @@ export default function ProductView({ slug, initialProduct, initialRating }: {
       <div className="px-[5%] py-3 flex gap-1.5 text-[.68rem] text-ink-4">
         <Link href="/" className="hover:text-green transition-colors">Home</Link>
         <span>›</span>
-        <Link href={`/products?category=${product.category}`} className="hover:text-green transition-colors capitalize">{product.category.replace('-', ' ')}</Link>
+        <Link href={product.category === 'herbs' ? '/ayurvedic-herbs' : `/products?category=${product.category}`} className="hover:text-green transition-colors capitalize">{product.category === 'herbs' ? 'Ayurvedic herbs' : product.category.replace('-', ' ')}</Link>
         <span>›</span>
         <span className="text-ink-3">{product.name}</span>
       </div>
@@ -381,6 +385,9 @@ export default function ProductView({ slug, initialProduct, initialRating }: {
 
           {product.vendor && <div className="text-[.6rem] tracking-[.18em] uppercase text-ink-4 mb-2">{product.vendor}</div>}
           <h1 className="font-serif text-[clamp(1.8rem,3vw,2.6rem)] text-ink font-light leading-tight mb-2 tracking-tight">{product.name}</h1>
+          {aka && aka.length > 0 && (
+            <p className="text-[.8rem] text-ink-3 mb-3">Also known as: {aka.join(' · ')}</p>
+          )}
 
           {avgRating !== null && reviewCount > 0 && (
             <div className="flex items-center gap-3 mb-4">
@@ -672,8 +679,10 @@ export default function ProductView({ slug, initialProduct, initialRating }: {
         </div>
       </div>
       
-      <ProductRecommendations 
-        currentSlug={product.slug} 
+      {details}
+
+      <ProductRecommendations
+        currentSlug={product.slug}
         category={product.category} 
       />
 

@@ -3,7 +3,7 @@ import { CalendarDays, Instagram } from 'lucide-react'
 
 const SHOP_LINKS = [
   { label: 'Dry Fruits', href: '/products?category=dry-fruits' },
-  { label: 'Herbs & Ayurveda', href: '/products?category=herbs' },
+  { label: 'Herbs & Ayurveda', href: '/ayurvedic-herbs' },
   { label: 'Spices', href: '/products?category=spices' },
   { label: 'Pansari Items', href: '/products?category=pansari' },
   { label: 'Kits', href: '/kits' },

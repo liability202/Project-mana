@@ -9,7 +9,7 @@ import { useTheme } from '@/components/ThemeProvider'
 
 const NAV_LINKS = [
   { label: 'Dry Fruits', href: '/products?category=dry-fruits' },
-  { label: 'Herbs', href: '/products?category=herbs' },
+  { label: 'Herbs', href: '/ayurvedic-herbs' },
   { label: 'Spices', href: '/products?category=spices' },
   { label: 'Kits', href: '/kits' },
   { label: 'Blog', href: '/blog' },

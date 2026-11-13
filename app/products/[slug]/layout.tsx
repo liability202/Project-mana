@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from 'next/navigation'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { BRAND_NAME, SITE_URL } from '@/lib/seo'
 import { findProductBySlug } from '@/lib/product-lookup'
+import { getHerbContent } from '@/lib/herb-content'
 
 // The product page itself is a client component, so it cannot export metadata.
 // This server layout wraps it purely to give each product a real <title>,
@@ -31,8 +32,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const path = product.category === 'kits' ? `/kits/${product.slug}` : `/products/${product.slug}`
   const category = String(product.category || '').replace(/-/g, ' ')
-  const title = `Buy ${product.name} Online${category ? ` – Premium ${category}` : ''}`
-  const description = (product.description || '')
+  // Herbs with a written guide get a title/description carrying their other
+  // names (Hindi, spellings, botanical) — that is what people search for.
+  const herb = getHerbContent(product.slug)
+  const title = herb?.seoTitle || `Buy ${product.name} Online${category ? ` – Premium ${category}` : ''}`
+  const description = herb?.seoDescription || (product.description || '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 155)
