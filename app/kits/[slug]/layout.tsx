@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { supabase } from '@/lib/supabase'
 import { findProductBySlug } from '@/lib/product-lookup'
+import { getKitContent } from '@/lib/kit-content'
 import { BRAND_NAME, SITE_URL } from '@/lib/seo'
 
 // See app/products/[slug]/layout.tsx — same reason: the kit page is a client
@@ -24,8 +25,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
 
-  const title = `${kit.name} – Curated Wellness Kit`
-  const description = (kit.description || '')
+  const guide = getKitContent(kit.slug)
+  const title = guide?.seoTitle || `${kit.name} – Curated Wellness Kit`
+  const description = guide?.seoDescription || (kit.description || '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 155)

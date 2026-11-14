@@ -57,6 +57,17 @@ type ItemState = {
 const getSizeDisplayName = getKitSizeDisplayName
 const getBasePrice = kitItemBasePrice
 
+// "100 g of each" when every item has the same weight; otherwise the total
+// (the Gym Kit mixes 100 g of herbs with up to 1 kg of dates, so "100g each"
+// was wrong).
+function kitSizeLabel(variant: KitVariant) {
+  const weights = (variant.items || []).map(item => item.grams || variant.grams_each || 0).filter(g => g > 0)
+  if (!weights.length) return variant.grams_each ? `${variant.grams_each} g of each` : ''
+  if (weights.every(g => g === weights[0])) return `${weights[0]} g of each`
+  const total = weights.reduce((sum, g) => sum + g, 0)
+  return `${total >= 1000 ? `${Math.round(total / 100) / 10} kg` : `${total} g`} in total`
+}
+
 function roundToStep(value: number, step = 25) {
   return Math.max(step, Math.round(value / step) * step)
 }
@@ -77,7 +88,12 @@ function normalizeVariants(kit: KitProduct): KitVariant[] {
 // Rendered by the server page with the kit already loaded, so the HTML carries
 // the kit for crawlers. `initialKit` is null only if the server lookup failed,
 // in which case this fetches it in the browser as before.
-export default function KitView({ slug, initialKit }: { slug: string; initialKit: KitProduct | null }) {
+export default function KitView({ slug, initialKit, details }: {
+  slug: string
+  initialKit: KitProduct | null
+  /** Server-rendered kit guide (KitDetails), shown below the builder. */
+  details?: React.ReactNode
+}) {
   const [kit, setKit] = useState<KitProduct | null>(initialKit)
   const [loading, setLoading] = useState(!initialKit)
 
@@ -116,6 +132,7 @@ export default function KitView({ slug, initialKit }: { slug: string; initialKit
       <div className="max-w-[1000px] mx-auto px-[5%]">
         <KitBuilder kit={kit} onClose={() => {}} />
       </div>
+      {details}
       </div>
     </>
   )
@@ -341,7 +358,7 @@ function KitBuilder({ kit, onClose }: { kit: KitProduct; onClose: () => void }) 
                   style={{ background: sizeIdx === index ? undefined : 'rgb(var(--c-ivory2))' }}
                 >
                   <div className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{getSizeDisplayName(variant.name, index)}</div>
-                  <div className="text-[.66rem] mt-1" style={{ color: 'var(--ink4)' }}>{variant.grams_each || variant.items?.[0]?.grams || 100}g each recommended</div>
+                  <div className="text-[.66rem] mt-1" style={{ color: 'var(--ink4)' }}>{kitSizeLabel(variant)}</div>
                   <div className="text-[.82rem] font-medium mt-1" style={{ color: 'var(--green)' }}>{formatPrice(variant.price || kit.price)}</div>
                 </button>
               ))}
