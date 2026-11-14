@@ -97,6 +97,9 @@ async function runAgent(ctx: ToolContext) {
       model: MODEL,
       max_tokens: 4000,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      // Also cache the conversation so far: each tool step in a reply (and the
+      // next customer message) re-reads it at ~5% of the normal input price.
+      cache_control: { type: 'ephemeral' },
       tools: TOOLS,
       messages,
       output_config: { effort: EFFORT },
