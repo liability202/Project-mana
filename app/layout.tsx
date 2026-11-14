@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { GoogleAnalytics } from '@next/third-parties/google'
+import { Fraunces, Outfit } from 'next/font/google'
 import './globals.css'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
@@ -9,6 +10,23 @@ import { ScrollObserver } from '@/components/ScrollObserver'
 import { ThemeProvider } from '@/components/ThemeProvider'
 
 import { SITE_URL } from '@/lib/seo'
+
+// Self-hosted by Next.js and preloaded with the page. The old CSS @import
+// fetched Google's stylesheet first and then the fonts — a render-blocking
+// chain to a third-party server on every first visit.
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  style: ['normal', 'italic'],
+  axes: ['opsz'],
+  display: 'swap',
+  variable: '--font-fraunces',
+})
+const outfit = Outfit({
+  subsets: ['latin'],
+  weight: ['300', '400', '500'],
+  display: 'swap',
+  variable: '--font-outfit',
+})
 
 const siteUrl = SITE_URL
 
@@ -162,7 +180,7 @@ const themeScript = `(function(){try{var t=localStorage.getItem('mana-theme');if
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${fraunces.variable} ${outfit.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         {/* Warm up the image CDN before the hero image request is discovered. */}

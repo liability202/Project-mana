@@ -9,6 +9,16 @@ export const revalidate = 3600
 
 type Props = { params: { slug: string } }
 
+/** Pre-build every kit page at deploy time (see app/products/[slug]/page.tsx). */
+export async function generateStaticParams() {
+  try {
+    const { data } = await (supabaseAdmin || supabase).from('products').select('slug').eq('category', 'kits')
+    return (data || []).filter(k => k.slug).map(k => ({ slug: k.slug as string }))
+  } catch {
+    return []
+  }
+}
+
 /**
  * Server half of the kit page: puts the kit's name, contents and Product
  * schema in the HTML, which AI crawlers (they don't run JavaScript) and

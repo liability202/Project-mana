@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import { supabase } from '@/lib/supabase'
 import { ProductCard } from '@/components/product/ProductCard'
+import { getInStockCatalog, toCardProduct } from '@/lib/catalog'
 import { SortSelect } from '@/components/product/SortSelect'
 import { matchCatalogProducts } from '@/lib/product-search'
 import type { Product } from '@/lib/supabase'
@@ -60,17 +60,21 @@ const CATEGORIES = [
 
 const TAGS = ['All', 'Bestseller', 'Organic', 'Premium']
 
+// Filters and sorts the cached catalogue in memory (lib/catalog.ts): this page
+// is rendered per request because it reads ?category=/?sort=, and querying the
+// database each time made every shop visit wait on a round trip.
 async function getProducts(params: Props['searchParams']): Promise<Product[]> {
-  let query = supabase.from('products').select('*').eq('in_stock', true)
-  if (params.category) query = query.eq('category', params.category)
-  if (params.tag && params.tag !== 'All') query = query.contains('tags', [params.tag.toLowerCase()])
-  if (params.sort === 'price-asc') query = query.order('price', { ascending: true })
-  else if (params.sort === 'price-desc') query = query.order('price', { ascending: false })
-  else query = query.order('created_at', { ascending: false })
-  // The whole in-stock catalogue fits on one page; 24 hid most of it.
-  const { data } = await query.limit(200)
-  if (params.q) return matchCatalogProducts(data || [], params.q, 48).map(match => match.product)
-  return data || []
+  let products = await getInStockCatalog().catch(() => [] as Product[])
+  if (params.category) products = products.filter(p => p.category === params.category)
+  if (params.tag && params.tag !== 'All') {
+    const tag = params.tag.toLowerCase()
+    products = products.filter(p => p.tags?.includes(tag))
+  }
+  if (params.sort === 'price-asc') products = [...products].sort((a, b) => a.price - b.price)
+  else if (params.sort === 'price-desc') products = [...products].sort((a, b) => b.price - a.price)
+  // (default order — newest first — is the catalogue's own order)
+  if (params.q) return matchCatalogProducts(products, params.q, 48).map(match => match.product)
+  return products
 }
 
 export default async function ProductsPage({ searchParams }: Props) {
@@ -139,7 +143,7 @@ export default async function ProductsPage({ searchParams }: Props) {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {products.map(p => <ProductCard key={p.id} product={p} />)}
+            {products.map(p => <ProductCard key={p.id} product={toCardProduct(p)} />)}
           </div>
         )}
       </div>

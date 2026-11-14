@@ -4,6 +4,7 @@ import { matchCatalogProducts } from '@/lib/product-search'
 import { extractBadgeConfig } from '@/lib/utils'
 import { isAdminRequest, unauthorized } from '@/lib/admin-auth'
 import { findProductBySlug } from '@/lib/product-lookup'
+import { revalidateCatalog } from '@/lib/revalidate'
 
 function prepareProductData(payload: any) {
   const { badge_x, badge_y, badge_scale, badge_size, ...cleanData } = payload
@@ -110,6 +111,7 @@ export async function POST(req: Request) {
     }
     const { data, error } = await supabaseAdmin.from('products').insert(payload).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    revalidateCatalog([data?.slug])
     return NextResponse.json(formatProductResponse(data))
   } catch (error) {
     return NextResponse.json({
@@ -130,8 +132,11 @@ export async function PUT(req: Request) {
     if (payload.slug) {
       payload.slug = await makeUniqueSlug(payload.slug, id)
     }
+    // The old slug's cached page must be refreshed too if the slug changes.
+    const { data: before } = await supabaseAdmin.from('products').select('slug').eq('id', id).maybeSingle()
     const { data, error } = await supabaseAdmin.from('products').update(payload).eq('id', id).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    revalidateCatalog([before?.slug, data?.slug])
     return NextResponse.json(formatProductResponse(data))
   } catch (error) {
     return NextResponse.json({
@@ -148,8 +153,10 @@ export async function DELETE(req: Request) {
     const id = searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'Product id is required' }, { status: 400 })
 
+    const { data: before } = await supabaseAdmin.from('products').select('slug').eq('id', id).maybeSingle()
     const { error } = await supabaseAdmin.from('products').delete().eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    revalidateCatalog([before?.slug])
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({

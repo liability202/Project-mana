@@ -22,8 +22,8 @@ module.exports = {
         gold:   token('gold'),
       },
       fontFamily: {
-        serif: ['Fraunces', 'Georgia', 'serif'],
-        sans:  ['Outfit', 'system-ui', 'sans-serif'],
+        serif: ['var(--font-fraunces)', 'Fraunces', 'Georgia', 'serif'],
+        sans:  ['var(--font-outfit)', 'Outfit', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         soft: '0 2px 20px var(--shadow-soft)',

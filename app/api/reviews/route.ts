@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { isAdminRequest, unauthorized } from '@/lib/admin-auth'
 import { getSessionPhone, phoneVariants } from '@/lib/session'
 import { rateLimit } from '@/lib/rate-limit'
+import { revalidateCatalog } from '@/lib/revalidate'
 
 export const dynamic = 'force-dynamic'
 
@@ -174,6 +175,8 @@ export async function PATCH(req: Request) {
       if (isMissingSchemaError(error)) return NextResponse.json({ error: 'Reviews are not enabled in the database yet.' }, { status: 503 })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+    // An approved review changes the product's star rating, which is cached in its page.
+    revalidateCatalog([data?.product_slug])
     return NextResponse.json(data)
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })

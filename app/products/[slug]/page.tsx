@@ -14,6 +14,22 @@ export const revalidate = 3600
 
 type Props = { params: { slug: string } }
 
+/**
+ * Pre-build every product page at deploy time. In Next.js 14 a dynamic route
+ * without generateStaticParams is rendered on every request (no cache at all),
+ * which made each product view a fresh round of database queries. Slugs added
+ * later are built on their first visit and cached from then on; admin saves
+ * refresh them immediately (lib/revalidate.ts).
+ */
+export async function generateStaticParams() {
+  try {
+    const { data } = await (supabaseAdmin || supabase).from('products').select('slug, category').neq('category', 'kits')
+    return (data || []).filter(p => p.slug).map(p => ({ slug: p.slug as string }))
+  } catch {
+    return []
+  }
+}
+
 async function loadRating(slug: string): Promise<RatingSummary | null> {
   try {
     const { data, error } = await supabaseAdmin

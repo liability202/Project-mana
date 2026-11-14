@@ -6,6 +6,7 @@ import { BLOG_POSTS } from '@/lib/blog-data'
 import { BRAND_NAME, SITE_URL, breadcrumbJsonLd } from '@/lib/seo'
 import { supabase } from '@/lib/supabase'
 import { ProductCard } from '@/components/product/ProductCard'
+import { toCardProduct } from '@/lib/catalog'
 
 type Props = { params: { slug: string } }
 
@@ -189,7 +190,7 @@ export default async function BlogPostPage({ params }: Props) {
                   Shop Authentic {connectedProduct.name} Direct From Mana
                 </h3>
                 <div className="max-w-[320px]">
-                  <ProductCard product={connectedProduct} />
+                  <ProductCard product={toCardProduct(connectedProduct)} />
                 </div>
               </div>
             )}

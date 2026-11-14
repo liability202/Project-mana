@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
-import { supabase } from '@/lib/supabase'
 import type { Product } from '@/lib/supabase'
 import { ProductCard } from '@/components/product/ProductCard'
+import { getInStockCatalog, toCardProduct } from '@/lib/catalog'
 import { getHerbContent } from '@/lib/herb-content'
 import { breadcrumbJsonLd, SITE_URL } from '@/lib/seo'
 
@@ -21,14 +21,9 @@ function cleanName(name: string) {
 }
 
 async function getHerbs(): Promise<Product[]> {
-  const { data } = await supabase
-    .from('products')
-    .select('*')
-    .eq('category', 'herbs')
-    .eq('in_stock', true)
-    .limit(500)
+  const data = (await getInStockCatalog().catch(() => [] as Product[])).filter(p => p.category === 'herbs')
   const seen = new Set<string>()
-  return (data || [])
+  return data
     // Drop accidental duplicates (same name listed twice).
     .filter(p => {
       const key = cleanName(p.name).toLowerCase()
@@ -86,7 +81,7 @@ export default async function AyurvedicHerbsPage() {
             const guide = getHerbContent(p.slug)
             return (
               <div key={p.id} className="flex flex-col">
-                <ProductCard product={p} />
+                <ProductCard product={toCardProduct(p)} />
                 {guide && (
                   <p className="mt-1.5 px-1 text-[.68rem] text-ink-4 leading-snug">
                     {guide.hindi} · <span className="italic">{guide.botanical}</span>

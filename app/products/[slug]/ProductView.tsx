@@ -110,17 +110,21 @@ export default function ProductView({ slug, initialProduct, initialRating, aka, 
             setGrams(getDefaultWeight(prod.category))
             setCustomWeight(false)
           }
-          // Fetch real review average
-          fetch(`/api/reviews?slug=${prod.slug}`)
-            .then(r => r.json())
-            .then((reviews: any[]) => {
-              if (Array.isArray(reviews) && reviews.length > 0) {
-                const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-                setAvgRating(Math.round(avg * 10) / 10)
-                setReviewCount(reviews.length)
-              }
-            })
-            .catch(() => {})
+          // The server page already sent the rating (and refreshes it when a
+          // review is approved), so only fetch it on the client-only fallback.
+          // ReviewList fetches the reviews themselves for the list below.
+          if (!initialProduct) {
+            fetch(`/api/reviews?slug=${prod.slug}`)
+              .then(r => r.json())
+              .then((reviews: any[]) => {
+                if (Array.isArray(reviews) && reviews.length > 0) {
+                  const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+                  setAvgRating(Math.round(avg * 10) / 10)
+                  setReviewCount(reviews.length)
+                }
+              })
+              .catch(() => {})
+          }
         }
         setLoading(false)
       })

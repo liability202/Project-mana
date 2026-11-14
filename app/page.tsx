@@ -1,38 +1,23 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabase'
 import { ProductCard } from '@/components/product/ProductCard'
+import { getInStockCatalog, toCardProduct } from '@/lib/catalog'
 import { NewsletterForm } from '@/components/NewsletterForm'
 import { formatPrice } from '@/lib/utils'
 import type { Product } from '@/lib/supabase'
 
 export const revalidate = 60
 
+// Both read the shared cached catalogue (lib/catalog.ts) instead of querying.
 async function getFeaturedProducts(): Promise<Product[]> {
-  const { data: bestsellers } = await supabase
-    .from('products')
-    .select('*')
-    .contains('tags', ['bestseller'])
-    .eq('in_stock', true)
-    .limit(4)
-  if (bestsellers && bestsellers.length > 0) return bestsellers
-  const { data: any4 } = await supabase
-    .from('products')
-    .select('*')
-    .eq('in_stock', true)
-    .limit(4)
-  return any4 || []
+  const catalog = (await getInStockCatalog().catch(() => [] as Product[])).filter(p => p.category !== 'kits')
+  const bestsellers = catalog.filter(p => p.tags?.includes('bestseller')).slice(0, 4)
+  return bestsellers.length > 0 ? bestsellers : catalog.slice(0, 4)
 }
 
 async function getKits(): Promise<Product[]> {
-  const { data } = await supabase
-    .from('products')
-    .select('*')
-    .eq('category', 'kits')
-    .eq('in_stock', true)
-    .order('created_at', { ascending: false })
-    .limit(4)
-  return data || []
+  const catalog = await getInStockCatalog().catch(() => [] as Product[])
+  return catalog.filter(p => p.category === 'kits').slice(0, 4)
 }
 
 const CATEGORIES = [
@@ -256,7 +241,7 @@ export default async function HomePage() {
         </div>
         {featuredProducts.length > 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {featuredProducts.map(p => <ProductCard key={p.id} product={p} />)}
+            {featuredProducts.map(p => <ProductCard key={p.id} product={toCardProduct(p)} />)}
           </div>
         ) : (
           <div className="text-center py-16 border-2 border-dashed border-ivory-3 dark:border-green-5/20 rounded-2xl" style={{ background: 'rgb(var(--c-ivory2))' }}>
