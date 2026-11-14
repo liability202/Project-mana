@@ -12,12 +12,14 @@ import { CHANGE_ORDER_ID, CONFIRM_ORDER_ID, TOOL_DEFINITIONS, confirmPendingOrde
 /**
  * The WhatsApp shop assistant: Claude with Mana's shop tools (lib/whatsapp/tools.ts).
  *
- * Model: ANTHROPIC_MODEL (default claude-opus-5-5). Effort is "low" — this is
- * chat, where quick replies matter more than deep reasoning; raise it with
- * ANTHROPIC_EFFORT if answers ever feel thin.
+ * Model: ANTHROPIC_MODEL, default claude-haiku-5-5 — chosen by the shop to keep
+ * the AI cost around ₹50–200 a month. Set ANTHROPIC_MODEL=claude-opus-5-5 in
+ * Vercel for a more capable (and ~40× pricier) assistant; no code change needed.
+ * Effort is "low" — this is chat, where quick replies matter more than deep
+ * reasoning; raise it with ANTHROPIC_EFFORT if answers ever feel thin.
  */
 
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5-5'
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-5-5'
 const EFFORT = (process.env.ANTHROPIC_EFFORT || 'low') as 'low' | 'medium' | 'high'
 const MAX_TOOL_ROUNDS = 6
 // Server-side refusal fallback is available on these models (not Haiku).
