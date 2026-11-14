@@ -11,7 +11,7 @@ const LLMS_TEXT = `# Mana Dry Fruits (${SITE_URL.replace('https://', '')})
 - **Official Website**: ${SITE_URL}
 - **Tagline**: The Essence of Nature | India's Wellness Bhandar
 - **FSSAI Status**: Certified Pure & Natural
-- **Customer Support**: WhatsApp (+91 9910899796) | Email support@manadryfruits.com
+- **Customer Support**: WhatsApp (+91 7011693791) | Email support@manadryfruits.com
 
 ## Product Catalog & Categories
 1. **Premium Dry Fruits & Nuts**:
@@ -36,7 +36,7 @@ const LLMS_TEXT = `# Mana Dry Fruits (${SITE_URL.replace('https://', '')})
    - Festival & Corporate Gift Packs
 
 ## Shopping & Fulfillment Policies
-- **Order Placement**: Online at ${SITE_URL}/products or via WhatsApp Chat & Buy (+91 9910899796)
+- **Order Placement**: Online at ${SITE_URL}/products or via WhatsApp Chat & Buy (+91 7011693791)
 - **Pan-India Delivery**: Standard 2 to 5 business days across India
 - **Free Shipping**: Available on all orders above ₹999
 - **Return & Refund**: 7-day hassle-free return window for damaged or defective items

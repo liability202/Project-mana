@@ -688,6 +688,7 @@ export default function AdminPage() {
           <button onClick={() => setTab('reviews')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'reviews' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Reviews</button>
           <button onClick={() => setTab('creators')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'creators' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Creators</button>
           <button onClick={() => setTab('settings')} className={`text-xs px-3 py-1.5 rounded-md border transition-all ${tab === 'settings' ? 'bg-ivory text-green border-ivory' : 'bg-transparent text-green-4 border-green-5/30'}`}>Settings</button>
+          <a href="/admin/whatsapp" className="text-xs px-3 py-1.5 rounded-md border transition-all bg-transparent text-green-4 border-green-5/30 no-underline hover:text-ivory">WhatsApp inbox</a>
           <button onClick={() => { localStorage.removeItem('mana_admin'); setAuth(false) }} className="text-xs text-green-4 hover:text-ivory transition-colors">Logout</button>
         </div>
       </div>

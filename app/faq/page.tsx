@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 
-const WHATSAPP_NUMBER = '919910899796'
+const WHATSAPP_NUMBER = '917011693791'
 
 const faqGroups = [
   {

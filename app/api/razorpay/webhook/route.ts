@@ -3,6 +3,8 @@ import { isValidWebhookSignature, razorpay } from '@/lib/razorpay'
 import { supabaseAdmin } from '@/lib/supabase'
 import { markOrderPaid, runOrderSideEffects } from '@/lib/checkout'
 import { updateRows } from '@/lib/db-fallback'
+import { notifyOrderPaid } from '@/lib/whatsapp/tools'
+import { whatsappOutbox } from '@/lib/whatsapp/inbox'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,6 +60,10 @@ export async function POST(req: Request) {
         })
         if (order && newlyPaid) {
           await runOrderSideEffects(supabaseAdmin, order, {})
+          // Tell the customer on WhatsApp and move the chat to "Paid" in the inbox.
+          if (link?.notes?.channel === 'whatsapp') {
+            await notifyOrderPaid(order, whatsappOutbox).catch(error => console.error('[whatsapp] paid notification failed', order.id, error))
+          }
         } else if (order && order.payment_status === 'pending') {
           // Bot orders created before this change were saved as 'pending'.
           await updateRows(

@@ -75,7 +75,7 @@ const sections = [
     title: '10. Contact Us',
     body: [
       'If you have any privacy-related questions, access requests, correction requests, or deletion requests, please contact MK and Sons through Mana support.',
-      'WhatsApp: +91 9910899796',
+      'WhatsApp: +91 7011693791',
       'Email: care@manafoods.in'
     ]
   }

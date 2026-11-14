@@ -96,7 +96,7 @@ const sections = [
     title: '12. Contact Us',
     body: [
       'If you have any questions about these Terms & Conditions, your order, returns, or support requests, please contact Mana by MK and Sons.',
-      'WhatsApp: +91 9910899796',
+      'WhatsApp: +91 7011693791',
       
     ]
   }

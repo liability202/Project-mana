@@ -28,7 +28,7 @@ export async function GET() {
     },
     contact: {
       email: 'support@manadryfruits.com',
-      whatsapp: '+91-9910899796',
+      whatsapp: '+91-7011693791',
     },
   }
 

@@ -1,6 +1,12 @@
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { handleIncomingMessage } from '@/lib/whatsapp/bot'
+import { waitUntil } from '@vercel/functions'
+import { handleIncoming, type IncomingKind } from '@/lib/whatsapp/agent'
+import { recordInbound, updateMessageStatus, whatsappOutbox } from '@/lib/whatsapp/inbox'
+
+export const dynamic = 'force-dynamic'
+// The assistant may make several model + database calls for one message.
+export const maxDuration = 120
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -17,15 +23,14 @@ export async function GET(req: NextRequest) {
 
 /**
  * Meta signs each delivery with the app secret (X-Hub-Signature-256). Without
- * this check anyone could post fake messages "from" any customer's number.
- * Set WHATSAPP_APP_SECRET (Meta app → Settings → Basic → App secret).
+ * this check anyone could post fake messages "from" any customer's number —
+ * and the assistant can create orders — so unsigned requests are rejected
+ * once WHATSAPP_APP_SECRET is set (Meta app → Settings → Basic → App secret).
  */
 function hasValidSignature(rawBody: string, header: string | null) {
   const secret = process.env.WHATSAPP_APP_SECRET
   if (!secret) {
-    // Deliberately fail open until the secret is configured: failing closed
-    // would silently stop the bot replying to every customer.
-    console.error('[whatsapp] WHATSAPP_APP_SECRET is not set; anyone can post fake messages to this webhook.')
+    console.error('[whatsapp] WHATSAPP_APP_SECRET is not set; webhook messages are not verified.')
     return true
   }
   const expected = Buffer.from(`sha256=${crypto.createHmac('sha256', secret).update(rawBody).digest('hex')}`)
@@ -33,83 +38,81 @@ function hasValidSignature(rawBody: string, header: string | null) {
   return expected.length === received.length && crypto.timingSafeEqual(expected, received)
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const rawBody = await req.text()
-    if (!hasValidSignature(rawBody, req.headers.get('x-hub-signature-256'))) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+type Parsed = { kind: IncomingKind; text: string; display: string; payload?: unknown }
+
+function parseMessage(message: any): Parsed {
+  switch (message.type) {
+    case 'text':
+      return { kind: 'text', text: message.text?.body || '', display: message.text?.body || '' }
+    case 'interactive': {
+      const reply = message.interactive?.button_reply || message.interactive?.list_reply
+      return { kind: 'button', text: reply?.id || '', display: reply?.title || reply?.id || '', payload: message.interactive }
     }
-    const body = JSON.parse(rawBody)
-    const entry = body.entry?.[0]
-    const changes = entry?.changes?.[0]
-    const value = changes?.value
-    const message = value?.messages?.[0]
-
-    if (!message) {
-      return NextResponse.json({ status: 'no_message' })
+    case 'button':
+      return { kind: 'button', text: message.button?.payload || message.button?.text || '', display: message.button?.text || '' }
+    case 'image':
+      return { kind: 'image', text: message.image?.caption || '', display: `📷 Photo${message.image?.caption ? `: ${message.image.caption}` : ''}`, payload: message.image }
+    case 'audio':
+      return { kind: 'audio', text: '', display: '🎤 Voice note', payload: message.audio }
+    case 'location': {
+      const l = message.location || {}
+      const text = [l.name, l.address, l.latitude && l.longitude ? `(${l.latitude}, ${l.longitude})` : ''].filter(Boolean).join(', ')
+      return { kind: 'location', text: `My location: ${text}`, display: `📍 ${text}`, payload: l }
     }
-
-    const phone = message.from || ''
-    const msgType = message.type
-    let userInput = message.text?.body || ''
-    let imageInfo: { mediaId: string; mimeType?: string; caption?: string } | undefined
-    let locationInfo: { latitude?: number; longitude?: number; addressText?: string } | undefined
-    let audioInfo: { mediaId: string; mimeType?: string } | undefined
-
-    if (msgType === 'interactive') {
-      userInput =
-        message.interactive?.button_reply?.id ||
-        message.interactive?.list_reply?.id ||
-        userInput
-    }
-
-    if (msgType === 'button') {
-      userInput = message.button?.payload || userInput
-    }
-
-    if (msgType === 'image') {
-      imageInfo = {
-        mediaId: message.image?.id || '',
-        mimeType: message.image?.mime_type,
-        caption: message.image?.caption,
-      }
-      userInput = message.image?.caption || '__IMAGE_RECEIVED__'
-    }
-
-    if (msgType === 'location') {
-      const lat = message.location?.latitude
-      const lng = message.location?.longitude
-      const name = message.location?.name
-      const address = message.location?.address
-      locationInfo = {
-        latitude: lat,
-        longitude: lng,
-        addressText: [name, address, lat && lng ? `${lat}, ${lng}` : ''].filter(Boolean).join(', '),
-      }
-      userInput = locationInfo.addressText || '__LOCATION_RECEIVED__'
-    }
-
-    if (msgType === 'audio') {
-      audioInfo = {
-        mediaId: message.audio?.id || '',
-        mimeType: message.audio?.mime_type,
-      }
-      userInput = '__AUDIO_RECEIVED__'
-    }
-
-    console.log('PHONE:', phone)
-    console.log('MESSAGE:', userInput)
-    if (imageInfo) console.log('IMAGE:', imageInfo.mediaId)
-
-    try {
-      await handleIncomingMessage(phone, userInput, { imageInfo, locationInfo, audioInfo })
-    } catch (error) {
-      console.error('WhatsApp bot handler error:', error)
-    }
-
-    return NextResponse.json({ status: 'ok' })
-  } catch (error) {
-    console.error('WhatsApp webhook error:', error)
-    return NextResponse.json({ status: 'error' }, { status: 200 })
+    default:
+      return { kind: 'other', text: '', display: `[${message.type || 'unsupported'} message]`, payload: message }
   }
+}
+
+export async function POST(req: NextRequest) {
+  const rawBody = await req.text()
+  if (!hasValidSignature(rawBody, req.headers.get('x-hub-signature-256'))) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  }
+
+  let body: any
+  try {
+    body = JSON.parse(rawBody)
+  } catch {
+    return NextResponse.json({ status: 'bad_json' })
+  }
+
+  const work: Promise<unknown>[] = []
+  for (const entry of body.entry || []) {
+    for (const change of entry.changes || []) {
+      const value = change.value || {}
+
+      // Delivery receipts for our messages: sent → delivered → read.
+      for (const status of value.statuses || []) {
+        work.push(updateMessageStatus(status.id, status.status).catch(() => {}))
+      }
+
+      const names: Record<string, string> = {}
+      for (const contact of value.contacts || []) names[contact.wa_id] = contact.profile?.name
+
+      for (const message of value.messages || []) {
+        const phone = String(message.from || '')
+        if (!phone) continue
+        const parsed = parseMessage(message)
+        work.push((async () => {
+          const isNew = await recordInbound({
+            phone,
+            waMessageId: message.id,
+            type: message.type,
+            body: parsed.display,
+            payload: parsed.payload,
+            name: names[phone] || null,
+          })
+          if (!isNew) return // Meta re-delivered a message we already handled
+          const kind = parsed.kind === 'location' ? 'text' : parsed.kind
+          await handleIncoming(phone, kind, parsed.text || parsed.display, whatsappOutbox)
+        })().catch(error => console.error('[whatsapp] failed to handle message', message.id, error)))
+      }
+    }
+  }
+
+  // Answer Meta straight away (it retries slow webhooks) and finish the reply
+  // in the background.
+  waitUntil(Promise.all(work))
+  return NextResponse.json({ status: 'ok' })
 }

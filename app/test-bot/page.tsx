@@ -105,7 +105,9 @@ export default function TestBotPage() {
               <div className="font-medium text-ink mb-1">How to use</div>
               <div>1. Keep the same phone number for one conversation.</div>
               <div>2. Send one message at a time.</div>
-              <div>3. The bot reply appears in the chat panel.</div>
+              <div>3. The assistant's reply appears in the chat panel.</div>
+              <div>4. Type <span className="font-mono">confirm</span> or <span className="font-mono">change</span> to press the order buttons.</div>
+              <div>5. Test mode never creates real orders, payment links or alerts. Test chats also show in the WhatsApp inbox.</div>
             </div>
           </div>
 
