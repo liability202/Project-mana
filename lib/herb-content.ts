@@ -905,9 +905,6 @@ export const HERB_CONTENT: Record<string, HerbContent> = {
   },
 }
 
-// The same product listed twice in the catalogue shares one guide.
-HERB_CONTENT['gond-katira-1'] = HERB_CONTENT['gond-katira']
-
 export function getHerbContent(slug: string | null | undefined): HerbContent | null {
   if (!slug) return null
   return HERB_CONTENT[slug] ?? HERB_CONTENT[RENAMED_SLUGS[slug] ?? ''] ?? null

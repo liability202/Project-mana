@@ -19,6 +19,8 @@ export const RENAMED_SLUGS: Record<string, string> = {
   'star-anais': 'star-anise',
   'pepali': 'pippali',
   'sugar-managment-kit': 'sugar-management-kit',
+  // A duplicate listing (removed); its old link now lands on the original.
+  'gond-katira-1': 'gond-katira',
 }
 
 const RENAMED_SLUGS_REVERSE = Object.fromEntries(Object.entries(RENAMED_SLUGS).map(([oldSlug, newSlug]) => [newSlug, oldSlug]))
