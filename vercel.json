@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "app/api/telegram/daily-summary/route.ts": {
+      "experimentalTriggers": [{ "type": "schedule/v1beta" }]
+    }
+  },
+  "schedules": {
+    "telegram-daily-summary": {
+      "schedule": "0 21 * * *",
+      "timezone": "Asia/Kolkata",
+      "function": "api/telegram/daily-summary"
+    }
+  }
+}
