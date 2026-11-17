@@ -5,6 +5,7 @@ import { LOYALTY_CODE, LOYALTY_DISCOUNT_PCT, ensureUserProfile, ensureWallet, ge
 import { estimateCommission } from '@/lib/commissions'
 import { insertRow, updateRows } from '@/lib/db-fallback'
 import { sendOrderConfirmation } from '@/lib/email'
+import { sendOrderAlert } from '@/lib/telegram'
 import {
   MAX_LINE_QUANTITY,
   cartLineKey,
@@ -692,6 +693,13 @@ export async function runOrderSideEffects(
       console.error(`[checkout] ${name} failed for order ${order.id}`, error)
     }
   }
+
+  // Runs once per confirmed order (COD placed, or online payment received),
+  // never for an abandoned payment attempt.
+  await step('owner alert', async () => {
+    const previousOrders = await countCompletedOrders(client, order.customer_phone, order.id).catch(() => null)
+    await sendOrderAlert(order, { previousOrders, refCode: context.refCode || null })
+  })
 
   await step('cashback eligibility', async () => {
     if (!settings.enable_cashback_earning) return

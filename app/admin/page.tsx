@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { formatPrice } from '@/lib/utils'
 import { MIN_PRODUCT_IMAGES, photoStatus } from '@/lib/image-utils'
 import { LoyaltyPanel } from '@/components/admin/LoyaltyPanel'
+import { TelegramAlerts } from '@/components/admin/TelegramAlerts'
 import type { Coupon, Order, Product, Review } from '@/lib/supabase'
 
 type AdminTab = 'orders' | 'products' | 'kits' | 'coupons' | 'customers' | 'reviews' | 'creators' | 'settings'
@@ -1730,6 +1731,8 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
+
+            <TelegramAlerts adminSecret={adminSecret} />
 
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
               <div className="font-medium text-amber-800 mb-2">⚠ One-time database setup required</div>
