@@ -6,6 +6,7 @@ type Status = {
   tokenSet: boolean
   chatIdSet: boolean
   chats: Array<{ id: string; name: string; username: string | null }>
+  controls?: { connected: boolean; lastError?: string | null }
   error?: string
 }
 
@@ -30,19 +31,26 @@ export function TelegramAlerts({ adminSecret }: { adminSecret: string }) {
 
   useEffect(() => { refresh() }, [refresh])
 
-  const sendTest = async () => {
+  const post = async (action: 'test' | 'connect', success: string) => {
     setLoading(true)
     setMessage(null)
     try {
-      const res = await fetch('/api/admin/telegram', { method: 'POST', headers: { authorization: `Bearer ${adminSecret}` } })
+      const res = await fetch('/api/admin/telegram', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${adminSecret}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
       const data = await res.json()
-      setMessage(res.ok ? { ok: true, text: 'Test alert sent — check Telegram on your phone.' } : { ok: false, text: data.error || 'Sending failed.' })
+      setMessage(res.ok ? { ok: true, text: success } : { ok: false, text: data.error || 'That did not work.' })
+      if (res.ok && action === 'connect') await refresh()
     } catch {
-      setMessage({ ok: false, text: 'Sending failed.' })
+      setMessage({ ok: false, text: 'That did not work.' })
     } finally {
       setLoading(false)
     }
   }
+  const sendTest = () => post('test', 'Test alert sent — check Telegram on your phone.')
+  const connect = () => post('connect', 'Bot controls are on — send /help to your bot.')
 
   const ready = status?.tokenSet && status?.chatIdSet
 
@@ -81,6 +89,18 @@ export function TelegramAlerts({ adminSecret }: { adminSecret: string }) {
         </div>
       )}
 
+      {ready && (
+        <div className="mb-4 rounded-lg bg-ivory-2 border border-ivory-3 p-3 text-sm">
+          <div className="font-medium text-ink">Bot controls: {status?.controls?.connected ? <span className="text-green-3">● On</span> : <span className="text-ink-4">○ Off</span>}</div>
+          <div className="text-ink-3 mt-1">
+            {status?.controls?.connected
+              ? 'Confirm, ship and cancel orders from the alert buttons; /orders, /sales, /stock, /price, /reviews, /coupons in the bot.'
+              : 'Press Connect to manage orders, stock, prices, reviews and coupons from Telegram.'}
+          </div>
+          {status?.controls?.lastError && <div className="text-red-700 mt-1">Last Telegram error: {status.controls.lastError}</div>}
+        </div>
+      )}
+
       {status?.error && <div className="mb-3 text-sm text-red-700">{status.error}</div>}
       {message && <div className={`mb-3 text-sm ${message.ok ? 'text-green-3' : 'text-red-700'}`}>{message.text}</div>}
 
@@ -91,6 +111,11 @@ export function TelegramAlerts({ adminSecret }: { adminSecret: string }) {
         <button onClick={sendTest} disabled={loading || !ready} className="text-sm px-4 py-2 rounded-lg bg-green text-ivory hover:opacity-90 disabled:opacity-40">
           Send test alert
         </button>
+        {ready && (
+          <button onClick={connect} disabled={loading} className="text-sm px-4 py-2 rounded-lg border border-green text-green hover:bg-ivory-2 disabled:opacity-40">
+            {status?.controls?.connected ? 'Reconnect bot controls' : 'Connect bot controls'}
+          </button>
+        )}
       </div>
     </div>
   )

@@ -4,6 +4,8 @@ import { isAdminRequest, unauthorized } from '@/lib/admin-auth'
 import { getSessionPhone, phoneVariants } from '@/lib/session'
 import { rateLimit } from '@/lib/rate-limit'
 import { revalidateCatalog } from '@/lib/revalidate'
+import { sendTelegramMessage } from '@/lib/telegram'
+import { reviewKeyboard, reviewText } from '@/lib/telegram-bot'
 
 export const dynamic = 'force-dynamic'
 
@@ -144,13 +146,17 @@ export async function POST(req: Request) {
       approved: false,
     }
 
-    const { error } = await supabaseAdmin.from('reviews').insert(payload)
+    const { data: inserted, error } = await supabaseAdmin.from('reviews').insert(payload).select('id').single()
     if (error) {
       if (isMissingSchemaError(error)) {
         return NextResponse.json({ error: 'Reviews are not enabled in the database yet.' }, { status: 503 })
       }
       console.error('Review insert failed', error)
       return NextResponse.json({ error: 'Could not submit your review right now.' }, { status: 500 })
+    }
+    // Ask the owner on Telegram (Approve / Delete); never blocks the review.
+    if (inserted?.id) {
+      await sendTelegramMessage(reviewText(payload), { keyboard: reviewKeyboard(inserted.id) }).catch(e => console.error('[telegram] review alert failed', e))
     }
     return NextResponse.json({ success: true })
   } catch (err: any) {

@@ -479,6 +479,17 @@ export default function CheckoutPage() {
         return
       }
 
+      // If the customer gives up, tell the shop owner (Telegram) so they can follow up.
+      let lastFailure = ''
+      const reportAbandoned = () => {
+        fetch('/api/razorpay/abandoned', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ razorpay_order_id: data.razorpay_order_id, reason: lastFailure }),
+          keepalive: true,
+        }).catch(() => {})
+      }
+
       const rzp = new window.Razorpay({
         key: data.key_id,
         amount: data.amount,
@@ -496,6 +507,7 @@ export default function CheckoutPage() {
           ondismiss: function () {
             setLoading(false)
             showToast('Payment window closed')
+            reportAbandoned()
           },
         },
         handler: async function (response: any) {
@@ -519,6 +531,8 @@ export default function CheckoutPage() {
         },
       })
       rzp.on('payment.failed', function (response: any) {
+        // The window stays open for a retry; only report if they then close it.
+        lastFailure = `Payment failed: ${response.error?.description || 'unknown reason'}`
         showToast('Payment failed: ' + (response.error?.description || 'Please try again'))
         setLoading(false)
       })

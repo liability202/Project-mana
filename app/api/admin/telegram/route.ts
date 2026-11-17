@@ -1,28 +1,45 @@
 import { NextResponse } from 'next/server'
 import { isAdminRequest, unauthorized } from '@/lib/admin-auth'
-import { orderAlertText, recentTelegramChats, sendTelegramMessage, telegramStatus } from '@/lib/telegram'
+import { botControlsStatus, connectBotControls, orderAlertText, recentTelegramChats, sendTelegramMessage, telegramStatus } from '@/lib/telegram'
+import { SITE_URL } from '@/lib/seo'
 
 export const dynamic = 'force-dynamic'
 
-/** Order-alert setup status, plus the chats that have messaged the bot (to find the chat ID). */
+/** Setup status: keys present, chats that messaged the bot, and whether bot controls are connected. */
 export async function GET(req: Request) {
   if (!isAdminRequest(req)) return unauthorized()
   const status = telegramStatus()
-  if (!status.tokenSet) return NextResponse.json({ ...status, chats: [] })
+  if (!status.tokenSet) return NextResponse.json({ ...status, chats: [], controls: { connected: false } })
   try {
-    return NextResponse.json({ ...status, chats: await recentTelegramChats() })
+    const [chats, controls] = await Promise.all([
+      status.chatIdSet ? Promise.resolve([]) : recentTelegramChats(),
+      botControlsStatus().catch(() => ({ connected: false })),
+    ])
+    return NextResponse.json({ ...status, chats, controls })
   } catch (error: any) {
-    return NextResponse.json({ ...status, chats: [], error: error?.message || 'Could not reach Telegram.' })
+    return NextResponse.json({ ...status, chats: [], controls: { connected: false }, error: error?.message || 'Could not reach Telegram.' })
   }
 }
 
-/** Sends a test alert so the owner can check it arrives on their phone. */
+/** action "test": send a sample alert. action "connect": turn on bot commands and buttons. */
 export async function POST(req: Request) {
   if (!isAdminRequest(req)) return unauthorized()
   const status = telegramStatus()
   if (!status.tokenSet || !status.chatIdSet) {
     return NextResponse.json({ error: 'Order alerts are not set up yet: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are both needed.' }, { status: 400 })
   }
+  const body = await req.json().catch(() => ({}))
+
+  if (body?.action === 'connect') {
+    try {
+      await connectBotControls(SITE_URL)
+      await sendTelegramMessage('🤖 <b>Bot controls are on.</b>\nNew orders now arrive with buttons, and you can manage the shop from here. Send /help to see everything.')
+      return NextResponse.json({ ok: true })
+    } catch (error: any) {
+      return NextResponse.json({ error: error?.message || 'Could not connect the bot.' }, { status: 502 })
+    }
+  }
+
   const sample = {
     order_ref: 'TEST1234',
     created_at: new Date().toISOString(),
@@ -46,7 +63,7 @@ export async function POST(req: Request) {
     ],
   }
   try {
-    await sendTelegramMessage(orderAlertText(sample, { heading: '🧪 <b>Test alert</b> — real orders will look like this', previousOrders: 2 }))
+    await sendTelegramMessage(orderAlertText(sample, { heading: '🧪 <b>Test alert</b> — real orders will look like this (with buttons)', previousOrders: 2 }))
     return NextResponse.json({ ok: true })
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Telegram did not accept the message.' }, { status: 502 })
