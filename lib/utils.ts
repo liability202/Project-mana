@@ -72,6 +72,28 @@ export function shippingCost(subtotalPaise: number, city?: string, state?: strin
   return 5900
 }
 
+/**
+ * How an order's payment reads to people. Cash on Delivery orders stay
+ * payment "pending" until they are delivered, which looks like an unpaid
+ * order, so they are named for what they are. Notes match ORDER_NOTE in
+ * lib/checkout.ts (server-only, so the strings are repeated here).
+ */
+export function paymentLabel(
+  order: { payment_status?: string | null; notes?: string | null },
+  audience: 'admin' | 'customer' = 'customer'
+): string {
+  const paid = order.payment_status === 'paid'
+  if (order.notes === 'Cash on Delivery') {
+    if (paid) return audience === 'admin' ? 'Cash on delivery · collected' : 'Paid · cash on delivery'
+    return audience === 'admin' ? 'Cash on delivery · to collect' : 'Cash on delivery'
+  }
+  if (order.notes === 'Awaiting online payment' && !paid) return 'Online payment not completed'
+  if (paid) return 'Paid'
+  if (order.payment_status === 'refunded') return 'Refunded'
+  if (order.payment_status === 'failed') return 'Payment failed'
+  return 'Payment pending'
+}
+
 // Slugify
 export function slugify(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')

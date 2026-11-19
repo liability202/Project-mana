@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { formatPrice } from '@/lib/utils'
+import { formatPrice, paymentLabel } from '@/lib/utils'
 import { showToast } from '@/components/ui/Toaster'
 import { confirmOtp, requestOtp, useSession, useSessionLoader } from '@/lib/use-session'
 import type { Order } from '@/lib/supabase'
@@ -364,7 +364,7 @@ function LatestTrackingCard({ order }: { order: TrackingOrder }) {
         </div>
         <div className="text-right">
           <div className="font-serif text-2xl text-green">{formatPrice(order.final_amount || order.total)}</div>
-          <div className="text-xs text-ink-3 capitalize mt-1">{order.payment_status} payment</div>
+          <div className="text-xs text-ink-3 mt-1">{paymentLabel(order)}</div>
         </div>
       </div>
       <StatusTimeline status={order.status} />

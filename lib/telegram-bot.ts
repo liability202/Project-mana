@@ -15,6 +15,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { phoneVariants } from '@/lib/session'
 import { revalidateCatalog } from '@/lib/revalidate'
+import { getNimbusCourierRates, isCodOrder } from '@/lib/nimbuspost'
 import {
   answerCallback, editTelegramMessage, esc, grams, isUnpaidOnlineAttempt, orderAlertText, orderCode, orderKeyboard,
   rupees, sendTelegramMessage, type Keyboard,
@@ -312,6 +313,9 @@ async function handleReply(origin: string, text: string, question: string) {
 
 // ── orders: ship ──
 
+/** NimbusPost prices are in rupees with paise, e.g. 103.08. */
+const courierPrice = (rupeesValue: number) => `₹${rupeesValue.toFixed(2).replace(/\.00$/, '')}`
+
 function parcelGrams(order: any) {
   const items: any[] = Array.isArray(order.items) ? order.items : []
   return items.reduce((s, i) => s + (Number(i.weight_grams) || 0) * (Number(i.quantity) || 1), 0) || 500
@@ -320,8 +324,28 @@ function parcelGrams(order: any) {
 async function shipPreview(order: any, g = parcelGrams(order)) {
   if (isUnpaidOnlineAttempt(order)) return sendTelegramMessage('This online order was never paid — do not ship it.')
   if (!['pending', 'confirmed', 'packed'].includes(order.status)) return sendTelegramMessage(`This order is already ${esc(order.status)}.`)
+  // The bot books the cheapest courier (a courier id won't fit in a Telegram button).
+  // Choosing a different one is done from the admin panel's Ship Order window.
+  let quote = 'Prices could not be loaded; the cheapest courier at booking time will be used.'
+  try {
+    const { rates, message } = await getNimbusCourierRates({
+      deliveryPincode: order.pincode,
+      cod: isCodOrder(order),
+      orderAmountPaise: order.final_amount || order.total,
+      weightGrams: g,
+      lengthCm: BOX.length_cm,
+      breadthCm: BOX.breadth_cm,
+      heightCm: BOX.height_cm,
+    })
+    const r = rates[0]
+    const others = rates.length - 1
+    quote = r
+      ? `Cheapest courier: <b>${esc(r.name)}</b> · ${courierPrice(r.total)}${r.deliveryDate ? ` · delivery by ${esc(r.deliveryDate.split('-').reverse().join('-'))}` : ''}` +
+        (others > 0 ? `\n${others} other option${others === 1 ? '' : 's'}; choose one in the admin panel if you prefer.` : '')
+      : `⚠️ ${esc(message || 'No courier delivers to this pincode.')}`
+  } catch {}
   await sendTelegramMessage(
-    `🚚 Book the courier for <code>${esc(orderCode(order))}</code>?\nParcel: <b>${grams(g)}</b>, box ${BOX.length_cm}×${BOX.breadth_cm}×${BOX.height_cm} cm.\nThe customer gets the tracking details automatically.`,
+    `🚚 Book the courier for <code>${esc(orderCode(order))}</code>?\nParcel: <b>${grams(g)}</b>, box ${BOX.length_cm}×${BOX.breadth_cm}×${BOX.height_cm} cm.\n${quote}\nThe customer gets the tracking details automatically.`,
     { keyboard: [[{ text: '🚚 Book courier', callback_data: `osb:${order.id}:${g}` }], [{ text: '✏️ Different weight', callback_data: `osw:${order.id}` }, { text: '✖️ Not now', callback_data: 'x' }]] }
   )
 }
@@ -397,7 +421,7 @@ export async function handleCallback(origin: string, cb: any) {
         await editTelegramMessage(msgId, `⏳ Booking the courier (${grams(g)})…`) // buttons gone: no double booking
         try {
           const updated = await adminApi(origin, '/api/admin/orders/ship', 'POST', { id, weight_grams: g, ...BOX, generate_pickup: true })
-          await editTelegramMessage(msgId, `✅ <b>Shipped</b> · <code>${esc(orderCode(updated))}</code>\n${esc(updated.courier_name || 'Courier')} · AWB <code>${esc(updated.tracking_number || '—')}</code>${updated.tracking_link ? `\n<a href="${esc(updated.tracking_link)}">Tracking link</a>` : ''}\nThe customer has been sent the tracking details.`, orderKeyboard(updated))
+          await editTelegramMessage(msgId, `✅ <b>Shipped</b> · <code>${esc(orderCode(updated))}</code>\n${esc(updated.courier_name || 'Courier')}${typeof updated.shipping_cost === 'number' ? ` · ${courierPrice(updated.shipping_cost)}` : ''} · AWB <code>${esc(updated.tracking_number || '—')}</code>${updated.label_url ? `\n<a href="${esc(updated.label_url)}">🏷️ Print shipping label</a>` : ''}${updated.tracking_link ? `\n<a href="${esc(updated.tracking_link)}">Tracking link</a>` : ''}\nThe customer has been sent the tracking details.`, orderKeyboard(updated))
         } catch (e: any) {
           await editTelegramMessage(msgId, `⚠️ Courier not booked: ${esc(e.message)}`, [[{ text: '🔁 Try again', callback_data: `os:${id}` }]])
         }

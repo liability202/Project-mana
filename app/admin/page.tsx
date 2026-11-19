@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatPrice } from '@/lib/utils'
+import { formatPrice, paymentLabel } from '@/lib/utils'
 import { MIN_PRODUCT_IMAGES, photoStatus } from '@/lib/image-utils'
 import { LoyaltyPanel } from '@/components/admin/LoyaltyPanel'
 import { TelegramAlerts } from '@/components/admin/TelegramAlerts'
@@ -29,6 +29,29 @@ type ShipFormState = {
   courier_id: string
   generate_pickup: boolean
 } | null
+
+type CourierOption = {
+  id: string
+  name: string
+  total: number
+  codCharge: number
+  deliveryDate: string | null
+  chargeableWeightGrams: number | null
+}
+
+type CourierQuote = {
+  /** The parcel the prices are for; prices go stale when it changes. */
+  key: string
+  loading: boolean
+  error: string
+  rates: CourierOption[]
+  missingSettings: string[]
+  cod: boolean
+}
+
+const parcelKey = (f: NonNullable<ShipFormState>) => [f.weight_grams, f.length_cm, f.breadth_cm, f.height_cm].join('|')
+const rupeesExact = (n: number) => `₹${n.toFixed(2).replace(/\.00$/, '')}`
+const shortDate = (ymd: string) => new Date(`${ymd}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -123,6 +146,8 @@ export default function AdminPage() {
   const [creators, setCreators] = useState<any[]>([])
   const [payouts, setPayouts] = useState<any[]>([])
   const [shipForm, setShipForm] = useState<ShipFormState>(null)
+  const [courierQuote, setCourierQuote] = useState<CourierQuote | null>(null)
+  const [shipBooked, setShipBooked] = useState<{ orderRef: string; courier: string; awb: string; label: string | null; cost: number | null } | null>(null)
   const [trackingForm, setTrackingForm] = useState<{
     id: string
     orderRef: string
@@ -332,7 +357,7 @@ export default function AdminPage() {
       ? order.items.reduce((sum: number, item: any) => sum + Number(item.weight_grams || 0) * Number(item.quantity || 1), 0) || 500
       : 500
 
-    setShipForm({
+    const form = {
       id: order.id,
       orderRef: order.order_ref || order.id.slice(0, 8).toUpperCase(),
       weight_grams: String(inferredWeight),
@@ -341,11 +366,53 @@ export default function AdminPage() {
       height_cm: '12',
       courier_id: '',
       generate_pickup: true,
-    })
+    }
+    setShipForm(form)
+    void loadCourierRates(form)
+  }
+
+  // Asks NimbusPost which couriers can take this parcel and what each costs. Books nothing.
+  const loadCourierRates = async (form: NonNullable<ShipFormState>) => {
+    const key = parcelKey(form)
+    setCourierQuote({ key, loading: true, error: '', rates: [], missingSettings: [], cod: false })
+    try {
+      const res = await fetch('/api/admin/orders/courier-rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${localStorage.getItem('mana_admin') || ''}` },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Could not get courier prices.')
+      const rates: CourierOption[] = data.rates || []
+      setCourierQuote({
+        key,
+        loading: false,
+        error: rates.length ? '' : (data.message || 'No courier delivers to this pincode.'),
+        rates,
+        missingSettings: data.missingSettings || [],
+        cod: Boolean(data.cod),
+      })
+      // Pre-select the cheapest; keep an earlier choice if it is still offered.
+      setShipForm(prev => prev ? { ...prev, courier_id: rates.some(r => r.id === prev.courier_id) ? prev.courier_id : (rates[0]?.id || '') } : prev)
+    } catch (error: any) {
+      setCourierQuote({ key, loading: false, error: error.message || 'Could not get courier prices.', rates: [], missingSettings: [], cod: false })
+    }
+  }
+
+  const closeShipForm = () => {
+    setShipForm(null)
+    setCourierQuote(null)
   }
 
   const submitShipOrder = async () => {
     if (!shipForm) return
+    const chosen = courierQuote?.rates.find(r => r.id === shipForm.courier_id)
+    if (!chosen) return
+    const ok = confirm(
+      `Book ${chosen.name} for ${rupeesExact(chosen.total)} to ship order #${shipForm.orderRef}?\n\n` +
+      'This creates a real shipment in NimbusPost and tells the customer it is on the way.'
+    )
+    if (!ok) return
     const secret = localStorage.getItem('mana_admin') || ''
     setShipLoading(true)
     try {
@@ -361,7 +428,14 @@ export default function AdminPage() {
       if (!res.ok) throw new Error(data?.error || 'Could not ship this order.')
 
       setOrders(prev => prev.map(order => order.id === data.id ? data : order))
-      setShipForm(null)
+      setShipBooked({
+        orderRef: shipForm.orderRef,
+        courier: data.courier_name || chosen.name,
+        awb: data.tracking_number || '',
+        label: data.label_url || null,
+        cost: typeof data.shipping_cost === 'number' ? data.shipping_cost : chosen.total,
+      })
+      closeShipForm()
     } catch (error: any) {
       alert(error.message || 'Could not ship this order.')
     } finally {
@@ -789,7 +863,7 @@ export default function AdminPage() {
                     </div>
                     <div className="rounded-lg bg-ivory-2 p-3">
                       <div className="text-ink-4 mb-1">Payment</div>
-                      <div className="font-medium text-ink">{isUnpaidAttempt(order) ? 'not completed' : order.payment_status}</div>
+                      <div className="font-medium text-ink">{paymentLabel(order, 'admin')}</div>
                     </div>
                   </div>
 
@@ -1758,13 +1832,13 @@ on conflict (key) do nothing;`}</pre>
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00000080] backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[520px] p-6 relative">
             <button
-              onClick={() => !shipLoading && setShipForm(null)}
+              onClick={() => !shipLoading && closeShipForm()}
               className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-ivory-2 text-ink-3 hover:text-ink hover:bg-ivory-3 transition-colors border-none cursor-pointer"
             >
               ×
             </button>
             <h3 className="font-serif text-2xl text-ink mb-1">Ship Order</h3>
-            <p className="text-sm text-ink-3 mb-5">Enter parcel details for order #{shipForm.orderRef} before creating the shipment in NimbusPost.</p>
+            <p className="text-sm text-ink-3 mb-5">Check the parcel for order #{shipForm.orderRef}, then choose the courier. Nothing is booked until you press Book.</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
@@ -1807,36 +1881,121 @@ on conflict (key) do nothing;`}</pre>
                   placeholder="12"
                 />
               </div>
-              <div>
-                <label className="text-xs text-ink-3 block mb-1.5">Courier ID (optional)</label>
-                <input
-                  value={shipForm.courier_id}
-                  onChange={e => setShipForm(prev => prev ? { ...prev, courier_id: e.target.value } : prev)}
-                  className="input"
-                  inputMode="numeric"
-                  placeholder="Auto-select fastest"
-                />
-              </div>
             </div>
 
-            <label className="flex items-center gap-3 text-sm text-ink cursor-pointer mt-4">
-              <input
-                type="checkbox"
-                checked={shipForm.generate_pickup}
-                onChange={e => setShipForm(prev => prev ? { ...prev, generate_pickup: e.target.checked } : prev)}
-                className="h-4 w-4 accent-[var(--green)]"
-              />
-              Generate pickup request immediately
-            </label>
+            {(() => {
+              const quote = courierQuote
+              const stale = !quote || quote.key !== parcelKey(shipForm)
+              const rates = quote?.rates || []
+              const fastest = [...rates].sort((a, b) => (a.deliveryDate || '9999').localeCompare(b.deliveryDate || '9999') || a.total - b.total)[0]
+              const showFastest = fastest && rates[0] && fastest.id !== rates[0].id && (fastest.deliveryDate || '') < (rates[0].deliveryDate || '9999')
+              const chosen = rates.find(r => r.id === shipForm.courier_id)
+              const blocked = !chosen || stale || Boolean(quote?.loading) || Boolean(quote?.missingSettings.length) || shipLoading
+              return (
+                <>
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs text-ink-3">
+                        Courier{quote?.cod ? ' (prices include the COD fee)' : ''}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => loadCourierRates(shipForm)}
+                        disabled={Boolean(quote?.loading) || shipLoading}
+                        className="text-xs text-green-3 hover:text-green underline bg-transparent border-none cursor-pointer p-0"
+                      >
+                        {stale && !quote?.loading ? 'Get prices for this parcel' : 'Refresh prices'}
+                      </button>
+                    </div>
 
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShipForm(null)} disabled={shipLoading} className="btn-outline flex-1 justify-center">
-                Cancel
-              </button>
-              <button onClick={submitShipOrder} disabled={shipLoading} className="btn-primary flex-1 justify-center">
-                <span>{shipLoading ? 'Shipping...' : 'Create Shipment'}</span>
+                    {quote?.loading && <div className="text-sm text-ink-3 py-3">Getting prices from NimbusPost…</div>}
+                    {!quote?.loading && stale && quote && (
+                      <div className="text-xs text-terra mb-2">The parcel changed, so prices may differ. Get prices again before booking.</div>
+                    )}
+                    {!quote?.loading && quote?.error && <div className="text-sm text-terra py-2">{quote.error}</div>}
+                    {!quote?.loading && Boolean(quote?.missingSettings.length) && (
+                      <div className="text-xs text-terra bg-ivory-2 rounded-lg p-3 mb-2">
+                        Booking is switched off until the pickup address is set up in Vercel: {quote?.missingSettings.join(', ')}.
+                      </div>
+                    )}
+
+                    {!quote?.loading && rates.length > 0 && (
+                      <div className="max-h-[260px] overflow-y-auto border border-ivory-3 rounded-lg divide-y divide-ivory-3">
+                        {rates.map((r, i) => (
+                          <label key={r.id} className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer ${shipForm.courier_id === r.id ? 'bg-ivory-2' : 'hover:bg-ivory-2'}`}>
+                            <input
+                              type="radio"
+                              name="courier"
+                              checked={shipForm.courier_id === r.id}
+                              onChange={() => setShipForm(prev => prev ? { ...prev, courier_id: r.id } : prev)}
+                              className="h-4 w-4 accent-[var(--green)] shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm text-ink flex items-center gap-1.5 flex-wrap">
+                                <span className="break-words">{r.name}</span>
+                                {i === 0 && <span className="text-[0.65rem] px-1.5 py-0.5 rounded bg-green-6 text-green-2 border border-green-5">Cheapest</span>}
+                                {showFastest && r.id === fastest.id && <span className="text-[0.65rem] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200">Fastest</span>}
+                              </div>
+                              <div className="text-xs text-ink-4">
+                                {r.deliveryDate ? `Delivery by ${shortDate(r.deliveryDate)}` : 'No delivery date given'}
+                                {r.chargeableWeightGrams ? ` · charged as ${r.chargeableWeightGrams >= 1000 ? `${r.chargeableWeightGrams / 1000} kg` : `${r.chargeableWeightGrams} g`}` : ''}
+                              </div>
+                            </div>
+                            <div className="text-sm font-medium text-ink whitespace-nowrap">{rupeesExact(r.total)}</div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <label className="flex items-center gap-3 text-sm text-ink cursor-pointer mt-4">
+                    <input
+                      type="checkbox"
+                      checked={shipForm.generate_pickup}
+                      onChange={e => setShipForm(prev => prev ? { ...prev, generate_pickup: e.target.checked } : prev)}
+                      className="h-4 w-4 accent-[var(--green)]"
+                    />
+                    Ask the courier to come and pick it up
+                  </label>
+
+                  <div className="flex gap-3 mt-6">
+                    <button onClick={closeShipForm} disabled={shipLoading} className="btn-outline flex-1 justify-center">
+                      Cancel
+                    </button>
+                    <button onClick={submitShipOrder} disabled={blocked} className="btn-primary flex-1 justify-center disabled:opacity-50">
+                      <span>{shipLoading ? 'Booking…' : chosen ? `Book ${chosen.name.length > 18 ? 'courier' : chosen.name} · ${rupeesExact(chosen.total)}` : 'Choose a courier'}</span>
+                    </button>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+
+      {shipBooked && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#00000080] backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[440px] p-6">
+            <h3 className="font-serif text-2xl text-ink mb-1">Courier booked</h3>
+            <p className="text-sm text-ink-3 mb-4">
+              Order #{shipBooked.orderRef} is booked with <b>{shipBooked.courier}</b>
+              {shipBooked.cost !== null ? <> for {rupeesExact(shipBooked.cost)}</> : null}. The customer has been sent the tracking details.
+            </p>
+            <div className="rounded-lg bg-ivory-2 p-3 text-sm mb-4">
+              <div className="text-ink-4 text-xs mb-1">AWB / tracking number</div>
+              <div className="font-medium text-ink break-all">{shipBooked.awb || 'Not given'}</div>
+            </div>
+            <div className="flex gap-3">
+              {shipBooked.label && (
+                <a href={shipBooked.label} target="_blank" rel="noopener noreferrer" className="btn-primary flex-1 justify-center">
+                  <span>Print shipping label</span>
+                </a>
+              )}
+              <button onClick={() => setShipBooked(null)} className="btn-outline flex-1 justify-center">
+                Done
               </button>
             </div>
+            {shipBooked.label && <p className="text-xs text-ink-4 mt-3">You can also download the label later from the NimbusPost dashboard.</p>}
           </div>
         </div>
       )}

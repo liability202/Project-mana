@@ -46,18 +46,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `This order is already ${order.status}.` }, { status: 409 })
     }
 
-    const shipmentUpdate = await buildNimbusShipmentUpdate(order, {
+    const result = await buildNimbusShipmentUpdate(order, {
       weightGrams,
       lengthCm,
       breadthCm,
       heightCm,
-      courierId: body.courier_id ? Number(body.courier_id) : null,
+      // NimbusPost courier ids are text (e.g. "6a4ceb5f47ce..."). Empty = cheapest.
+      courierId: String(body.courier_id || '').trim() || null,
       generatePickup: body.generate_pickup !== false,
     })
 
-    if (!shipmentUpdate) {
+    if (!result) {
       return NextResponse.json({ error: 'Could not create shipment in NimbusPost.' }, { status: 500 })
     }
+    const shipmentUpdate = result.update
 
     // No AWB means nothing was booked: keep what NimbusPost told us, but don't
     // mark the order shipped or tell the customer it is on the way.
@@ -81,12 +83,14 @@ export async function POST(req: Request) {
       .eq('status', order.status)
       .select('*')
 
+    // The courier is already booked at this point, so never lose the AWB.
+    const bookedNote = `The courier WAS booked (AWB ${shipmentUpdate.tracking_number}${result.label ? `, label: ${result.label}` : ''}). Do not book again; add the tracking details by hand.`
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return NextResponse.json({ error: `${updateError.message}. ${bookedNote}` }, { status: 500 })
     }
     const updated = updatedRows?.[0]
     if (!updated) {
-      return NextResponse.json({ error: 'This order was just updated by someone else. Please refresh.' }, { status: 409 })
+      return NextResponse.json({ error: `This order was just updated by someone else. ${bookedNote}` }, { status: 409 })
     }
 
     if (updated.customer_email) {
@@ -112,7 +116,12 @@ export async function POST(req: Request) {
       sendWhatsAppMessage(updated.customer_phone, msg).catch(console.error)
     }
 
-    return NextResponse.json(updated)
+    return NextResponse.json({
+      ...updated,
+      // Not stored on the order; shown once so the label can be printed.
+      label_url: result.label,
+      shipping_cost: result.rate?.total ?? null,
+    })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Could not ship order.' }, { status: 500 })
   }

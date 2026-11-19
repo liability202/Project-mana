@@ -1,22 +1,20 @@
 import type { Order } from '@/lib/supabase'
 
-// NimbusPost setup:
-// NIMBUSPOST_API_KEY=
-// or
-// NIMBUSPOST_EMAIL=
+// NimbusPost setup (API docs: documenter.getpostman.com/view/9692837/TW6wHnoz):
+// NIMBUSPOST_EMAIL=            login for the API token
 // NIMBUSPOST_PASSWORD=
-// Required:
-// NIMBUSPOST_PICKUP_LOCATION=
+// NIMBUSPOST_PICKUP_LOCATION=  warehouse name as saved in NimbusPost (max 20 chars)
 // NIMBUSPOST_PICKUP_POSTCODE=
+// Needed to book shipments (NimbusPost wants the full pickup address each time):
+// NIMBUSPOST_PICKUP_NAME=      contact person / business name
+// NIMBUSPOST_PICKUP_ADDRESS=
+// NIMBUSPOST_PICKUP_ADDRESS_2= (optional)
+// NIMBUSPOST_PICKUP_CITY=
+// NIMBUSPOST_PICKUP_STATE=
+// NIMBUSPOST_PICKUP_PHONE=     10 digits
 // Optional:
+// NIMBUSPOST_API_KEY=          a ready-made bearer token instead of email/password
 // NIMBUSPOST_BASE_URL=https://api.nimbuspost.com/v1
-// NIMBUSPOST_FALLBACK_EMAIL=orders@yourdomain.com
-// NIMBUSPOST_AUTH_PATH=/auth/login
-// NIMBUSPOST_SERVICEABILITY_PATH=/courier/serviceability
-// NIMBUSPOST_CREATE_SHIPMENT_PATH=/shipments
-// NIMBUSPOST_ASSIGN_AWB_PATH=/shipments/assign-awb
-// NIMBUSPOST_PICKUP_PATH=/shipments/generate-pickup
-// NIMBUSPOST_TRACKING_PATH=/shipments/track/:awb
 
 const NIMBUSPOST_BASE_URL = (process.env.NIMBUSPOST_BASE_URL || 'https://api.nimbuspost.com/v1').replace(/\/+$/, '')
 const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
@@ -26,8 +24,6 @@ const PATHS = {
   auth: process.env.NIMBUSPOST_AUTH_PATH || '/users/login',
   serviceability: process.env.NIMBUSPOST_SERVICEABILITY_PATH || '/courier/serviceability',
   createShipment: process.env.NIMBUSPOST_CREATE_SHIPMENT_PATH || '/shipments',
-  assignAwb: process.env.NIMBUSPOST_ASSIGN_AWB_PATH || '/shipments/assign-awb',
-  pickup: process.env.NIMBUSPOST_PICKUP_PATH || '/shipments/generate-pickup',
   tracking: process.env.NIMBUSPOST_TRACKING_PATH || '/shipments/track/:awb',
 }
 
@@ -35,10 +31,6 @@ let cachedToken: { token: string; expiresAt: number } | null = null
 
 function normalizeMoney(amountPaise: number) {
   return Number((amountPaise / 100).toFixed(2))
-}
-
-function normalizeWeightKg(weightGrams: number) {
-  return Math.max(0.1, Number((weightGrams / 1000).toFixed(2)))
 }
 
 function calculateOrderWeightGrams(items: any[] = []) {
@@ -91,22 +83,6 @@ function extractErrorMessage(data: any, fallback: string) {
     data?.errors?.[0]?.message ||
     fallback
   )
-}
-
-function parseEtdDays(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string') {
-    const match = value.match(/\d+/)
-    if (match) return Number(match[0])
-  }
-  return null
-}
-
-function formatEstimatedDate(days: number | null) {
-  if (!days && days !== 0) return null
-  const date = new Date()
-  date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 10)
 }
 
 function getCourierOptions(data: any): any[] {
@@ -193,11 +169,83 @@ async function nimbusFetch(path: string, init: RequestInit = {}) {
   return data
 }
 
+// ── rates ──
+
+/** One courier NimbusPost offers for a parcel, with its price in rupees. */
+export type CourierRate = {
+  id: string
+  name: string
+  freight: number
+  codCharge: number
+  total: number
+  /** YYYY-MM-DD */
+  deliveryDate: string | null
+  minWeightGrams: number | null
+  chargeableWeightGrams: number | null
+}
+
+function toNumber(value: unknown) {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function toCourierRate(raw: any): CourierRate | null {
+  const id = String(raw?.id ?? raw?.courier_id ?? '').trim()
+  if (!id) return null
+  const freight = toNumber(raw?.freight_charges) ?? 0
+  const codCharge = toNumber(raw?.cod_charges) ?? 0
+  return {
+    id,
+    name: String(raw?.name || raw?.courier_name || 'Courier').trim(),
+    freight,
+    codCharge,
+    total: toNumber(raw?.total_charges) ?? freight + codCharge,
+    deliveryDate: normalizeDateOnly(raw?.edd ?? raw?.etd ?? raw?.expected_delivery_date),
+    minWeightGrams: toNumber(raw?.min_weight),
+    chargeableWeightGrams: toNumber(raw?.chargeable_weight),
+  }
+}
+
+const byPriceThenDate = (a: CourierRate, b: CourierRate) =>
+  a.total - b.total || (a.deliveryDate || '9999').localeCompare(b.deliveryDate || '9999')
+
+export type ParcelSize = { weightGrams: number; lengthCm?: number; breadthCm?: number; heightCm?: number }
+
+/** Every courier that can take this parcel, cheapest first. Books nothing. */
+export async function getNimbusCourierRates(params: ParcelSize & {
+  deliveryPincode: string
+  cod: boolean
+  orderAmountPaise?: number
+}): Promise<{ rates: CourierRate[]; message: string | null }> {
+  const data = await nimbusFetch(PATHS.serviceability, {
+    method: 'POST',
+    body: JSON.stringify({
+      origin: process.env.NIMBUSPOST_PICKUP_POSTCODE || '',
+      destination: params.deliveryPincode,
+      payment_type: params.cod ? 'cod' : 'prepaid',
+      order_amount: params.orderAmountPaise ? normalizeMoney(params.orderAmountPaise) : 500,
+      weight: Math.max(1, Math.round(params.weightGrams)),
+      length: Math.max(1, Math.round(Number(params.lengthCm) || 10)),
+      breadth: Math.max(1, Math.round(Number(params.breadthCm) || 10)),
+      height: Math.max(1, Math.round(Number(params.heightCm) || 10)),
+    }),
+  })
+
+  const rates = getCourierOptions(data)
+    .map(toCourierRate)
+    .filter((r): r is CourierRate => Boolean(r))
+    .sort(byPriceThenDate)
+  return {
+    rates,
+    message: rates.length ? null : extractErrorMessage(data, 'No courier delivers to this pincode.'),
+  }
+}
+
 type ServiceabilityResult = {
   configured: boolean
   serviceable: boolean | null
   courierName: string | null
-  courierId: number | null
+  courierId: string | null
   etdDays: number | null
   estimatedDeliveryDate: string | null
   availableCourierCount: number
@@ -206,78 +254,114 @@ type ServiceabilityResult = {
   message?: string
 }
 
+/** The customer-facing pincode check: can we deliver, and by when. */
 export async function getNimbusPostServiceability(params: {
   deliveryPincode: string
   weightGrams: number
   cod: boolean
-}) {
+}): Promise<ServiceabilityResult> {
+  const empty = {
+    courierName: null,
+    courierId: null,
+    etdDays: null,
+    estimatedDeliveryDate: null,
+    availableCourierCount: 0,
+    freightCharge: null,
+  }
   if (!hasNimbusPostConfig()) {
-    return {
-      configured: false,
-      serviceable: null,
-      courierName: null,
-      courierId: null,
-      etdDays: null,
-      estimatedDeliveryDate: null,
-      availableCourierCount: 0,
-      codAvailable: null,
-      freightCharge: null,
-      message: 'NimbusPost is not configured yet.',
-    } satisfies ServiceabilityResult
+    return { ...empty, configured: false, serviceable: null, codAvailable: null, message: 'NimbusPost is not configured yet.' }
   }
 
-  const data = await nimbusFetch(PATHS.serviceability, {
-    method: 'POST',
-    body: JSON.stringify({
-      origin: process.env.NIMBUSPOST_PICKUP_POSTCODE || '',
-      destination: params.deliveryPincode,
-      payment_type: params.cod ? 'cod' : 'prepaid',
-      weight: Math.max(1, Math.round(params.weightGrams)),
-      order_amount: 500,
-    }),
-  })
-
-  const companies = getCourierOptions(data)
-
-  if (!companies.length) {
+  const { rates, message } = await getNimbusCourierRates(params)
+  if (!rates.length) {
     return {
+      ...empty,
       configured: true,
       serviceable: false,
-      courierName: null,
-      courierId: null,
-      etdDays: null,
-      estimatedDeliveryDate: null,
-      availableCourierCount: 0,
       codAvailable: params.cod ? false : true,
-      freightCharge: null,
-      message: extractErrorMessage(data, 'Delivery is not available on this pincode.'),
-    } satisfies ServiceabilityResult
+      message: message || 'Delivery is not available on this pincode.',
+    }
   }
 
-  const ranked = [...companies].sort((left, right) => {
-    const leftDays = parseEtdDays(left?.estimated_delivery_days ?? left?.etd ?? left?.edd_days) ?? 999
-    const rightDays = parseEtdDays(right?.estimated_delivery_days ?? right?.etd ?? right?.edd_days) ?? 999
-    return leftDays - rightDays
-  })
-
-  const best = ranked[0]
-  const etdDays = parseEtdDays(best?.estimated_delivery_days ?? best?.etd ?? best?.edd_days)
-  const estimatedDeliveryDate =
-    normalizeDateOnly(best?.etd || best?.edd || best?.estimated_delivery_date || best?.expected_delivery_date) ||
-    formatEstimatedDate(etdDays)
+  // Quote the earliest date any courier offers, priced by the cheapest one on that date.
+  const fastest = [...rates].sort(
+    (a, b) => (a.deliveryDate || '9999').localeCompare(b.deliveryDate || '9999') || a.total - b.total
+  )[0]
+  const etdDays = fastest.deliveryDate
+    ? Math.max(0, Math.round((Date.parse(`${fastest.deliveryDate}T00:00:00+05:30`) - Date.now()) / 86_400_000))
+    : null
 
   return {
     configured: true,
     serviceable: true,
-    courierName: best?.courier_name || best?.channel_courier_name || best?.name || null,
-    courierId: Number(best?.courier_company_id || best?.courier_id || best?.id || 0) || null,
+    courierName: fastest.name,
+    courierId: fastest.id,
     etdDays,
-    estimatedDeliveryDate,
-    availableCourierCount: companies.length,
-    codAvailable: typeof best?.cod === 'number' ? Boolean(best.cod) : params.cod,
-    freightCharge: typeof best?.rate === 'number' ? best.rate : Number(best?.total_charges || best?.freight_charges || best?.freight_charge || best?.charge || 0) || null,
-    message: companies.length > 1 ? `${companies.length} courier options available.` : 'Delivery is available.',
-  } satisfies ServiceabilityResult
+    estimatedDeliveryDate: fastest.deliveryDate,
+    availableCourierCount: rates.length,
+    codAvailable: params.cod,
+    freightCharge: fastest.total,
+    message: rates.length > 1 ? `${rates.length} courier options available.` : 'Delivery is available.',
+  }
+}
+
+// ── booking ──
+
+const digits10 = (value: unknown) => String(value || '').replace(/\D/g, '').slice(-10)
+
+/** Settings NimbusPost needs for the pickup address that aren't filled in yet. */
+export function missingPickupSettings() {
+  const required: Record<string, string | undefined> = {
+    NIMBUSPOST_PICKUP_LOCATION: process.env.NIMBUSPOST_PICKUP_LOCATION,
+    NIMBUSPOST_PICKUP_NAME: process.env.NIMBUSPOST_PICKUP_NAME,
+    NIMBUSPOST_PICKUP_ADDRESS: process.env.NIMBUSPOST_PICKUP_ADDRESS,
+    NIMBUSPOST_PICKUP_CITY: process.env.NIMBUSPOST_PICKUP_CITY,
+    NIMBUSPOST_PICKUP_STATE: process.env.NIMBUSPOST_PICKUP_STATE,
+    NIMBUSPOST_PICKUP_POSTCODE: process.env.NIMBUSPOST_PICKUP_POSTCODE,
+  }
+  const missing = Object.entries(required)
+    .filter(([, v]) => !String(v || '').trim())
+    .map(([k]) => k)
+  if (digits10(process.env.NIMBUSPOST_PICKUP_PHONE).length !== 10) missing.push('NIMBUSPOST_PICKUP_PHONE')
+  return missing
+}
+
+function pickupAddress() {
+  const missing = missingPickupSettings()
+  if (missing.length) {
+    throw new Error(`The pickup address is not set up yet (${missing.join(', ')}). Nothing was booked.`)
+  }
+  const env = process.env
+  return {
+    warehouse_name: String(env.NIMBUSPOST_PICKUP_LOCATION).slice(0, 20),
+    name: String(env.NIMBUSPOST_PICKUP_NAME).slice(0, 200),
+    address: String(env.NIMBUSPOST_PICKUP_ADDRESS).slice(0, 200),
+    address_2: String(env.NIMBUSPOST_PICKUP_ADDRESS_2 || '').slice(0, 200),
+    city: String(env.NIMBUSPOST_PICKUP_CITY).slice(0, 40),
+    state: String(env.NIMBUSPOST_PICKUP_STATE).slice(0, 40),
+    pincode: String(env.NIMBUSPOST_PICKUP_POSTCODE),
+    phone: digits10(env.NIMBUSPOST_PICKUP_PHONE),
+  }
+}
+
+/** Splits a long address over NimbusPost's two 200-character lines. */
+function splitAddress(address: string) {
+  const text = address.replace(/\s+/g, ' ').trim()
+  if (text.length <= 200) return { address: text, address_2: '' }
+  const space = text.lastIndexOf(' ', 200)
+  const cut = space > 120 ? space : 200
+  return { address: text.slice(0, cut).trim(), address_2: text.slice(cut).trim().slice(0, 200) }
+}
+
+/** "Ashwagandha Powder", not "Ashwagandha Powder - Powder". */
+function itemName(item: any, index: number) {
+  const base = String(item.product_name || item.name || `Item ${index + 1}`).trim()
+  const variant = String(item.variant_name || '').trim()
+  return (variant && !base.toLowerCase().includes(variant.toLowerCase()) ? `${base} - ${variant}` : base).slice(0, 200)
+}
+
+export function isCodOrder(order: { payment_status?: string | null }) {
+  return order.payment_status !== 'paid'
 }
 
 export type NimbusParcelInput = {
@@ -285,67 +369,84 @@ export type NimbusParcelInput = {
   lengthCm?: number
   breadthCm?: number
   heightCm?: number
-  courierId?: number | null
+  /** A courier id from getNimbusCourierRates. Empty means the cheapest one. */
+  courierId?: string | null
   generatePickup?: boolean
 }
 
-export async function createNimbusShipment(order: Order, parcel?: NimbusParcelInput) {
-  const orderCode = order.order_ref || sanitizeCode(order.id.slice(0, 8))
-  const weightGrams = Math.max(100, Number(parcel?.weightGrams || 0) || calculateOrderWeightGrams(order.items))
+export type NimbusBooking = {
+  orderId: string | null
+  shipmentId: string | null
+  awb: string | null
+  courierId: string | null
+  courierName: string | null
+  label: string | null
+  manifest: string | null
+}
+
+/** Books the parcel with NimbusPost and returns the AWB. This costs money. */
+export async function createNimbusShipment(
+  order: Order,
+  parcel: NimbusParcelInput & { courierId: string }
+): Promise<NimbusBooking> {
+  const orderCode = (order.order_ref || sanitizeCode(order.id.slice(0, 8))).slice(0, 20)
+  const weightGrams = Math.max(100, Math.round(Number(parcel.weightGrams || 0) || calculateOrderWeightGrams(order.items)))
+  const consigneePhone = digits10(order.customer_phone)
+  if (consigneePhone.length !== 10) {
+    throw new Error('The customer phone number is not a valid 10-digit number. Nothing was booked.')
+  }
+  if (!/^\d{6}$/.test(String(order.pincode || ''))) {
+    throw new Error('The delivery pincode is not 6 digits. Nothing was booked.')
+  }
 
   const payload = {
     order_number: orderCode,
-    order_reference_number: orderCode,
+    payment_type: isCodOrder(order) ? 'cod' : 'prepaid',
+    // What the courier collects on a COD order, so it must be the customer's final total.
     order_amount: normalizeMoney(order.final_amount || order.total),
-    payment_type: order.payment_status === 'paid' ? 'prepaid' : 'cod',
-    package_weight: normalizeWeightKg(weightGrams),
-    package_length: Math.max(1, Number(parcel?.lengthCm || 20)),
-    package_breadth: Math.max(1, Number(parcel?.breadthCm || 15)),
-    package_height: Math.max(1, Number(parcel?.heightCm || 12)),
-    pickup_location: process.env.NIMBUSPOST_PICKUP_LOCATION,
-    pickup_pincode: process.env.NIMBUSPOST_PICKUP_POSTCODE,
+    package_weight: weightGrams,
+    package_length: Math.max(1, Math.round(Number(parcel.lengthCm) || 20)),
+    package_breadth: Math.max(1, Math.round(Number(parcel.breadthCm) || 15)),
+    package_height: Math.max(1, Math.round(Number(parcel.heightCm) || 12)),
+    request_auto_pickup: parcel.generatePickup === false ? 'no' : 'yes',
     consignee: {
-      name: order.customer_name,
-      phone: order.customer_phone,
-      email: order.customer_email || process.env.NIMBUSPOST_FALLBACK_EMAIL || 'orders@mana.local',
-      address: order.address,
-      city: order.city,
-      state: order.state || 'NA',
-      pincode: order.pincode,
-      country: 'India',
+      name: String(order.customer_name || 'Customer').slice(0, 200),
+      ...splitAddress(String(order.address || '')),
+      city: String(order.city || '').slice(0, 40),
+      state: String(order.state || order.city || '').slice(0, 40),
+      pincode: String(order.pincode),
+      phone: consigneePhone,
     },
-    items: (order.items || []).map((item: any, index: number) => ({
-      name: item.product_name || item.name || `Item ${index + 1}`,
-      sku: sanitizeCode(item.product_id || `${orderCode}-${index + 1}`),
-      units: Math.max(1, Number(item.quantity || 1)),
-      selling_price: normalizeMoney(Number(item.price || 0)),
+    pickup: pickupAddress(),
+    order_items: (order.items || []).map((item: any, index: number) => ({
+      name: itemName(item, index),
+      qty: String(Math.max(1, Number(item.quantity || 1))),
+      price: String(normalizeMoney(Number(item.price || 0))),
+      sku: sanitizeCode(String(item.product_id || `${orderCode}-${index + 1}`)).slice(0, 40),
     })),
+    courier_id: parcel.courierId,
+    is_insurance: '0',
+    tags: 'manadryfruits.com',
   }
 
-  return nimbusFetch(PATHS.createShipment, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  })
+  const data = await nimbusFetch(PATHS.createShipment, { method: 'POST', body: JSON.stringify(payload) })
+  if (data?.status === false || !data?.data) {
+    throw new Error(`NimbusPost refused the booking: ${extractErrorMessage(data, 'no reason given')}. Nothing was booked.`)
+  }
+  const d = data.data
+  const text = (v: unknown) => (v === null || v === undefined || v === '' ? null : String(v))
+  return {
+    orderId: text(d.order_id),
+    shipmentId: text(d.shipment_id),
+    awb: text(d.awb_number),
+    courierId: text(d.courier_id),
+    courierName: text(d.courier_name),
+    label: text(d.label),
+    manifest: text(d.manifest),
+  }
 }
 
-export async function assignNimbusAwb(params: { shipmentId: number | string; courierId?: number | null }) {
-  return nimbusFetch(PATHS.assignAwb, {
-    method: 'POST',
-    body: JSON.stringify({
-      shipment_id: Number(params.shipmentId),
-      courier_id: params.courierId ? Number(params.courierId) : undefined,
-    }),
-  })
-}
-
-export async function generateNimbusPickup(params: { shipmentId: number | string }) {
-  return nimbusFetch(PATHS.pickup, {
-    method: 'POST',
-    body: JSON.stringify({
-      shipment_id: Number(params.shipmentId),
-    }),
-  })
-}
+// ── tracking ──
 
 export async function trackNimbusAwb(awbCode: string) {
   const data = await nimbusFetch(withAwb(PATHS.tracking, awbCode), {
@@ -353,23 +454,25 @@ export async function trackNimbusAwb(awbCode: string) {
   })
 
   const trackingData = data?.tracking_data || data?.data || data
-  const shipmentTrack = Array.isArray(trackingData?.shipment_track)
-    ? trackingData.shipment_track
-    : Array.isArray(trackingData?.shipment_track_activities)
-      ? trackingData.shipment_track_activities
-      : Array.isArray(trackingData?.activities)
-        ? trackingData.activities
-        : Array.isArray(trackingData?.events)
-          ? trackingData.events
-          : []
+  const shipmentTrack = Array.isArray(trackingData?.history)
+    ? trackingData.history
+    : Array.isArray(trackingData?.shipment_track)
+      ? trackingData.shipment_track
+      : Array.isArray(trackingData?.shipment_track_activities)
+        ? trackingData.shipment_track_activities
+        : Array.isArray(trackingData?.activities)
+          ? trackingData.activities
+          : Array.isArray(trackingData?.events)
+            ? trackingData.events
+            : []
 
   const latestTrack = shipmentTrack[0] || trackingData?.shipment_status || {}
   const currentStatus =
     trackingData?.track_status?.current_status ||
+    trackingData?.status ||
     latestTrack?.current_status ||
     latestTrack?.status ||
     trackingData?.current_status ||
-    trackingData?.status ||
     null
 
   return {
@@ -387,101 +490,90 @@ export async function trackNimbusAwb(awbCode: string) {
   }
 }
 
-export async function buildNimbusShipmentUpdate(order: Order, parcel?: NimbusParcelInput) {
+// ── ship an order ──
+
+export type NimbusShipResult = {
+  /** Columns to save on the order. */
+  update: Record<string, any>
+  /** The courier that was booked, with the price NimbusPost quoted. */
+  rate: CourierRate | null
+  label: string | null
+}
+
+/**
+ * Books an order with the chosen courier (or the cheapest if none is chosen)
+ * and returns what to save on the order. An order that already has an AWB is
+ * only re-synced, never booked twice.
+ */
+export async function buildNimbusShipmentUpdate(order: Order, parcel: NimbusParcelInput = {}): Promise<NimbusShipResult | null> {
   if (!hasNimbusPostConfig()) return null
 
   const orderRef = order.order_ref || sanitizeCode(order.id.slice(0, 8))
-  const trackingLink = getPublicTrackingUrl(orderRef, order.customer_phone, order.tracking_number)
 
   if (order.tracking_number) {
     const tracking = await trackNimbusAwb(order.tracking_number)
     return {
-      tracking_number: order.tracking_number,
-      tracking_link: trackingLink,
-      courier_name: tracking.courierName || order.courier_name || null,
-      expected_delivery: tracking.expectedDelivery || order.expected_delivery || null,
-      shiprocket_tracking_status: tracking.currentStatus || null,
-      tracking_events: tracking.activities || [],
-      tracking_synced_at: new Date().toISOString(),
+      rate: null,
+      label: null,
+      update: {
+        tracking_number: order.tracking_number,
+        tracking_link: getPublicTrackingUrl(orderRef, order.customer_phone, order.tracking_number),
+        courier_name: tracking.courierName || order.courier_name || null,
+        expected_delivery: tracking.expectedDelivery || order.expected_delivery || null,
+        shiprocket_tracking_status: tracking.currentStatus || null,
+        tracking_events: tracking.activities || [],
+        tracking_synced_at: new Date().toISOString(),
+      },
     }
   }
 
-  const serviceability = await getNimbusPostServiceability({
+  const weightGrams = Math.max(100, Number(parcel.weightGrams || 0) || calculateOrderWeightGrams(order.items))
+  const { rates } = await getNimbusCourierRates({
     deliveryPincode: order.pincode,
-    weightGrams: Math.max(100, Number(parcel?.weightGrams || 0) || calculateOrderWeightGrams(order.items)),
-    cod: order.payment_status !== 'paid',
+    cod: isCodOrder(order),
+    orderAmountPaise: order.final_amount || order.total,
+    weightGrams,
+    lengthCm: parcel.lengthCm,
+    breadthCm: parcel.breadthCm,
+    heightCm: parcel.heightCm,
   })
 
-  if (!serviceability.serviceable) {
+  if (!rates.length) {
     return {
-      tracking_link: trackingLink,
-      shiprocket_tracking_status: 'UNSERVICEABLE',
-      tracking_synced_at: new Date().toISOString(),
+      rate: null,
+      label: null,
+      update: {
+        tracking_link: getPublicTrackingUrl(orderRef, order.customer_phone, null),
+        shiprocket_tracking_status: 'UNSERVICEABLE',
+        tracking_synced_at: new Date().toISOString(),
+      },
     }
   }
 
-  const created = await createNimbusShipment(order, parcel)
-  const shipmentId =
-    created?.shipment_id ||
-    created?.data?.shipment_id ||
-    created?.data?.id ||
-    created?.shipment?.id ||
-    created?.id ||
-    null
-
-  const providerOrderId =
-    created?.order_id ||
-    created?.data?.order_id ||
-    created?.data?.order_number ||
-    created?.shipment?.order_id ||
-    null
-
-  let awbCode: string | null = null
-  let courierName = serviceability.courierName
-
-  if (shipmentId) {
-    const awbResponse = await assignNimbusAwb({
-      shipmentId,
-      courierId: Number(parcel?.courierId || serviceability.courierId || 0) || undefined,
-    })
-
-    awbCode =
-      awbResponse?.awb_code ||
-      awbResponse?.data?.awb_code ||
-      awbResponse?.shipment?.awb_code ||
-      awbResponse?.tracking_number ||
-      awbResponse?.data?.tracking_number ||
-      null
-
-    courierName =
-      awbResponse?.courier_name ||
-      awbResponse?.data?.courier_name ||
-      awbResponse?.shipment?.courier_name ||
-      courierName
-
-    if (parcel?.generatePickup !== false) {
-      await generateNimbusPickup({ shipmentId }).catch(console.error)
-    }
+  const wanted = String(parcel.courierId || '').trim()
+  const rate = wanted ? rates.find(r => r.id === wanted) : rates[0]
+  if (!rate) {
+    throw new Error('That courier is no longer offered for this parcel. Check the couriers again. Nothing was booked.')
   }
+
+  const booking = await createNimbusShipment(order, { ...parcel, weightGrams, courierId: rate.id })
 
   let tracking = null
-  if (awbCode) {
-    tracking = await trackNimbusAwb(awbCode).catch(() => null)
-  }
+  if (booking.awb) tracking = await trackNimbusAwb(booking.awb).catch(() => null)
 
   return {
-    shiprocket_order_id: providerOrderId ? String(providerOrderId) : null,
-    shiprocket_shipment_id: shipmentId ? String(shipmentId) : null,
-    tracking_number: awbCode,
-    tracking_link: getPublicTrackingUrl(orderRef, order.customer_phone, awbCode),
-    courier_name: tracking?.courierName || courierName || null,
-    expected_delivery:
-      tracking?.expectedDelivery ||
-      serviceability.estimatedDeliveryDate ||
-      order.expected_delivery ||
-      null,
-    shiprocket_tracking_status: tracking?.currentStatus || 'AWB_ASSIGNED',
-    tracking_events: tracking?.activities || [],
-    tracking_synced_at: new Date().toISOString(),
+    rate,
+    label: booking.label,
+    update: {
+      shiprocket_order_id: booking.orderId,
+      shiprocket_shipment_id: booking.shipmentId,
+      tracking_number: booking.awb,
+      tracking_link: getPublicTrackingUrl(orderRef, order.customer_phone, booking.awb),
+      courier_name: booking.courierName || rate.name,
+      expected_delivery: tracking?.expectedDelivery || rate.deliveryDate || order.expected_delivery || null,
+      shiprocket_tracking_status: tracking?.currentStatus || 'booked',
+      tracking_events: tracking?.activities || [],
+      tracking_synced_at: new Date().toISOString(),
+    },
   }
 }
